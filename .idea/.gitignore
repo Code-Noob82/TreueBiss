@@ -12,10 +12,6 @@ local.properties
 app/build/
 captures/
 
-# Gradle Wrapper logs
-.gradle/
-.gradle/*
-
 # Keystore files
 *.jks
 *.keystore
