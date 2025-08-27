@@ -1,7 +1,7 @@
-package com.dominikbaki.treuebiss.domain.usecases
+package com.dominikbaki.treuebiss.core.domain.usecases
 
-import com.dominikbaki.treuebiss.domain.model.WeatherData
-import com.dominikbaki.treuebiss.domain.repository.WeatherRepository
+import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
+import com.dominikbaki.treuebiss.feature_weather.domain.repository.WeatherRepository
 import javax.inject.Inject
 
 /**

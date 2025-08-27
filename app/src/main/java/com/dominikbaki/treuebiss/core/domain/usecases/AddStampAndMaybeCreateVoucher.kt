@@ -1,9 +1,10 @@
-package com.dominikbaki.treuebiss.domain.usecases
+package com.dominikbaki.treuebiss.core.domain.usecases
 
-import com.dominikbaki.treuebiss.domain.model.Stamp
-import com.dominikbaki.treuebiss.domain.model.Voucher
-import com.dominikbaki.treuebiss.domain.repository.StampRepository
-import com.dominikbaki.treuebiss.domain.repository.VoucherRepository
+import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
+import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
+import com.dominikbaki.treuebiss.feature_stamps.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
+import java.util.UUID
 
 class AddStampAndMaybeCreateVoucher(
     private val stampRepo: StampRepository,
@@ -16,7 +17,7 @@ class AddStampAndMaybeCreateVoucher(
         if (total % 10 == 0) {
             voucherRepo.create(
                 Voucher(
-                    id = java.util.UUID.randomUUID().toString(),
+                    id = UUID.randomUUID().toString(),
                     title = "Gratis Produkt",
                     description = "10 Stempel gesammelt",
                     createdAt = time()

@@ -7,7 +7,7 @@
 //import com.dominikbaki.treuebiss.data.remote.datasource.SupabaseStampDataSource
 //import com.dominikbaki.treuebiss.data.util.DeviceIdProvider
 //import com.dominikbaki.treuebiss.data.util.TenantProvider
-//import com.dominikbaki.treuebiss.domain.model.Stamp
+//import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 //import com.dominikbaki.treuebiss.domain.repository.StampRepository
 //import kotlinx.coroutines.Dispatchers
 //import kotlinx.coroutines.flow.Flow

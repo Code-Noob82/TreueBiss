@@ -1,6 +1,6 @@
-package com.dominikbaki.treuebiss.domain.repository
+package com.dominikbaki.treuebiss.feature_vouchers.domain.repository
 
-import com.dominikbaki.treuebiss.domain.model.Voucher
+import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
 import kotlinx.coroutines.flow.Flow
 
 /**

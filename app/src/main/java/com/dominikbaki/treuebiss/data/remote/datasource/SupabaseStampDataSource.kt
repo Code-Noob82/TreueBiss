@@ -1,6 +1,6 @@
 package com.dominikbaki.treuebiss.data.remote.datasource
 
-import com.dominikbaki.treuebiss.domain.model.Stamp
+import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 
 // Platzhalter für die Supabase Datenquelle
 interface SupabaseStampDataSource {

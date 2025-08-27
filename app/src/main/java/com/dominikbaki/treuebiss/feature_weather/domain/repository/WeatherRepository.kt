@@ -1,6 +1,6 @@
-package com.dominikbaki.treuebiss.domain.repository
+package com.dominikbaki.treuebiss.feature_weather.domain.repository
 
-import com.dominikbaki.treuebiss.domain.model.WeatherData
+import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
 
 /**
  * Port für das Abrufen von Wetterdaten.

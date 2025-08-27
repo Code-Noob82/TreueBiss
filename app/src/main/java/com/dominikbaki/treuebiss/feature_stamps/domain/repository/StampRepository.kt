@@ -1,6 +1,6 @@
-package com.dominikbaki.treuebiss.domain.repository
+package com.dominikbaki.treuebiss.feature_stamps.domain.repository
 
-import com.dominikbaki.treuebiss.domain.model.Stamp
+import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 import kotlinx.coroutines.flow.Flow
 
 /**

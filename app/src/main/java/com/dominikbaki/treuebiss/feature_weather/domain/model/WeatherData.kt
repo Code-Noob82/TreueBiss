@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.domain.model
+package com.dominikbaki.treuebiss.feature_weather.domain.model
 
 /**
  * Repräsentiert die Wetterdaten.
@@ -6,5 +6,6 @@ package com.dominikbaki.treuebiss.domain.model
 data class WeatherData(
     val city: String,
     val temperatureCelsius: Double,
-    val description: String
+    val description: String,
+    val iconUrl: String
 )
