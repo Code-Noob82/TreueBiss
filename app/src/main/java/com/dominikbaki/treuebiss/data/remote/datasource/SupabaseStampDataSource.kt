@@ -1,0 +1,8 @@
+package com.dominikbaki.treuebiss.data.remote.datasource
+
+import com.dominikbaki.treuebiss.domain.model.Stamp
+
+// Platzhalter für die Supabase Datenquelle
+interface SupabaseStampDataSource {
+    suspend fun upsert(stamp: Stamp, deviceId: String, tenantId: String)
+}
