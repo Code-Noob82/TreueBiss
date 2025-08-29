@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeScreen
+import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScreen
 import com.dominikbaki.treuebiss.feature_stamps.presentation.StampCardScreen
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherScreen
 
@@ -15,11 +16,11 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Home,
+        startDestination = Screen.Onboarding,
         modifier = modifier
     ) {
         composable<Screen.Onboarding> {
-            //OnboardingScreen(navController)
+            OnboardingScreen(navController)
         }
         composable<Screen.Home> {
             HomeScreen(navController)

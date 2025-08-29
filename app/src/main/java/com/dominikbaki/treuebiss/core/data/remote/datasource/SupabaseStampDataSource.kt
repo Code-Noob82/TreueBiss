@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.data.remote.datasource
+package com.dominikbaki.treuebiss.core.data.remote.datasource
 
 import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 

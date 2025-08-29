@@ -1,8 +1,8 @@
 //package com.dominikbaki.treuebiss.data.repository
 //
 //import android.util.Log
-//import com.dominikbaki.treuebiss.data.local.dao.StampDao
-//import com.dominikbaki.treuebiss.data.local.entity.toEntity
+//import com.dominikbaki.treuebiss.feature_stamps.data.local.dao.StampDao
+//import com.dominikbaki.treuebiss.feature_stamps.data.local.toEntity
 //import com.dominikbaki.treuebiss.data.local.entity.toDomain
 //import com.dominikbaki.treuebiss.data.remote.datasource.SupabaseStampDataSource
 //import com.dominikbaki.treuebiss.data.util.DeviceIdProvider

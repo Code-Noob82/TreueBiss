@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.data.util
+package com.dominikbaki.treuebiss.core.data.util
 
 // Platzhalter für Provider
 interface TenantProvider { suspend fun get(): String }

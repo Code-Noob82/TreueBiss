@@ -15,6 +15,8 @@ fun HomeScreen(navController: NavController) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = "Home Screen")
+        Text(
+            text = "Home Screen"
+        )
     }
 }

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * Anstelle von fehleranfälligen Strings wird das Objekt selbst zur Route.
  */
 @Serializable
-sealed class Screen(val route: String) {
+sealed class Screen {
     @Serializable
     data object Onboarding : Screen()
     @Serializable
