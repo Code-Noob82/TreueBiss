@@ -15,13 +15,16 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FinishButton(
+internal fun FinishButton(
     pagerState: PagerState,
     pageCount: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+    ) {
         AnimatedVisibility(
             visible = pagerState.currentPage == pageCount - 1,
             modifier = Modifier.align(Alignment.Center)

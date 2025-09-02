@@ -10,7 +10,12 @@ import androidx.navigation.NavController
 
 
 @Composable
-fun HomeScreen(navController: NavController) {
+internal fun HomeScreen(
+    onNavigateToStampCard: () -> Unit,
+    onNavigateToVoucher: () -> Unit,
+    onNavigateToWeather: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center

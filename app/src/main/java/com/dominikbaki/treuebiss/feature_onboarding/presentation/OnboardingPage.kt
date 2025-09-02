@@ -3,7 +3,7 @@ package com.dominikbaki.treuebiss.feature_onboarding.presentation
 import androidx.annotation.DrawableRes
 import com.dominikbaki.treuebiss.R
 
-sealed class OnboardingPage(
+internal sealed class OnboardingPage(
     val title: String,
     val description: String,
     @DrawableRes val imageRes: Int
@@ -11,24 +11,24 @@ sealed class OnboardingPage(
     object First : OnboardingPage(
         title = "Bonuspunkte sammeln",
         description = "Sammle bei jedem Einkauf Punkte und vergiss nie wieder deine Bonuskarte",
-        imageRes = R.drawable.stamp_card // Platzhalter
+        imageRes = R.drawable.bonuskarte
     )
 
     object Second : OnboardingPage(
         title = "Gutscheine sichern",
         description = "Volle Karte? Erhalte automatisch einen Gutschein für deinen nächsten Einkauf.",
-        imageRes = R.drawable.voucher // Platzhalter
+        imageRes = R.drawable.gutschein
     )
 
     object Third : OnboardingPage(
         title = "Immer informiert",
         description = "Checke das lokale Wetter, bevor du losgehst - direkt in deiner App.",
-        imageRes = R.drawable.weather // Platzhalter
+        imageRes = R.drawable.wetter
     )
 
     object Fourth : OnboardingPage(
         title = "Ganz wie dahäm",
         description = "Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.",
-        imageRes = R.drawable.settings // Platzhalter
+        imageRes = R.drawable.einstellungen
     )
 }

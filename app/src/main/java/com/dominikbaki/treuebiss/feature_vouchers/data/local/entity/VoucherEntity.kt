@@ -7,5 +7,6 @@ data class VoucherEntity(
     @PrimaryKey
     val id: String,
     val creationDate: Long,
+    val expiresAt: Long,
     val isRedeemed: Boolean = false
 )

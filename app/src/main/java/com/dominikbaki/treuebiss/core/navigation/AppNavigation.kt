@@ -7,8 +7,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeScreen
 import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScreen
+import com.dominikbaki.treuebiss.feature_settings.presentation.SettingsScreen
 import com.dominikbaki.treuebiss.feature_stamps.presentation.StampCardScreen
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherScreen
+import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherScreen
 
 @Composable
 fun AppNavigation(modifier: Modifier = Modifier) {
@@ -20,22 +22,44 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         composable<Screen.Onboarding> {
-            OnboardingScreen(navController)
+            OnboardingScreen(
+                onFinish = {
+                    // Die komplette Navigationslogik bleibt hier zentralisiert.
+                    // Der Onboarding-Screen wird aus dem Backstack entfernt.
+                    navController.navigate(Screen.Home) {
+                        popUpTo(Screen.Onboarding) { inclusive = true }
+                    }
+                }
+            )
         }
         composable<Screen.Home> {
-            HomeScreen(navController)
+            HomeScreen(
+                // Der HomeScreen weiß nichts vom NavController, er löst nur Events aus.
+                onNavigateToStampCard = { navController.navigate(Screen.StampCard)},
+                onNavigateToVoucher = { navController.navigate(Screen.Voucher)},
+                onNavigateToWeather = { navController.navigate(Screen.Weather)},
+                onNavigateToSettings = { navController.navigate(Screen.Settings)}
+            )
         }
         composable<Screen.StampCard> {
-            StampCardScreen(navController)
+            StampCardScreen(
+                onNavigateUp = { navController.navigateUp() }
+            )
         }
         composable<Screen.Voucher> {
-            VoucherScreen(navController)
+            VoucherScreen(
+                onNavigateUp = { navController.navigateUp() }
+            )
         }
         composable<Screen.Weather> {
-            //WeatherScreen(navController)
+            WeatherScreen(
+                onNavigateUp = { navController.navigateUp() }
+            )
         }
         composable<Screen.Settings> {
-            //SettingsScreen(navController)
+            SettingsScreen(
+                onNavigateUp = { navController.navigateUp() }
+            )
         }
     }
 }

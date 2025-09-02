@@ -15,7 +15,9 @@ import com.dominikbaki.treuebiss.core.navigation.Screen
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OnboardingScreen(navController: NavController) {
+fun OnboardingScreen(
+    onFinish: () -> Unit
+) {
     val pages = listOf(
         OnboardingPage.First,
         OnboardingPage.Second,
@@ -46,12 +48,8 @@ fun OnboardingScreen(navController: NavController) {
             pageCount = pages.size,
             modifier = Modifier.padding(horizontal = 40.dp, vertical = 20.dp)
         ) {
-            navController.navigate(Screen.Home) {
-                popUpTo(Screen.Onboarding) {
-                    inclusive = true
-                }
-                // Hinweis: Onboarding abgeschlossen - in ViewModel speichern (z.B. in Datastore)
-            }
+            onFinish()
         }
+        // Hinweis: Onboarding abgeschlossen - in ViewModel speichern (z.B. in Datastore)
     }
 }
