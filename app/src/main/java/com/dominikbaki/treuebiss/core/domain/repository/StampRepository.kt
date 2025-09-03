@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.feature_stamps.domain.repository
+package com.dominikbaki.treuebiss.core.domain.repository
 
 import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 import kotlinx.coroutines.flow.Flow
@@ -15,4 +15,6 @@ interface StampRepository {
 
     /** Liefert die aktuelle Anzahl Stempel (z. B. für 10er-Logik). */
     suspend fun count(): Int
+
+    suspend fun clearStamps() // NEU: Funktion zum Löschen aller Stempel
 }

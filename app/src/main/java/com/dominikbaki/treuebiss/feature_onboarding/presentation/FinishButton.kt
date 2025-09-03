@@ -4,7 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -23,7 +23,6 @@ internal fun FinishButton(
 ) {
     Box(
         modifier = modifier
-            .fillMaxSize()
     ) {
         AnimatedVisibility(
             visible = pagerState.currentPage == pageCount - 1,
@@ -31,7 +30,7 @@ internal fun FinishButton(
         ) {
             Button(
                 onClick = onClick,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 Text(text = "Los geht's!")

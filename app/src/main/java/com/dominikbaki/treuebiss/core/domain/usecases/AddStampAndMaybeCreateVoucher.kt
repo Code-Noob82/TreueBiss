@@ -2,7 +2,7 @@
 //
 //import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 //import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
-//import com.dominikbaki.treuebiss.feature_stamps.domain.repository.StampRepository
+//import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 //import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
 //import java.util.UUID
 //

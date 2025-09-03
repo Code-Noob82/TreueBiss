@@ -4,7 +4,7 @@ import com.dominikbaki.treuebiss.feature_stamps.data.local.dao.StampDao
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStamp
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStampEntity
 import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
-import com.dominikbaki.treuebiss.feature_stamps.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -33,5 +33,9 @@ class StampRepositoryImpl @Inject constructor(
 
     override suspend fun count(): Int {
         return dao.countStamps()
+    }
+
+    override suspend fun clearStamps() {
+        dao.clearStamps() // NEU: Funktion zum Löschen aller Stempel
     }
 }

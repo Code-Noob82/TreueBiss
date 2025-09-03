@@ -2,9 +2,9 @@ package com.dominikbaki.treuebiss.core.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeScreen
 import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScreen
 import com.dominikbaki.treuebiss.feature_settings.presentation.SettingsScreen
@@ -13,9 +13,10 @@ import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherScreen
 import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherScreen
 
 @Composable
-fun AppNavigation(modifier: Modifier = Modifier) {
-    val navController = rememberNavController()
-
+fun AppNavigation(
+    modifier: Modifier = Modifier,
+    navController: NavHostController
+) {
     NavHost(
         navController = navController,
         startDestination = Screen.Onboarding,

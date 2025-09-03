@@ -10,8 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
-import com.dominikbaki.treuebiss.core.navigation.Screen
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -46,10 +44,13 @@ fun OnboardingScreen(
         FinishButton(
             pagerState = pagerState,
             pageCount = pages.size,
-            modifier = Modifier.padding(horizontal = 40.dp, vertical = 20.dp)
-        ) {
-            onFinish()
-        }
-        // Hinweis: Onboarding abgeschlossen - in ViewModel speichern (z.B. in Datastore)
+            modifier = Modifier
+                .padding(horizontal = 40.dp)
+                .padding(bottom = 20.dp),
+            onClick = {
+                onFinish()
+            }
+        )
     }
+    // Hinweis: Onboarding abgeschlossen - in ViewModel speichern (z.B. in Datastore)
 }

@@ -5,20 +5,34 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
+import kotlinx.coroutines.flow.collectLatest
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun StampCardScreen(
@@ -29,8 +43,35 @@ internal fun StampCardScreen(
     // Bei jeder Änderung wird der Screen neu gezeichnet (recomposed).
     val stamps by viewModel.stamps.collectAsState()
     val stampCount = stamps.size
+    val snackBarHostState = remember { SnackbarHostState() } // Neu für Feedback
 
-    Scaffold { paddingValues ->
+    // NEU: Effekt, der auf das Event zum Erstellen eines Gutscheins lauscht
+    LaunchedEffect(key1 = true) {
+        viewModel.voucherCreatedEvent.collectLatest {
+            snackBarHostState.showSnackbar(
+                message = "Glückwunsch! Ein neuer Gutschein wurde erstellt.",
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackBarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Deine Stempelkarte") },
+                navigationIcon =  {
+                    IconButton(onClick = onNavigateUp) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Zurück"
+
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -46,7 +87,7 @@ internal fun StampCardScreen(
                     text = if (stampCount < 10) {
                         "Sammle 10 Stempel für eine tolle Prämie!"
                     } else {
-                        "Glückwunsch! Du hast einen Gutschein verdient."
+                        "Glückwunsch! Du hast einen Gutschein erhalten."
                     },
                     style = MaterialTheme.typography.bodyLarge
                 )
@@ -91,5 +132,12 @@ private fun StampCircle(isStamped: Boolean) {
         contentAlignment = Alignment.Center
     ) {
         // Hier könnte man später ein Icon oder eine Nummer hinzufügen
+    }
+}
+@Preview(showBackground = true)
+@Composable
+private fun StampCardScreenPreview() {
+    TreueBissTheme {
+        StampCardScreen(onNavigateUp = {})
     }
 }

@@ -19,6 +19,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,6 +34,22 @@ internal fun VoucherScreen(
     viewModel: VoucherViewModel = hiltViewModel()
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
+    var showDialog by remember { mutableStateOf(false) } // NEU: Dialog-Status
+    var selectedVoucherId by remember { mutableStateOf<String?>(null)} // Neu: ausgewählter Gutschein
+
+    if (showDialog && selectedVoucherId != null) {
+        RedeemConfirmDialog(
+            onConfirm = {
+                viewModel.onRedeemClicked(selectedVoucherId!!)
+                showDialog = false
+                selectedVoucherId = null
+            },
+            onDismiss = {
+                showDialog = false
+                selectedVoucherId = null
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -68,7 +87,10 @@ internal fun VoucherScreen(
                 items(vouchers, key = { it.id }) { voucher ->
                     VoucherItem(
                         voucher = voucher,
-                        onRedeem = { viewModel.onRedeemClicked(voucher.id) }
+                        onRedeem = {
+                            selectedVoucherId = voucher.id
+                            showDialog = true
+                        }
                     )
                 }
             }

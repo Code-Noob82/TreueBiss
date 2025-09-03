@@ -31,4 +31,7 @@ interface StampDao {
      */
     @Query("SELECT COUNT(id) FROM stamps")
     suspend fun countStamps(): Int
+
+    @Query("DELETE FROM stamps")
+    suspend fun clearStamps() // NEU: Funktion zum Löschen aller Stempel
 }

@@ -1,7 +1,7 @@
 package com.dominikbaki.treuebiss.core.di
 
 import com.dominikbaki.treuebiss.feature_stamps.data.repository.StampRepositoryImpl
-import com.dominikbaki.treuebiss.feature_stamps.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.feature_vouchers.data.repository.VoucherRepositoryImpl
 import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
 import dagger.Binds
