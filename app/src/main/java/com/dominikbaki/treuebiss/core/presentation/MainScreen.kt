@@ -7,9 +7,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -19,11 +21,15 @@ import com.dominikbaki.treuebiss.core.navigation.Screen
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 
 @Composable
-fun MainScreen() {
+fun MainScreen(
+    viewModel: MainViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
     val navController = rememberNavController()
+
+    // Logik zur Steuerung der BottomAppBar
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-
     val shouldShowBottomBar = currentDestination?.route in listOf(
         Screen.Home::class.qualifiedName,
         Screen.StampCard::class.qualifiedName,
@@ -65,6 +71,7 @@ fun MainScreen() {
         )
     }
 }
+
 @Preview
 @Composable
 fun MainScreenPreview() {

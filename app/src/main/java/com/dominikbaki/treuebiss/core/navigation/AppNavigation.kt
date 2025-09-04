@@ -15,18 +15,19 @@ import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherScreen
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
-    navController: NavHostController
+    navController: NavHostController,
+    startDestination: Screen, // Start-Ziel ist jetzt ein Screen-Objekt
+    onOnboardingFinished: () -> Unit = {} // Event vom OnboardingScreen zum MainScreen
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Onboarding,
+        startDestination = startDestination,
         modifier = modifier
     ) {
         composable<Screen.Onboarding> {
             OnboardingScreen(
                 onFinish = {
-                    // Die komplette Navigationslogik bleibt hier zentralisiert.
-                    // Der Onboarding-Screen wird aus dem Backstack entfernt.
+                    onOnboardingFinished() // ViewModel aufrufen, um Onboarding zu beenden
                     navController.navigate(Screen.Home) {
                         popUpTo(Screen.Onboarding) { inclusive = true }
                     }
