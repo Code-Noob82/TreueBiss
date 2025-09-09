@@ -2,17 +2,16 @@ package com.dominikbaki.treuebiss.feature_stamps.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
-import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
-import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
+import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
+import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.days
 
 @HiltViewModel
 class StampCardViewModel @Inject constructor(
@@ -32,19 +31,31 @@ class StampCardViewModel @Inject constructor(
 
     fun onAddStampClicked() {
         viewModelScope.launch {
-            val currentStampCount = stampRepository.count()
+            // Effizientere Zählung direkt aus dem StateFlow.
+            val currentStampCount = stamps.value.size
+            val newStampCount = currentStampCount + 1
 
-            // Nur hinzufügen, wenn die Karte noch nicht voll ist
-            if (currentStampCount < 10) {
-                val newStamp =
-                    Stamp(id = 0, timestamp = System.currentTimeMillis(), isSynced = false)
-                stampRepository.addStamp(newStamp)
-                // Nur hinzufügen, wenn die Karte noch nicht voll ist
-                if (currentStampCount + 1 == 10) {
-                    voucherRepository.create(Voucher()) // Erstellt Gutschein mit Standard-Ablaufdatum
-                    stampRepository.clearStamps() // NEU: Funktion zum Löschen aller Stempel
-                    _voucherCreatedEvent.emit(Unit) // Signalisiert der UI, dass ein Gutschein erstellt wurde
-                }
+            // Füge immer zuerst den neuen Stempel hinzu.
+            // Wir erstellen ein `Stamp`-Objekt, das nur die nötigen Informationen
+            // enthält (siehe Datenmodell). Die `id` wird von Supabase generiert.
+            val newStamp = Stamp(
+                timestamp = Clock.System.now()
+            )
+            stampRepository.addStamp(newStamp)
+
+            if (newStampCount > 0 && newStampCount % 10 == 0) {
+                val currentTime = Clock.System.now()
+                val expiryTime = currentTime.plus(90.days) // 90 Tage in die Zukunft
+
+                val newVoucher = Voucher(
+                    createdAt = currentTime,
+                    creationDate = currentTime.toEpochMilliseconds(),
+                    expiresAt = expiryTime.toEpochMilliseconds()
+                )
+                voucherRepository.createVoucher(newVoucher) // Erstellt einen neuen Gutschein
+                _voucherCreatedEvent.emit(Unit) // Signalisiert die UI, dass ein Gutschein erstellt wurde
+
+                stampRepository.clearStamps()
             }
         }
     }

@@ -1,26 +1,34 @@
 package com.dominikbaki.treuebiss.feature_stamps.data.mapper
 
 import com.dominikbaki.treuebiss.feature_stamps.data.local.entity.StampEntity
-import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.feature_stamps.data.remote.dto.StampDto
+import kotlinx.datetime.Instant
 
 /**
- * Wandelt ein StampEntity (Datenbank-Objekt) in ein Stamp-Objekt (Domain-Objekt) um.
+ * Konvertiert die Datenbank-Entität in das Domain-Modell
  */
 fun StampEntity.toStamp(): Stamp {
     return Stamp(
-        id = id,
-        timestamp = timestamp,
-        isSynced = isSynced
+        id = this.id,
+        timestamp = Instant.fromEpochMilliseconds(this.timestamp)
     )
 }
 
 /**
- * Wandelt ein Stamp-Objekt (Domain-Objekt) in ein StampEntity (Datenbank-Objekt) um.
+ * Konvertiert das Domain-Modell in die Datenbank-Entität
  */
 fun Stamp.toStampEntity(): StampEntity {
     return StampEntity(
-        id = id,
-        timestamp = timestamp,
-        isSynced = isSynced
+        id = this.id,
+        timestamp = this.timestamp.toEpochMilliseconds()
+    )
+}
+
+fun Stamp.toStampDto(currentUserId: String): StampDto {
+    return StampDto(
+        id = this.id,
+        timeStamp = this.timestamp.toString(),
+        userId = currentUserId
     )
 }

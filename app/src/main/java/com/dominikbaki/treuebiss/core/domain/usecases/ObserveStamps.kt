@@ -1,6 +1,6 @@
 package com.dominikbaki.treuebiss.core.domain.usecases
 
-import com.dominikbaki.treuebiss.feature_stamps.domain.model.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.Stamp
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

@@ -14,8 +14,9 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(FileInputStream(localPropertiesFile))
 }
-
-val githubTokenSupabase = localProperties.getProperty("GITHUB_TOKEN_SUPABASE") ?: ""
+val supabaseUrl = localProperties.getProperty("SUPABASE_URL") ?: ""
+val supabaseAnonKey = localProperties.getProperty("SUPABASE_ANON_KEY") ?: ""
+//val githubTokenSupabase = localProperties.getProperty("GITHUB_TOKEN_SUPABASE") ?: ""
 
 android {
     namespace = "com.dominikbaki.treuebiss"
@@ -32,11 +33,11 @@ android {
     }
 
     buildTypes {
-        debug {
-            buildConfigField("String", "GITHUB_TOKEN_SUPABASE", "\"$githubTokenSupabase\"")
+        all {
+            buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+            buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         }
         release {
-            buildConfigField("String", "GITHUB_TOKEN_SUPABASE", "\"$githubTokenSupabase\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -45,11 +46,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
     buildFeatures {
         buildConfig = true
@@ -67,11 +68,12 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.kotlinx.datetime)
 
     // Hilt - Dependency Injection
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
-    implementation(libs.androidx.room.common.jvm)
+    // implementation(libs.androidx.room.common.jvm)
     ksp(libs.hilt.compiler)
 
     // Navigation - Jetpack Compose
@@ -94,11 +96,12 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
 
     // Supabase - Backend-as-s-Service
-//    implementation(platform(libs.supabase.bom))
-//    implementation(libs.supabase.gotrue)
-//    implementation(libs.supabase.postgrest)
-//    implementation(libs.supabase.realtime)
-//    implementation(libs.supabase.storage)
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.gotrue)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.realtime)
+    implementation(libs.supabase.storage)
+    implementation(libs.ktor.client.okhttp)
 
     // Coroutines - Für async/await
     implementation(libs.kotlinx.coroutines.android)

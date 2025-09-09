@@ -12,8 +12,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "stamps")
 data class StampEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Int = 0,
-    val timestamp: Long,
-    val isSynced: Boolean
+    @PrimaryKey
+    val id: String,
+    val timestamp: Long
 )

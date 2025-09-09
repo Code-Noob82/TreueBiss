@@ -1,11 +1,13 @@
 package com.dominikbaki.treuebiss.core.di
 
+import com.dominikbaki.treuebiss.core.data.repository.AuthRepositoryImpl
 import com.dominikbaki.treuebiss.core.data.repository.UserPreferencesRepositoryImpl
-import com.dominikbaki.treuebiss.feature_stamps.data.repository.StampRepositoryImpl
+import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
+import com.dominikbaki.treuebiss.core.data.repository.StampRepositoryImpl
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
-import com.dominikbaki.treuebiss.feature_vouchers.data.repository.VoucherRepositoryImpl
-import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
+import com.dominikbaki.treuebiss.core.data.repository.VoucherRepositoryImpl
+import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -36,4 +38,10 @@ abstract class RepositoryModule {
     abstract fun bindUserPreferencesRepository(
         userPreferencesRepositoryImpl: UserPreferencesRepositoryImpl
     ): UserPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(
+        authRepositoryImpl: AuthRepositoryImpl
+    ): AuthRepository
 }

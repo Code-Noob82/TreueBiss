@@ -8,5 +8,5 @@ data class VoucherEntity(
     val id: String,
     val creationDate: Long,
     val expiresAt: Long,
-    val isRedeemed: Boolean = false
+    val isRedeemed: Boolean
 )

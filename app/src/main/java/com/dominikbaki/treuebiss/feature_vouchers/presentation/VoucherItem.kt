@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
+import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.core.ui.utils.DateTimeFormatter
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -28,9 +31,9 @@ internal fun VoucherItem(
     voucher: Voucher,
     onRedeem: () -> Unit
 ) {
-    val dateFormat = SimpleDateFormat("dd. MMM yyyy", Locale.GERMAN)
-    val expiresAtFormatted = dateFormat.format(Date(voucher.expiresAt))
-    val isExpired = System.currentTimeMillis() > voucher.expiresAt
+    val expiresAtInstant = Instant.fromEpochMilliseconds(voucher.expiresAt)
+    val expiresAtFormatted = DateTimeFormatter.formatInstant(expiresAtInstant)
+    val isExpired = Clock.System.now() > expiresAtInstant
 
     Card(
         modifier = Modifier.fillMaxWidth(),

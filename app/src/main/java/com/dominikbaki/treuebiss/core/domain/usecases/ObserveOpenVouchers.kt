@@ -1,7 +1,7 @@
 package com.dominikbaki.treuebiss.core.domain.usecases
 
-import com.dominikbaki.treuebiss.feature_vouchers.domain.model.Voucher
-import com.dominikbaki.treuebiss.feature_vouchers.domain.repository.VoucherRepository
+import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
