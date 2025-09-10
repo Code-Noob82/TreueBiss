@@ -38,7 +38,8 @@ android {
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true // R8 (Code shrinking/obfuscation)
+            isShrinkResources = true // entfernt ungenutzte Ressourcen (Icons)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -69,6 +70,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.kotlinx.datetime)
+    implementation(libs.icons.extended)
 
     // Hilt - Dependency Injection
     implementation(libs.hilt.android)
