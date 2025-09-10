@@ -6,6 +6,6 @@ import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
  * Port für das Abrufen von Wetterdaten.
  */
 interface WeatherRepository {
-    /** Liefert Wetterdaten als Result (Netzwerk/Mapping-Fehler werden gekapselt). */
-    suspend fun getForCity(city: String): Result<WeatherData>
+    // Verwendet Result, um Erfolgs- und Fehlerfälle sauber zu behandeln
+    suspend fun getCurrentWeather(latitude: Double, longitude: Double): Result<WeatherData>
 }
