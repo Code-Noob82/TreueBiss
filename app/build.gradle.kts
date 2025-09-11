@@ -75,6 +75,7 @@ dependencies {
     // Hilt - Dependency Injection
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.play.services.location)
     // implementation(libs.androidx.room.common.jvm)
     ksp(libs.hilt.compiler)
 

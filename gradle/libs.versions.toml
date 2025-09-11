@@ -22,6 +22,7 @@ kotlinxCoroutines = "1.8.1"
 datastore = "1.1.1"
 kotlinx-datetime = "0.6.0"
 iconsExtended = "1.7.7"
+playServicesLocation = "21.3.0"
 
 [libraries]
 # Core & UI
@@ -82,6 +83,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,5 +1,9 @@
 package com.dominikbaki.treuebiss.feature_home.presentation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,17 +17,24 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 
 // --- ZENTRALE BRANDING-KONFIGURATION ---
 // Diese Klasse bündelt alle anpassbaren UI-Elemente.
@@ -42,7 +53,9 @@ val LocalBrandingConfig = staticCompositionLocalOf<BrandingConfig> {
 }
 
 // Annahme: Diese Daten kommen von einem ViewModel
-data class StampCardState(val currentStamps: Int, val totalStamps: Int = 10)
+data class StampCardState(
+    val currentStamps: Int,
+    val totalStamps: Int = 10)
 data class DailySpecial(
     val title: String,
     val description: String,
@@ -68,6 +81,41 @@ internal fun HomeScreen(
     )
 
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // NEU: Laucher für die Berechtigungsabfrage
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) ||
+        permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)) {
+            viewModel.fetchWeather()
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar("Ohne Standorterlaubnis kann das Wetter nicht angezeigt werden.")
+            }
+        }
+    }
+
+    // NEU: Effekt, der beim Start des Screens die Berechtigungen prüft/anfragt
+    LaunchedEffect(key1 = true) {
+        val hasCoarsePermission = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasCoarsePermission) {
+            viewModel.fetchWeather()
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            )
+        }
+    }
 
     CompositionLocalProvider(LocalBrandingConfig provides branding) {
         val currentBranding = LocalBrandingConfig.current
@@ -84,7 +132,7 @@ internal fun HomeScreen(
                 )
             }
         ) { paddingValues ->
-            if (uiState.isLoading) {
+            if (uiState.isWeatherLoading && uiState.weatherData == null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
@@ -116,8 +164,12 @@ internal fun HomeScreen(
                         // voucherCount aus uiState befüllen
                         QuickActionsRow(
                             voucherCount = uiState.voucherCount,
+                            weatherData = uiState.weatherData,
+                            weatherError = uiState.weatherError,
+                            isWeatherLoading = uiState.isWeatherLoading,
                             onVoucherClick = onNavigateToVoucher,
-                            onWeatherClick = onNavigateToWeather
+                            onWeatherClick = onNavigateToWeather,
+                            onRetryWeatherClick = viewModel::onRetryWeatherFetch
                         )
                     }
                 }

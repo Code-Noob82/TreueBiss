@@ -9,12 +9,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.FilterDrama
+import androidx.compose.material.icons.filled.Refresh
+import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
+import kotlin.math.roundToInt
 
 @Composable
 fun QuickActionsRow(
     voucherCount: Int,
+    weatherData: WeatherData?,
+    weatherError: String?,
+    isWeatherLoading: Boolean,
     onVoucherClick: () -> Unit,
-    onWeatherClick: () -> Unit
+    onWeatherClick: () -> Unit,
+    onRetryWeatherClick: () -> Unit
 ) {
     val branding = LocalBrandingConfig.current // Holt sich das Branding
     Row(
@@ -28,12 +35,20 @@ fun QuickActionsRow(
             icon = Icons.Filled.Redeem,
             onClick = onVoucherClick
         )
+        val weatherSubtitle = when {
+            isWeatherLoading -> "Wird geladen..."
+            weatherError != null -> "Fehler"
+            weatherData != null -> "${weatherData.temperature.roundToInt()}°C, ${weatherData.weatherType.description}"
+            else -> "Daten laden"
+        }
+        val weatherIcon = if (weatherError != null) Icons.Default.Refresh else Icons.Default.FilterDrama
+
         ActionCard(
             modifier = Modifier.weight(1f),
             title = branding.weatherTitle, // AUS BRANDING
-            subtitle = "Grillwetter?",
+            subtitle = weatherSubtitle,
             icon = Icons.Filled.FilterDrama,
-            onClick = onWeatherClick
+            onClick = if (weatherError != null) onRetryWeatherClick else onWeatherClick
         )
     }
 }

@@ -47,8 +47,8 @@ internal fun WeatherDetails(data: WeatherData, city: String) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
-                WeatherInfoItem("Gefühlt", "${data.pressure.roundToInt()} hPa")
-                WeatherInfoItem("Wind", "${data.windSpeed} km/h")
+                WeatherInfoItem("Druck", "${data.pressure.roundToInt()} hPa")
+                WeatherInfoItem("Wind", "${data.windSpeed.roundToInt()} km/h")
                 WeatherInfoItem("Feuchtigkeit", "${data.humidity}%")
             }
         }
