@@ -34,6 +34,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dominikbaki.treuebiss.feature_home.presentation.components.DailySpecialCard
+import com.dominikbaki.treuebiss.feature_home.presentation.components.QuickActionsRow
+import com.dominikbaki.treuebiss.feature_home.presentation.components.StampCardProgress
 import kotlinx.coroutines.launch
 
 // --- ZENTRALE BRANDING-KONFIGURATION ---
@@ -55,7 +58,9 @@ val LocalBrandingConfig = staticCompositionLocalOf<BrandingConfig> {
 // Annahme: Diese Daten kommen von einem ViewModel
 data class StampCardState(
     val currentStamps: Int,
-    val totalStamps: Int = 10)
+    val totalStamps: Int = 10
+)
+
 data class DailySpecial(
     val title: String,
     val description: String,
@@ -85,21 +90,27 @@ internal fun HomeScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // NEU: Laucher für die Berechtigungsabfrage
+    // --- BERECHTIGUNGS-LOGIK ---
+    // 1. Launcher, der das Ergebnis der Berechtigungsanfrage verarbeitet.
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        if (permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) ||
-        permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)) {
+        val isGranted =
+            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) ||
+                    permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)
+
+        if (isGranted) {
+            // Berechtigung erteilt -> Wetterdaten abrufen
             viewModel.fetchWeather()
         } else {
+            // Berechtigung verweigert -> Nutzerfeedback geben
             scope.launch {
                 snackbarHostState.showSnackbar("Ohne Standorterlaubnis kann das Wetter nicht angezeigt werden.")
             }
         }
     }
 
-    // NEU: Effekt, der beim Start des Screens die Berechtigungen prüft/anfragt
+    // 2. Effekt, der beim ersten Start des Screens die Berechtigung prüft oder anfragt.
     LaunchedEffect(key1 = true) {
         val hasCoarsePermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_COARSE_LOCATION
@@ -116,7 +127,7 @@ internal fun HomeScreen(
             )
         }
     }
-
+    // Stellt die Branding-Daten für alle untergeordneten UI-Elemente bereit.
     CompositionLocalProvider(LocalBrandingConfig provides branding) {
         val currentBranding = LocalBrandingConfig.current
 
@@ -132,8 +143,13 @@ internal fun HomeScreen(
                 )
             }
         ) { paddingValues ->
+            // --- UI-ZUSTANDS-LOGIK ---
+            // Zeigt einen Lade-Spinner nur beim allerersten Laden an.
             if (uiState.isWeatherLoading && uiState.weatherData == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {

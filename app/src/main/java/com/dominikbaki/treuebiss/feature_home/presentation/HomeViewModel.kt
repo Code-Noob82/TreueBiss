@@ -23,7 +23,7 @@ data class HomeUiState(
     val stampCount: Int = 0,
     val voucherCount: Int = 0,
     val dailySpecial: DailySpecial? = null, // Vorerst optional
-    val isWeatherLoading: Boolean = true,
+    val isWeatherLoading: Boolean = false, // Startwert kann false sein, da der init-Block das Laden steuert
     val weatherData: WeatherData? = null,
     val weatherError: String? = null
 )
@@ -36,8 +36,6 @@ class HomeViewModel @Inject constructor(
     private val locationTracker: LocationTracker // NEU: LocationTracker injiziert
 ) : ViewModel() {
 
-    // NEU: Eine Variable, die sicherstellt, dass die initiale Wetterabfrage nur einmal gestartet wird.
-    private var hasInitialWeatherFetched = false
 
     // Ein interner StateFlow nur für das Ergebnis des Wetter API-Calls
     private val _weatherState = MutableStateFlow<Result<WeatherData>?>(null)
@@ -79,20 +77,21 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Ruft den Standort ab und aktualisiert den Wetter-Status.
-     * Setzt den Ladezustand vor und nach dem Aufruf.
+     * Diese Funktion ist jetzt sowohl für den initialen als auch für manuelle Aufrufe zuständig.
      */
     fun fetchWeather() {
 
-        // KORREKTUR: Wir prüfen, ob die Abfrage bereits läuft oder schon abgeschlossen ist.
-        if (hasInitialWeatherFetched || _isWeatherLoading.value) {
-            return // Verhindert unnötige, wiederholte Aufrufe
+        // VÄNDERUNG: Wir prüfen nur noch, ob bereits eine Abfrage läuft.
+        if (_isWeatherLoading.value) {
+            return // Verhindert doppelte Aufrufe, während schon geladen wird.
         }
-        hasInitialWeatherFetched = true // Markieren, dass wir es jetzt versuchen
 
         viewModelScope.launch {
             // LOG 1: Wird die Funktion überhaupt aufgerufen?
-            Log.d("HomeViewModel_Weather", "fetchWeather() called")
+            Log.d("HomeViewModel_Weather",
+                "fetchWeather() called")
             _isWeatherLoading.value = true
+            _weatherState.value = null // Fehler vom vorherigen Versuch zurücksetzen
 
             val location = locationTracker.getCurrentLocation()
 

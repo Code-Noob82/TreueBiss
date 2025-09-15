@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.feature_home.presentation
+package com.dominikbaki.treuebiss.feature_home.presentation.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
