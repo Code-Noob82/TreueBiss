@@ -42,7 +42,7 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
     - Sync von Stempeln und Gutscheinen.
     - RLS Policies pro Nutzer.
 - [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h.
-- [ ] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenWeatherMap API) auf dem HomeScreen.
+- [ ] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
 - [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt beim App-Start.
 - [ ] **Corporate Branding:** Zentrale Theme-Datei, BrandingConfig (Farben, Logo, Strings).
 
@@ -117,5 +117,5 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 
 - Dank an die Dozenten & Tutoren des Syntax Instituts für Feedback und Begleitung.
 - Besonderer Dank an die Testbetriebe aus dem Lebensmittelhandwerk für erste Gespräche & Feedback.
-- Wetterdaten bereitgestellt durch die **OpenWeatherMap API**.
+- Wetterdaten bereitgestellt durch die **OpenMeteo API**.
 - Backend-Dienste bereitgestellt durch **Supabase**.  
