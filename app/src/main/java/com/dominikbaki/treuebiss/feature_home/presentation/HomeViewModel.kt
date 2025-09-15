@@ -36,9 +36,12 @@ class HomeViewModel @Inject constructor(
     private val locationTracker: LocationTracker // NEU: LocationTracker injiziert
 ) : ViewModel() {
 
+    // NEU: Eine Variable, die sicherstellt, dass die initiale Wetterabfrage nur einmal gestartet wird.
+    private var hasInitialWeatherFetched = false
+
     // Ein interner StateFlow nur für das Ergebnis des Wetter API-Calls
     private val _weatherState = MutableStateFlow<Result<WeatherData>?>(null)
-    private val _isWeatherLoading = MutableStateFlow(true)
+    private val _isWeatherLoading = MutableStateFlow(false) // Startet jetzt mit false
 
     // Wir kombinieren die Live-Daten aus beiden Repositories in einen einzigen State.
     val uiState: StateFlow<HomeUiState> =
@@ -79,6 +82,13 @@ class HomeViewModel @Inject constructor(
      * Setzt den Ladezustand vor und nach dem Aufruf.
      */
     fun fetchWeather() {
+
+        // KORREKTUR: Wir prüfen, ob die Abfrage bereits läuft oder schon abgeschlossen ist.
+        if (hasInitialWeatherFetched || _isWeatherLoading.value) {
+            return // Verhindert unnötige, wiederholte Aufrufe
+        }
+        hasInitialWeatherFetched = true // Markieren, dass wir es jetzt versuchen
+
         viewModelScope.launch {
             // LOG 1: Wird die Funktion überhaupt aufgerufen?
             Log.d("HomeViewModel_Weather", "fetchWeather() called")
@@ -88,7 +98,10 @@ class HomeViewModel @Inject constructor(
 
             if (location != null) {
                 // LOG 2: Haben wir einen Standort vom Tracker bekommen?
-                Log.d("HomeViewModel_Weather", "Location received: Lat=${location.latitude}, Lon=${location.longitude}")
+                Log.d(
+                    "HomeViewModel_Weather",
+                    "Location received: Lat=${location.latitude}, Lon=${location.longitude}"
+                )
                 val result = weatherRepository.getCurrentWeather(
                     latitude = location.latitude,
                     longitude = location.longitude
@@ -97,12 +110,26 @@ class HomeViewModel @Inject constructor(
 
                 // LOG 4: War der API-Aufruf erfolgreich oder ist er fehlgeschlagen?
                 result
-                    .onSuccess { Log.d("HomeViewModel_Weather", "Weather API call was successful.") }
-                    .onFailure { error -> Log.e("HomeViewModel_Weather", "Weather API call failed!", error) }
+                    .onSuccess {
+                        Log.d(
+                            "HomeViewModel_Weather",
+                            "Weather API call was successful."
+                        )
+                    }
+                    .onFailure { error ->
+                        Log.e(
+                            "HomeViewModel_Weather",
+                            "Weather API call failed!",
+                            error
+                        )
+                    }
 
             } else {
                 // LOG 3: Der Standort ist null - das ist der wahrscheinlichste Fehlerpunkt.
-                Log.e("HomeViewModel_Weather", "locationTracker.getCurrentLocation() returned NULL.")
+                Log.e(
+                    "HomeViewModel_Weather",
+                    "locationTracker.getCurrentLocation() returned NULL."
+                )
                 _weatherState.value = Result.failure(
                     Exception("Standort konnte nicht abgerufen werden.")
                 )
