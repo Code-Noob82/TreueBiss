@@ -1,22 +1,29 @@
 package com.dominikbaki.treuebiss.core.navigation
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 /**
  * Definiert alle Navigationsziele als serialisierbare Objekte.
  * Anstelle von fehleranfälligen Strings wird das Objekt selbst zur Route.
  */
 @Serializable
-sealed class Screen {
+sealed interface Screen {
     @Serializable
-    data object Onboarding : Screen()
+    @SerialName("onboarding")
+    data object Onboarding : Screen
     @Serializable
-    data object Home : Screen()
+    @SerialName("home")
+    data object Home : Screen
     @Serializable
-    data object StampCard : Screen()
+    @SerialName("stampCard")
+    data class StampCard(val cardId: String) : Screen
     @Serializable
-    data object Voucher : Screen()
+    @SerialName("voucher")
+    data class Voucher(val voucherId: String) : Screen
     @Serializable
-    data object Weather : Screen()
+    @SerialName("weather")
+    data object Weather : Screen
     @Serializable
-    data object Settings : Screen()
+    @SerialName("settings")
+    data object Settings : Screen
 }

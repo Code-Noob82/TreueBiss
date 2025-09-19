@@ -1,10 +1,12 @@
 package com.dominikbaki.treuebiss.core.navigation
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeScreen
 import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScreen
 import com.dominikbaki.treuebiss.feature_settings.presentation.SettingsScreen
@@ -12,10 +14,16 @@ import com.dominikbaki.treuebiss.feature_stamps.presentation.StampCardScreen
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherScreen
 import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherScreen
 
+/**
+ * Zentrale Navigationsfunktion.
+ * - Nutzt `Screen` als typsichere Route.
+ * - Handhabt dynamische Argumente (z. B. cardId, voucherId).
+ */
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
     navController: NavHostController,
+    snackBarHostState: SnackbarHostState,
     startDestination: Screen, // Start-Ziel ist jetzt ein Screen-Objekt
     onOnboardingFinished: () -> Unit = {} // Event vom OnboardingScreen zum MainScreen
 ) {
@@ -24,6 +32,7 @@ fun AppNavigation(
         startDestination = startDestination,
         modifier = modifier
     ) {
+        // ---------- Onboarding ----------
         composable<Screen.Onboarding> {
             OnboardingScreen(
                 onFinish = {
@@ -34,30 +43,41 @@ fun AppNavigation(
                 }
             )
         }
+        // ---------- Home ----------
         composable<Screen.Home> {
             HomeScreen(
-                // Der HomeScreen weiß nichts vom NavController, er löst nur Events aus.
-                onNavigateToStampCard = { navController.navigate(Screen.StampCard)},
-                onNavigateToVoucher = { navController.navigate(Screen.Voucher)},
-                onNavigateToWeather = { navController.navigate(Screen.Weather)},
-                onNavigateToSettings = { navController.navigate(Screen.Settings)}
+                onNavigateToStampCard = { cardId ->
+                    navController.navigate(Screen.StampCard(cardId))
+                },
+                onNavigateToVoucher = { voucherId ->
+                    navController.navigate(Screen.Voucher(voucherId))
+                },
+                onNavigateToWeather = { navController.navigate(Screen.Weather) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings) }
             )
         }
-        composable<Screen.StampCard> {
+        // ---------- StampCard ----------
+        composable<Screen.StampCard> { backStackEntry ->
+            val args = backStackEntry.toRoute<Screen.StampCard>()
             StampCardScreen(
-                onNavigateUp = { navController.navigateUp() }
+                cardId = args.cardId,
+                snackBarHostState = snackBarHostState,
             )
         }
-        composable<Screen.Voucher> {
+        // ---------- Voucher ----------
+        composable<Screen.Voucher> { backStackEntry ->
+            val args = backStackEntry.toRoute<Screen.Voucher>()
             VoucherScreen(
-                onNavigateUp = { navController.navigateUp() }
+                voucherId = args.voucherId
             )
         }
+        // ---------- Weather ----------
         composable<Screen.Weather> {
             WeatherScreen(
                 onNavigateUp = { navController.navigateUp() }
             )
         }
+        // ---------- Settings ----------
         composable<Screen.Settings> {
             SettingsScreen(
                 onNavigateUp = { navController.navigateUp() }

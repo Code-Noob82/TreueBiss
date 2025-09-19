@@ -22,6 +22,8 @@ import javax.inject.Inject
 data class HomeUiState(
     val stampCount: Int = 0,
     val voucherCount: Int = 0,
+    val currentStampCardId: String? = null,
+    val currentVoucherId: String? = null,
     val dailySpecial: DailySpecial? = null, // Vorerst optional
     val isWeatherLoading: Boolean = false, // Startwert kann false sein, da der init-Block das Laden steuert
     val weatherData: WeatherData? = null,
@@ -52,6 +54,8 @@ class HomeViewModel @Inject constructor(
             HomeUiState(
                 stampCount = stamps.size,
                 voucherCount = vouchers.size,
+                currentStampCardId = stamps.firstOrNull()?.id ?: "default-card",
+                currentVoucherId = vouchers.firstOrNull()?.id ?: "default-voucher",
                 dailySpecial = DailySpecial( // Dummy-Daten für das Tagesangebot
                     title = "Unser Dinkel-Kracher",
                     description = "Heute frisch aus dem Ofen, nur 3,50€!",
