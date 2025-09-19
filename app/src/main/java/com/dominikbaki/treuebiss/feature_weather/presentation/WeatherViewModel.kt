@@ -60,7 +60,7 @@ class WeatherViewModel @Inject constructor(
             if (location != null) {
                 weatherRepository.getCurrentWeather(location.latitude, location.longitude)
                     .onSuccess { data ->
-                        _uiState.value = WeatherUiState.Success(data, cityName = "Dein Standort")
+                        _uiState.value = WeatherUiState.Success(data, cityName = "Dein Wetter")
                     }
                     .onFailure { error ->
                         _uiState.value = WeatherUiState.Error(error.message ?: "Unbekannter Fehler")

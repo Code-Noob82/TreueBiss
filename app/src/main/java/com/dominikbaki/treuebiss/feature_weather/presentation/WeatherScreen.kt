@@ -4,40 +4,37 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
+import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherType
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeatherScreen(
+    modifier: Modifier = Modifier,
     onNavigateUp: () -> Unit,
     viewModel: WeatherViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // NEU: Launcher für die Berechtigungsanfrage, genau wie im HomeScreen
+    // Berechtigungs-Launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -45,13 +42,11 @@ fun WeatherScreen(
             permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false)
         ) {
             viewModel.fetchWeatherDataForCurrentLocation()
-        } else {
-            // Optional: Zeige eine Snackbar, dass die Funktion ohne Erlaubnis nicht geht
         }
     }
 
-    // NEU: Effekt, der beim Start die Berechtigungen prüft und ggf. anfragt
-    LaunchedEffect(key1 = true) {
+    // Initialer Berechtigungs-Check
+    LaunchedEffect(Unit) {
         val hasPermission = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_COARSE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
@@ -60,41 +55,90 @@ fun WeatherScreen(
             viewModel.fetchWeatherDataForCurrentLocation()
         } else {
             permissionLauncher.launch(
-                arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
             )
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Wetter-Details") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
-                    }
-                }
-            )
+    // --- Inhalt ---
+    when (val state = uiState) {
+        is WeatherUiState.Loading -> LoadingContent()
+        is WeatherUiState.Success -> WeatherContent(
+            data = state.weatherData,
+            city = state.cityName ?: "Wetter"
+        )
+        is WeatherUiState.Error -> ErrorContent(
+            message = state.message,
+            onRetry = { viewModel.fetchWeatherDataForCurrentLocation() }
+        )
+    }
+}
+
+@Composable
+private fun LoadingContent() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator()
+        Spacer(Modifier.height(8.dp))
+        Text("Wetterdaten werden geladen…")
+    }
+}
+
+@Composable
+private fun ErrorContent(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "❌ Fehler: $message",
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = onRetry) {
+            Text("Erneut versuchen")
         }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            when (val state = uiState) {
-                is WeatherUiState.Loading -> CircularProgressIndicator()
-                is WeatherUiState.Success -> WeatherDetails(
-                    data = state.weatherData,
-                    city = state.cityName ?: "Wetter"
-                )
-                is WeatherUiState.Error -> Text(
-                    text = "Fehler: ${state.message}",
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
+    }
+}
+
+@Composable
+private fun WeatherContent(data: WeatherData, city: String) {
+    // Hintergrundfarbe + Icon je nach Zustand
+    val (bgColor, icon, label) = when (val type = data.weatherType) {
+        is WeatherType.ClearSky -> Triple(Color(0xFF90CAF9), Icons.Default.WbSunny, type.description)
+        is WeatherType.MainlyClear -> Triple(Color(0xFFBBDEFB), Icons.Default.WbSunny, type.description)
+        is WeatherType.PartlyCloudy -> Triple(Color(0xFFB0BEC5), Icons.Default.Cloud, type.description)
+        is WeatherType.Overcast -> Triple(Color(0xFF90A4AE), Icons.Default.Cloud, type.description)
+        is WeatherType.Fog -> Triple(Color(0xFFE0E0E0), Icons.Default.Cloud, type.description)
+        is WeatherType.Rain -> Triple(Color(0xFF80CBC4), Icons.Default.WaterDrop, "${type.description} (${type.intensity})")
+        is WeatherType.Snow -> Triple(Color(0xFFB3E5FC), Icons.Default.AcUnit, "${type.description} (${type.intensity})")
+        is WeatherType.Thunderstorm -> Triple(Color(0xFF9575CD), Icons.Default.Bolt, type.description)
+        is WeatherType.Unknown -> Triple(Color(0xFFCFD8DC), Icons.Default.Help, type.description)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgColor)
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(64.dp))
+            Spacer(Modifier.height(16.dp))
+            Text("${data.temperature}°C", style = MaterialTheme.typography.headlineLarge)
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text("Wind: ${data.windSpeed} km/h")
+            Text("Luftfeuchtigkeit: ${data.humidity}%")
+            Text("Luftdruck: ${data.pressure} hPa")
         }
     }
 }

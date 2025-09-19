@@ -73,9 +73,7 @@ fun AppNavigation(
         }
         // ---------- Weather ----------
         composable<Screen.Weather> {
-            WeatherScreen(
-                onNavigateUp = { navController.navigateUp() }
-            )
+            WeatherScreen(onNavigateUp = { navController.navigateUp() })
         }
         // ---------- Settings ----------
         composable<Screen.Settings> {
