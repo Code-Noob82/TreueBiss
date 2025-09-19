@@ -1,30 +1,11 @@
 package com.dominikbaki.treuebiss.core.presentation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -48,7 +29,9 @@ fun MainScreen(
 ) {
     val uiState by mainViewModel.uiState.collectAsState()
     val homeUiState by homeViewModel.uiState.collectAsState()
-    
+    val snackBarHostState = remember { SnackbarHostState() }
+
+    // EIN NavController (Single-Backstack)
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = remember(navBackStackEntry) {
@@ -58,8 +41,6 @@ fun MainScreen(
             null
         }
     }
-
-    val snackBarHostState = remember { SnackbarHostState() }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarHostState) },
@@ -71,15 +52,14 @@ fun MainScreen(
                             when (currentRoute) {
                                 is Screen.Home -> "Home"
                                 is Screen.StampCard -> "Bonuskarte"
-                                is Screen.Voucher -> "Gutschein"
-                                is Screen.Weather -> "Wetter"
-                                is Screen.Settings -> "Einstellungen"
+                                is Screen.Voucher -> "Gutscheine"
                                 else -> ""
                             }
                         )
                     },
                     navigationIcon = {
-                        if (navController.previousBackStackEntry != null && currentRoute !is Screen.Home
+                        if (navController.previousBackStackEntry != null &&
+                            currentRoute !is Screen.Home
                         ) {
                             IconButton(onClick = { navController.navigateUp() }) {
                                 Icon(
@@ -113,34 +93,38 @@ fun MainScreen(
                         voucherId = homeUiState.currentVoucherId ?: "default-voucher"
                     )
                 )
+
                 NavigationBar {
                     items.forEach { item ->
                         NavigationBarItem(
                             label = { Text(item.title) },
                             icon = { Icon(item.icon, contentDescription = item.title) },
-                            selected = when (item) {
-                                is BottomNavItem.Home -> currentRoute is Screen.Home
-                                is BottomNavItem.StampCard -> currentRoute is Screen.StampCard
-                                is BottomNavItem.Vouchers -> currentRoute is Screen.Voucher
-                            },
+                            selected = isSameType(currentRoute, item),
                             onClick = {
                                 when (item) {
-                                    is BottomNavItem.Home -> {
-                                        navController.navigate(Screen.Home) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
+                                    is BottomNavItem.Home -> navController.navigate(Screen.Home) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            inclusive = false
                                         }
+                                        launchSingleTop = true
                                     }
 
-                                    is BottomNavItem.StampCard -> {
-                                        navController.navigate(Screen.StampCard(item.cardId))
+                                    is BottomNavItem.StampCard -> navController.navigate(
+                                        Screen.StampCard(item.cardId)
+                                    ) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            inclusive = false
+                                        }
+                                        launchSingleTop = true
                                     }
 
-                                    is BottomNavItem.Vouchers -> {
-                                        navController.navigate(Screen.Voucher(item.voucherId))
+                                    is BottomNavItem.Vouchers -> navController.navigate(
+                                        Screen.Voucher(item.voucherId)
+                                    ) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            inclusive = false
+                                        }
+                                        launchSingleTop = true
                                     }
                                 }
                             }
@@ -154,16 +138,14 @@ fun MainScreen(
             is MainUiState.Loading -> Box(
                 Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+            ) { CircularProgressIndicator() }
 
             is MainUiState.Success -> AppNavigation(
                 modifier = Modifier.padding(innerPadding),
                 navController = navController,
+                snackBarHostState = snackBarHostState,
                 startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
-                onOnboardingFinished = mainViewModel::onOnboardingFinished,
-                snackBarHostState = snackBarHostState
+                onOnboardingFinished = mainViewModel::onOnboardingFinished
             )
 
             is MainUiState.Error -> Box(
