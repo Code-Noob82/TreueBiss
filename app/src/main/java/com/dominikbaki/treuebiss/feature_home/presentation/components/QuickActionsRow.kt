@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.FilterDrama
 import androidx.compose.material.icons.filled.Refresh
-import com.dominikbaki.treuebiss.feature_home.presentation.LocalBrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
 import kotlin.math.roundToInt
 

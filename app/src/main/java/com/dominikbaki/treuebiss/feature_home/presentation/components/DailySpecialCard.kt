@@ -21,8 +21,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.feature_home.presentation.DailySpecial
-import com.dominikbaki.treuebiss.feature_home.presentation.LocalBrandingConfig
 
 @Composable
 fun DailySpecialCard(special: DailySpecial) {

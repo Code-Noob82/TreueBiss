@@ -18,8 +18,21 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.core.navigation.AppNavigation
 import com.dominikbaki.treuebiss.core.navigation.Screen
+import com.dominikbaki.treuebiss.core.presentation.branding.BrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeViewModel
+
+// ------------------
+// BrandingConfig (später dynamisch per API)
+// ------------------
+val branding = BrandingConfig(
+    businessName = "Bäckerei Mustermann",
+    dailySpecialTitle = "Schmankerl des Tages",
+    loyaltyPointsTitle = "Deine Treuepunkte",
+    vouchersTitle = "Meine Gutscheine",
+    weatherTitle = "Wetter-Check"
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,31 +147,33 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
-        when (val state = uiState) {
-            is MainUiState.Loading -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+        CompositionLocalProvider(LocalBrandingConfig provides branding) {
+            when (val state = uiState) {
+                is MainUiState.Loading -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
 
-            is MainUiState.Success -> AppNavigation(
-                modifier = Modifier.padding(innerPadding),
-                navController = navController,
-                snackBarHostState = snackBarHostState,
-                startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
-                onOnboardingFinished = mainViewModel::onOnboardingFinished
-            )
+                is MainUiState.Success -> AppNavigation(
+                    modifier = Modifier.padding(innerPadding),
+                    navController = navController,
+                    snackBarHostState = snackBarHostState,
+                    startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
+                    onOnboardingFinished = mainViewModel::onOnboardingFinished
+                )
 
-            is MainUiState.Error -> Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.message, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { mainViewModel.retryInitialAuth() }) {
-                        Text("Wiederholen")
+                is MainUiState.Error -> Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.message, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(16.dp))
+                        Button(onClick = { mainViewModel.retryInitialAuth() }) {
+                            Text("Wiederholen")
+                        }
                     }
                 }
             }
