@@ -34,6 +34,15 @@ val branding = BrandingConfig(
     weatherTitle = "Wetter-Check"
 )
 
+// ------------------
+// Mapping BottomNavItem -> Screen
+// ------------------
+private fun BottomNavItem.toScreen(): Screen = when (this) {
+    is BottomNavItem.Home -> Screen.Home
+    is BottomNavItem.StampCard -> Screen.StampCard(cardId)
+    is BottomNavItem.Vouchers -> Screen.Voucher(voucherId)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
@@ -63,9 +72,11 @@ fun MainScreen(
                     title = {
                         Text(
                             when (currentRoute) {
-                                is Screen.Home -> "Home"
-                                is Screen.StampCard -> "Bonuskarte"
-                                is Screen.Voucher -> "Gutscheine"
+                                is Screen.Home -> branding.businessName
+                                is Screen.StampCard -> branding.loyaltyPointsTitle
+                                is Screen.Voucher -> branding.vouchersTitle
+                                is Screen.Weather -> branding.weatherTitle
+                                is Screen.Settings -> "Einstellungen"
                                 else -> ""
                             }
                         )
@@ -98,11 +109,13 @@ fun MainScreen(
         bottomBar = {
             if (currentRoute !is Screen.Onboarding) {
                 val items = listOf(
-                    BottomNavItem.Home,
+                    BottomNavItem.Home(branding),
                     BottomNavItem.StampCard(
+                        branding = branding,
                         cardId = homeUiState.currentStampCardId ?: "default-card"
                     ),
                     BottomNavItem.Vouchers(
+                        branding = branding,
                         voucherId = homeUiState.currentVoucherId ?: "default-voucher"
                     )
                 )
@@ -112,33 +125,13 @@ fun MainScreen(
                         NavigationBarItem(
                             label = { Text(item.title) },
                             icon = { Icon(item.icon, contentDescription = item.title) },
-                            selected = isSameType(currentRoute, item),
+                            selected = BottomNavItem.isSameType(currentRoute, item),
                             onClick = {
-                                when (item) {
-                                    is BottomNavItem.Home -> navController.navigate(Screen.Home) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            inclusive = false
-                                        }
-                                        launchSingleTop = true
+                                navController.navigate(item.toScreen()) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = false
                                     }
-
-                                    is BottomNavItem.StampCard -> navController.navigate(
-                                        Screen.StampCard(item.cardId)
-                                    ) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            inclusive = false
-                                        }
-                                        launchSingleTop = true
-                                    }
-
-                                    is BottomNavItem.Vouchers -> navController.navigate(
-                                        Screen.Voucher(item.voucherId)
-                                    ) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
-                                            inclusive = false
-                                        }
-                                        launchSingleTop = true
-                                    }
+                                    launchSingleTop = true
                                 }
                             }
                         )
@@ -159,7 +152,8 @@ fun MainScreen(
                     navController = navController,
                     snackBarHostState = snackBarHostState,
                     startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
-                    onOnboardingFinished = mainViewModel::onOnboardingFinished
+                    onOnboardingFinished = mainViewModel::onOnboardingFinished,
+                    paddingValues = innerPadding
                 )
 
                 is MainUiState.Error -> Box(

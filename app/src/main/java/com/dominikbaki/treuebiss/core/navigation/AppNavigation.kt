@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.core.navigation
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,7 +26,8 @@ fun AppNavigation(
     navController: NavHostController,
     snackBarHostState: SnackbarHostState,
     startDestination: Screen, // Start-Ziel ist jetzt ein Screen-Objekt
-    onOnboardingFinished: () -> Unit = {} // Event vom OnboardingScreen zum MainScreen
+    onOnboardingFinished: () -> Unit = {}, // Event vom OnboardingScreen zum MainScreen
+    paddingValues: PaddingValues
 ) {
     NavHost(
         navController = navController,
@@ -53,7 +55,8 @@ fun AppNavigation(
                     navController.navigate(Screen.Voucher(voucherId))
                 },
                 onNavigateToWeather = { navController.navigate(Screen.Weather) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings) }
+                onNavigateToSettings = { navController.navigate(Screen.Settings) },
+                paddingValues = paddingValues
             )
         }
         // ---------- StampCard ----------
