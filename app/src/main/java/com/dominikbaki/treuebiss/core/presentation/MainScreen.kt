@@ -54,18 +54,20 @@ fun MainScreen(
         }
     }
 
+    val branding = LocalBrandingConfig.current
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarHostState) },
         topBar = {
-            if (currentRoute !is Screen.Onboarding) {
+            if (uiState is MainUiState.Success && currentRoute !is Screen.Onboarding) {
                 TopAppBar(
                     title = {
                         Text(
                             when (currentRoute) {
-                                is Screen.Home -> DefaultBrandingConfig.businessName
-                                is Screen.StampCard -> DefaultBrandingConfig.loyaltyPointsTitle
-                                is Screen.Voucher -> DefaultBrandingConfig.vouchersTitle
-                                is Screen.Weather -> DefaultBrandingConfig.weatherTitle
+                                is Screen.Home -> branding.businessName
+                                is Screen.StampCard -> branding.loyaltyPointsTitle
+                                is Screen.Voucher -> branding.vouchersTitle
+                                is Screen.Weather -> branding.weatherTitle
                                 is Screen.Settings -> "Einstellungen"
                                 else -> ""
                             }
@@ -97,15 +99,13 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (currentRoute !is Screen.Onboarding) {
+            if (uiState is MainUiState.Success && currentRoute !is Screen.Onboarding) {
                 val items = listOf(
-                    BottomNavItem.Home(DefaultBrandingConfig),
+                    BottomNavItem.Home,
                     BottomNavItem.StampCard(
-                        branding = DefaultBrandingConfig,
                         cardId = homeUiState.currentStampCardId ?: "default-card"
                     ),
                     BottomNavItem.Vouchers(
-                        branding = DefaultBrandingConfig,
                         voucherId = homeUiState.currentVoucherId ?: "default-voucher"
                     )
                 )
@@ -113,8 +113,8 @@ fun MainScreen(
                 NavigationBar {
                     items.forEach { item ->
                         NavigationBarItem(
-                            label = { Text(item.title) },
-                            icon = { Icon(item.icon, contentDescription = item.title) },
+                            label = { Text(item.title()) },
+                            icon = { Icon(item.icon, contentDescription = null) },
                             selected = BottomNavItem.isSameType(currentRoute, item),
                             onClick = {
                                 navController.navigate(item.toScreen()) {
@@ -130,40 +130,39 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
-        CompositionLocalProvider(LocalBrandingConfig provides DefaultBrandingConfig) {
-            when (val state = uiState) {
-                is MainUiState.Loading -> Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator() }
+        when (val state = uiState) {
+            is MainUiState.Loading -> Box(
+                Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
 
-                is MainUiState.Success -> AppNavigation(
-                    modifier = Modifier.padding(innerPadding),
-                    navController = navController,
-                    snackBarHostState = snackBarHostState,
-                    startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
-                    onOnboardingFinished = mainViewModel::onOnboardingFinished,
-                    paddingValues = innerPadding
-                )
+            is MainUiState.Success -> AppNavigation(
+                modifier = Modifier.padding(innerPadding),
+                navController = navController,
+                snackBarHostState = snackBarHostState,
+                startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
+                onOnboardingFinished = mainViewModel::onOnboardingFinished,
+                paddingValues = innerPadding
+            )
 
-                is MainUiState.Error -> Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.message, textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(16.dp))
-                        Button(onClick = { mainViewModel.retryInitialAuth() }) {
-                            Text("Wiederholen")
-                        }
+            is MainUiState.Error -> Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(state.message, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { mainViewModel.retryInitialAuth() }) {
+                        Text("Wiederholen")
                     }
                 }
             }
         }
     }
 }
+
 
 @Preview
 @Composable

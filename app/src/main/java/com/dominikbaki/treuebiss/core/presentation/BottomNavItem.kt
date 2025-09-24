@@ -4,41 +4,43 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.ShoppingCart
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.dominikbaki.treuebiss.core.navigation.Screen
-import com.dominikbaki.treuebiss.core.presentation.branding.BrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 
 /**
  * Definiert die Items der Bottom Navigation.
  * Titel kommen jetzt dynamisch aus der BrandingConfig.
  */
 sealed class BottomNavItem(
-    open val title: String,
     val icon: ImageVector
 ) {
-    data class Home(val branding: BrandingConfig) : BottomNavItem(
-        title = branding.businessName,
-        icon = Icons.Rounded.Home
-    )
+    @Composable
+    abstract fun title(): String
+    object Home : BottomNavItem(icon = Icons.Rounded.Home) {
+        @Composable
+        override fun title(): String = LocalBrandingConfig.current.businessName
+    }
 
-    data class StampCard(val branding: BrandingConfig, val cardId: String) : BottomNavItem(
-        title = branding.loyaltyPointsTitle,
-        icon = Icons.Rounded.ShoppingCart
-    )
+    data class StampCard(val cardId: String) : BottomNavItem(icon = Icons.Rounded.ShoppingCart) {
+        @Composable
+        override fun title(): String = LocalBrandingConfig.current.loyaltyPointsTitle
+    }
 
-    data class Vouchers(val branding: BrandingConfig, val voucherId: String) : BottomNavItem(
-        title = branding.vouchersTitle,
-        icon = Icons.Rounded.Favorite
-    )
+    data class Vouchers(val voucherId: String) : BottomNavItem(icon = Icons.Rounded.Favorite) {
+        @Composable
+        override fun title(): String = LocalBrandingConfig.current.vouchersTitle
+    }
 
     companion object {
         /**
          * Hilfsfunktion, um Typgleichheit zu prüfen (egal welche ID gesetzt ist).
          */
         fun isSameType(currentRoute: Screen?, item: BottomNavItem): Boolean = when {
-            currentRoute is Screen.Home && item is BottomNavItem.Home -> true
-            currentRoute is Screen.StampCard && item is BottomNavItem.StampCard -> true
-            currentRoute is Screen.Voucher && item is BottomNavItem.Vouchers -> true
+            currentRoute is Screen.Home && item is Home -> true
+            currentRoute is Screen.StampCard && item is StampCard -> true
+            currentRoute is Screen.Voucher && item is Vouchers -> true
             else -> false
         }
     }
