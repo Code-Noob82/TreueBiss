@@ -18,21 +18,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.core.navigation.AppNavigation
 import com.dominikbaki.treuebiss.core.navigation.Screen
-import com.dominikbaki.treuebiss.core.presentation.branding.BrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.branding.DefaultBrandingConfig
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeViewModel
 
-// ------------------
-// BrandingConfig (später dynamisch per API)
-// ------------------
-val branding = BrandingConfig(
-    businessName = "Bäckerei Mustermann",
-    dailySpecialTitle = "Schmankerl des Tages",
-    loyaltyPointsTitle = "Deine Treuepunkte",
-    vouchersTitle = "Meine Gutscheine",
-    weatherTitle = "Wetter-Check"
-)
 
 // ------------------
 // Mapping BottomNavItem -> Screen
@@ -72,10 +62,10 @@ fun MainScreen(
                     title = {
                         Text(
                             when (currentRoute) {
-                                is Screen.Home -> branding.businessName
-                                is Screen.StampCard -> branding.loyaltyPointsTitle
-                                is Screen.Voucher -> branding.vouchersTitle
-                                is Screen.Weather -> branding.weatherTitle
+                                is Screen.Home -> DefaultBrandingConfig.businessName
+                                is Screen.StampCard -> DefaultBrandingConfig.loyaltyPointsTitle
+                                is Screen.Voucher -> DefaultBrandingConfig.vouchersTitle
+                                is Screen.Weather -> DefaultBrandingConfig.weatherTitle
                                 is Screen.Settings -> "Einstellungen"
                                 else -> ""
                             }
@@ -109,13 +99,13 @@ fun MainScreen(
         bottomBar = {
             if (currentRoute !is Screen.Onboarding) {
                 val items = listOf(
-                    BottomNavItem.Home(branding),
+                    BottomNavItem.Home(DefaultBrandingConfig),
                     BottomNavItem.StampCard(
-                        branding = branding,
+                        branding = DefaultBrandingConfig,
                         cardId = homeUiState.currentStampCardId ?: "default-card"
                     ),
                     BottomNavItem.Vouchers(
-                        branding = branding,
+                        branding = DefaultBrandingConfig,
                         voucherId = homeUiState.currentVoucherId ?: "default-voucher"
                     )
                 )
@@ -140,7 +130,7 @@ fun MainScreen(
             }
         }
     ) { innerPadding ->
-        CompositionLocalProvider(LocalBrandingConfig provides branding) {
+        CompositionLocalProvider(LocalBrandingConfig provides DefaultBrandingConfig) {
             when (val state = uiState) {
                 is MainUiState.Loading -> Box(
                     Modifier.fillMaxSize(),

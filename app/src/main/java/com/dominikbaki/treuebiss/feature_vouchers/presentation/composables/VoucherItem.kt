@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.feature_vouchers.presentation
+package com.dominikbaki.treuebiss.feature_vouchers.presentation.composables
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,9 +23,7 @@ import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.ui.utils.DateTimeFormatter
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
 @Composable
 internal fun VoucherItem(
     voucher: Voucher,

@@ -1,4 +1,4 @@
-package com.dominikbaki.treuebiss.feature_vouchers.presentation
+package com.dominikbaki.treuebiss.feature_vouchers.presentation.composables
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button

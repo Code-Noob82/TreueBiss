@@ -1,0 +1,12 @@
+package com.dominikbaki.treuebiss.core.presentation.branding
+
+// ------------------
+// BrandingConfig (später dynamisch per API)
+// ------------------
+val DefaultBrandingConfig = BrandingConfig(
+    businessName = "Bäckerei Mustermann",
+    dailySpecialTitle = "Schmankerl des Tages",
+    loyaltyPointsTitle = "Meine Treuepunkte",
+    vouchersTitle = "Meine Gutscheine",
+    weatherTitle = "Aktuelles Wetter"
+)
