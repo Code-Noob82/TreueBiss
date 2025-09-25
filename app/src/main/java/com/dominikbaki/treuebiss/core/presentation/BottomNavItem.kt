@@ -5,6 +5,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.dominikbaki.treuebiss.core.navigation.Screen
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
@@ -17,19 +18,23 @@ sealed class BottomNavItem(
     val icon: ImageVector
 ) {
     @Composable
+    @ReadOnlyComposable
     abstract fun title(): String
     object Home : BottomNavItem(icon = Icons.Rounded.Home) {
         @Composable
+        @ReadOnlyComposable
         override fun title(): String = LocalBrandingConfig.current.businessName
     }
 
     data class StampCard(val cardId: String) : BottomNavItem(icon = Icons.Rounded.ShoppingCart) {
         @Composable
+        @ReadOnlyComposable
         override fun title(): String = LocalBrandingConfig.current.loyaltyPointsTitle
     }
 
     data class Vouchers(val voucherId: String) : BottomNavItem(icon = Icons.Rounded.Favorite) {
         @Composable
+        @ReadOnlyComposable
         override fun title(): String = LocalBrandingConfig.current.vouchersTitle
     }
 

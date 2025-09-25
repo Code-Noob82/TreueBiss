@@ -18,7 +18,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.core.navigation.AppNavigation
 import com.dominikbaki.treuebiss.core.navigation.Screen
-import com.dominikbaki.treuebiss.core.presentation.branding.DefaultBrandingConfig
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeViewModel
@@ -55,11 +54,12 @@ fun MainScreen(
     }
 
     val branding = LocalBrandingConfig.current
+    val showBars = uiState is MainUiState.Success && currentRoute !is Screen.Onboarding
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarHostState) },
         topBar = {
-            if (uiState is MainUiState.Success && currentRoute !is Screen.Onboarding) {
+            if (showBars) {
                 TopAppBar(
                     title = {
                         Text(
@@ -99,7 +99,7 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (uiState is MainUiState.Success && currentRoute !is Screen.Onboarding) {
+            if (uiState is MainUiState.Success && showBars) {
                 val items = listOf(
                     BottomNavItem.Home,
                     BottomNavItem.StampCard(
@@ -132,18 +132,21 @@ fun MainScreen(
     ) { innerPadding ->
         when (val state = uiState) {
             is MainUiState.Loading -> Box(
-                Modifier.fillMaxSize().padding(innerPadding),
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) { CircularProgressIndicator() }
 
-            is MainUiState.Success -> AppNavigation(
-                modifier = Modifier.padding(innerPadding),
-                navController = navController,
-                snackBarHostState = snackBarHostState,
-                startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
-                onOnboardingFinished = mainViewModel::onOnboardingFinished,
-                paddingValues = innerPadding
-            )
+            is MainUiState.Success ->
+                AppNavigation(
+                    modifier = Modifier.padding(innerPadding),
+                    navController = navController,
+                    snackBarHostState = snackBarHostState,
+                    startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,
+                    onOnboardingFinished = mainViewModel::onOnboardingFinished,
+                    paddingValues = innerPadding
+                )
 
             is MainUiState.Error -> Box(
                 modifier = Modifier
