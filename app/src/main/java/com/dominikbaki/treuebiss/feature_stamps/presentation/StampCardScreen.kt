@@ -1,11 +1,11 @@
 package com.dominikbaki.treuebiss.feature_stamps.presentation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Style
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
@@ -16,11 +16,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.feature_stamps.presentation.composables.DemoAddStampButton
+import com.dominikbaki.treuebiss.feature_stamps.presentation.composables.StampCircle
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -39,20 +40,34 @@ internal fun StampCardScreen(
                 message = "Glückwunsch! Ein neuer Gutschein wurde erstellt.",
                 duration = SnackbarDuration.Short
             )
-            // TODO: navController.navigate(Screen.Voucher(voucherId))
         }
     }
 
-    // Der Screen besteht jetzt nur noch aus der reinen Inhalts-Spalte.
+    // NEU: Verbessertes Layout mit besserer Struktur und optischen Elementen
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp), // Padding für den Inhalt
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Deine Stempelkarte", style = MaterialTheme.typography.headlineMedium)
+        // --- Header Sektion ---
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Style, // Thematisch passendes Icon
+                contentDescription = "Stempelkarten-Icon",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Meine Stempelkarte",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = if (stampCount < 10) {
@@ -60,16 +75,23 @@ internal fun StampCardScreen(
                 } else {
                     "Glückwunsch! Du hast einen Gutschein erhalten."
                 },
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Gitter für die 10 Stempel-Kreise
+        }
+        // --- Stempelgitter (zentriert im verfügbaren Platz) ---
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f), // Sorgt dafür, dass das Gitter den Platz füllt
+            contentAlignment = Alignment.Center
+        ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(5),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(horizontal = 16.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp), // Mehr Abstand
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.padding(horizontal = 8.dp)
             ) {
                 items(10) { index ->
                     val isStamped = index < stampCount
@@ -78,35 +100,15 @@ internal fun StampCardScreen(
             }
         }
 
-        DemoAddStampButton(
-            enabled = true,
-            onClick = { viewModel.onAddStampClicked() }
-        )
+        // --- Button am unteren Rand ---
+        // KORREKTUR: Der Button wird in eine Box gewrappt, um den Modifier anwenden zu können.
+        Box(modifier = Modifier.padding(bottom = 16.dp)) {
+            DemoAddStampButton(
+                enabled = stampCount < 10,
+                onClick = { viewModel.onAddStampClicked() }
+            )
+        }
     }
 }
 
-@Composable
-private fun StampCircle(isStamped: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(50.dp)
-            .clip(CircleShape)
-            .background(
-                if (isStamped) MaterialTheme.colorScheme.primary else Color.LightGray.copy(alpha = 0.5f)
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        // Hier könnte man später ein Icon oder eine Nummer hinzufügen
-    }
-}
 
-//@Preview(showBackground = true)
-//@Composable
-//private fun StampCardScreenPreview() {
-//    TreueBissTheme {
-//        // Die Vorschau wurde angepasst und benötigt 'onNavigateUp' nicht mehr.
-//        StampCardScreen(cardId = 1,
-//            snackarHostState = SnackbarHostState()
-//        )
-//    }
-//}
