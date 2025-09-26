@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.feature_vouchers.presentation.composables
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,18 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.ui.utils.DateTimeFormatter
 import kotlinx.datetime.Instant
 
@@ -37,6 +40,7 @@ fun VoucherDetailOverlay(
     voucher: Voucher,
     onDismiss: () -> Unit
 ) {
+    val branding = LocalBrandingConfig.current // Branding-Informationen abrufen
     val expiresAtInstant = Instant.fromEpochMilliseconds(voucher.expiresAt)
     val expiresAtFormatted = DateTimeFormatter.formatInstant(expiresAtInstant)
 
@@ -45,42 +49,72 @@ fun VoucherDetailOverlay(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Beispiel für den Geschäftsnamen
-                    Text(
-                        text = "Bäckerei Mustermann",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Zeige diesen Code an der Kasse vor.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(32.dp))
 
-                    // QR-Code Sektion
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        elevation = CardDefaults.cardElevation(4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White)
+        // Eleganter Hintergrund mit Farbverlauf
+        val gradientBrush = Brush.verticalGradient(
+            colors = listOf(
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                MaterialTheme.colorScheme.background
+            )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(gradientBrush)
+        ) {
+            // Zurück-Button statt Schließen-Icon für eine bessere UX
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Zurück",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp, vertical = 80.dp), // Mehr vertikaler Abstand
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Geschäftsname aus dem Branding
+                Text(
+                    text = branding.businessName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Zeige diesen Code an der Kasse vor, um deinen Gutschein einzulösen.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(48.dp))
+
+                // Aufgewertete QR-Code Karte
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(260.dp)
-                                .padding(24.dp),
+                                .size(220.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.White)
+                                .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -90,36 +124,19 @@ fun VoucherDetailOverlay(
                                 tint = Color.Black
                             )
                         }
+                        Spacer(Modifier.height(24.dp))
+                        Text(
+                            text = "Dein Treue-Gutschein",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Gültig bis: $expiresAtFormatted",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-
-                    Spacer(Modifier.height(32.dp))
-
-                    // Gutschein-Details
-                    Text(
-                        text = "Dein Treue-Gutschein",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Gültig bis: $expiresAtFormatted",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Schließen-Button am oberen Rand
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Schließen",
-                        modifier = Modifier.size(32.dp)
-                    )
                 }
             }
         }
