@@ -46,10 +46,17 @@ fun MainScreen(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = remember(navBackStackEntry) {
-        try {
-            navBackStackEntry?.toRoute<Screen>()
-        } catch (e: Exception) {
-            null
+        // Sicherer Versuch, die Route zu bestimmen
+        navBackStackEntry?.destination?.route?.let { routeString ->
+            when {
+                routeString.startsWith("home") -> Screen.Home
+                routeString.startsWith("onboarding") -> Screen.Onboarding
+                routeString.startsWith("stamp_card") -> navBackStackEntry?.toRoute<Screen.StampCard>()
+                routeString.startsWith("voucher") -> navBackStackEntry?.toRoute<Screen.Voucher>()
+                routeString.startsWith("weather") -> Screen.Weather
+                routeString.startsWith("settings") -> Screen.Settings
+                else -> null
+            }
         }
     }
 
