@@ -46,16 +46,20 @@ fun MainScreen(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = remember(navBackStackEntry) {
-        // Sicherer Versuch, die Route zu bestimmen
-        navBackStackEntry?.destination?.route?.let { routeString ->
-            when {
-                routeString.startsWith("home") -> Screen.Home
-                routeString.startsWith("onboarding") -> Screen.Onboarding
-                routeString.startsWith("stamp_card") -> navBackStackEntry?.toRoute<Screen.StampCard>()
-                routeString.startsWith("voucher") -> navBackStackEntry?.toRoute<Screen.Voucher>()
-                routeString.startsWith("weather") -> Screen.Weather
-                routeString.startsWith("settings") -> Screen.Settings
-                else -> null
+        try {
+            navBackStackEntry?.toRoute<Screen>()
+        } catch (e: Exception) {
+            // Fallback, wenn toRoute fehlschlägt (z.B. während der Navigation)
+            navBackStackEntry?.destination?.route?.let { routeString ->
+                when {
+                    routeString.startsWith("home") -> Screen.Home
+                    routeString.startsWith("onboarding") -> Screen.Onboarding
+                    routeString.startsWith("stamp_card") -> Screen.StampCard("")
+                    routeString.startsWith("voucher") -> Screen.Voucher("")
+                    routeString.startsWith("weather") -> Screen.Weather
+                    routeString.startsWith("settings") -> Screen.Settings
+                    else -> null
+                }
             }
         }
     }
@@ -122,7 +126,14 @@ fun MainScreen(
                         NavigationBarItem(
                             label = { Text(item.title()) },
                             icon = { Icon(item.icon, contentDescription = null) },
-                            selected = BottomNavItem.isSameType(currentRoute, item),
+                            // --- FIX: Die Logik zur Auswahl des Items wurde direkt hier implementiert ---
+                            // Das ist stabiler, als zu versuchen, die komplexe Route zu parsen.
+                            selected = when (currentRoute) {
+                                is Screen.Home -> item is BottomNavItem.Home
+                                is Screen.StampCard -> item is BottomNavItem.StampCard
+                                is Screen.Voucher -> item is BottomNavItem.Vouchers
+                                else -> false
+                            },
                             onClick = {
                                 navController.navigate(item.toScreen()) {
                                     popUpTo(navController.graph.findStartDestination().id) {

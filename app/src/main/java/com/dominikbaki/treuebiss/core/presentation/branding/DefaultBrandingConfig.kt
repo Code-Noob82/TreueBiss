@@ -6,7 +6,7 @@ package com.dominikbaki.treuebiss.core.presentation.branding
 val DefaultBrandingConfig = BrandingConfig(
     businessName = "Bäckerei Mustermann",
     dailySpecialTitle = "Schmankerl des Tages",
-    loyaltyPointsTitle = "Meine Treuepunkte",
-    vouchersTitle = "Meine Gutscheine",
+    loyaltyPointsTitle = "Treuepunkte",
+    vouchersTitle = "Gutscheine",
     weatherTitle = "Aktuelles Wetter"
 )

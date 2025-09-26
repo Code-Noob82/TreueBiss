@@ -23,7 +23,7 @@ sealed class BottomNavItem(
     object Home : BottomNavItem(icon = Icons.Rounded.Home) {
         @Composable
         @ReadOnlyComposable
-        override fun title(): String = LocalBrandingConfig.current.businessName
+        override fun title(): String = "Start"
     }
 
     data class StampCard(val cardId: String) : BottomNavItem(icon = Icons.Rounded.ShoppingCart) {
