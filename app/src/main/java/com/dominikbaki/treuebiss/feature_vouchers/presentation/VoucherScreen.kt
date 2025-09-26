@@ -37,6 +37,8 @@ internal fun VoucherScreen(
     viewModel: VoucherViewModel = hiltViewModel()
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
+
+
     var showDialog by remember { mutableStateOf(false) } // Dialog-Status
     var selectedVoucherId by remember { mutableStateOf<String?>(null) } // ausgewählter Gutschein
 
