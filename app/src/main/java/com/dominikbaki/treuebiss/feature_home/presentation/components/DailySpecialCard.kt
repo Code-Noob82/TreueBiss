@@ -1,6 +1,7 @@
 package com.dominikbaki.treuebiss.feature_home.presentation.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,8 +10,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,32 +31,66 @@ import com.dominikbaki.treuebiss.feature_home.presentation.DailySpecial
 @Composable
 fun DailySpecialCard(special: DailySpecial) {
     val branding = LocalBrandingConfig.current // Holt sich das Branding
+    // NEU: Angepasst an das moderne Kartendesign
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = MaterialTheme.shapes.large // Stärker abgerundete Ecken
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
-            Text(branding.dailySpecialTitle, style = MaterialTheme.typography.titleMedium) // Aus dem BRANDING
-            Spacer(Modifier.height(12.dp))
+            // --- Header Sektion ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = branding.dailySpecialTitle, // Titel aus BrandingConfig
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                // NEU: Ein Icon, das den "Special"-Charakter unterstreicht
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Tagesangebot-Icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            // --- Inhalts-Sektion ---
             Row(verticalAlignment = Alignment.CenterVertically) {
                 special.imageUrl?.let { imageResId ->
                     Image(
                         painter = painterResource(id = imageResId),
                         contentDescription = special.title,
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(MaterialTheme.shapes.small),
+                            .size(80.dp)
+                            .clip(MaterialTheme.shapes.medium),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(Modifier.width(16.dp))
                 }
-                Column {
-                    Text(special.title, fontWeight = FontWeight.Bold)
-                    Text(special.description, style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = special.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = special.description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        // NEU: Dezentere Farbe für die Beschreibung zur besseren Lesbarkeit
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
