@@ -140,7 +140,7 @@ fun MainScreen(
 
             is MainUiState.Success ->
                 AppNavigation(
-                    modifier = Modifier.padding(innerPadding),
+                    modifier = Modifier.fillMaxSize(),
                     navController = navController,
                     snackBarHostState = snackBarHostState,
                     startDestination = if (state.hasCompletedOnboarding) Screen.Home else Screen.Onboarding,

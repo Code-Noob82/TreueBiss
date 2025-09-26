@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -48,43 +47,58 @@ class MainViewModel @Inject constructor(
     init {
         initialize()
     }
+    // ÜBERARBEITETE, ROBUSTERE VERSION
     private fun initialize() {
         viewModelScope.launch {
+            _uiState.value = MainUiState.Loading
             try {
-                val initialAuthStatus = withTimeoutOrNull(3000) {
-                    authRepository.observeAuthState().first()
-                }
-                if (initialAuthStatus == null || initialAuthStatus == false) {
-                    authRepository.signInAnonymously()
-                }
+                // Schritt 1: Stelle sicher, dass der User angemeldet ist.
+                // Wir warten auf den ersten "wahren" Wert vom Auth-State.
+                val isLoggedIn = authRepository.observeAuthState().first { it }
 
+                // Wenn wir hier ankommen, ist der User definitiv angemeldet.
+                Log.d("MainViewModel", "User is authenticated, proceeding to load data.")
+
+                // Schritt 2: Lade jetzt die restlichen Daten, da die Anmeldung sicher ist.
                 combine(
                     userPreferencesRepository.hasCompletedOnboarding,
-                    authRepository.observeAuthState(),
                     stampRepository.observeStamps(),
                     voucherRepository.observeAll(includeRedeemed = false),
-                ) { hasCompletedOnboarding, isLoggedIn, stamps, vouchers ->
+                ) { hasCompletedOnboarding, stamps, vouchers ->
+                    // Der isLoggedIn-Wert kommt jetzt von oben, nicht mehr direkt aus dem Flow
                     MainUiState.Success(
                         hasCompletedOnboarding = hasCompletedOnboarding,
                         isLoggedIn = isLoggedIn,
                         stampCount = stamps.size,
                         voucherCount = vouchers.size,
+                        // Logik für IDs bleibt gleich
                         currentStampCardId = stamps.lastOrNull()?.id ?: "default-card",
                         currentVoucherId = vouchers.lastOrNull()?.id ?: "default-voucher"
                     )
                 }.collect { successState ->
+                    // Dies sollte jetzt zuverlässig erreicht werden
+                    Log.d("MainViewModel", "State is now SUCCESS!")
                     _uiState.value = successState
                 }
+
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Initialization failed: ${e.message}", e)
                 _uiState.value = MainUiState.Error("Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung.")
+            }
+        }
+
+        // Starte die anonyme Anmeldung parallel, falls nötig.
+        // Der obere Flow wird automatisch warten, bis dieser Prozess erfolgreich war.
+        viewModelScope.launch {
+            if (!authRepository.observeAuthState().first()) {
+                Log.d("MainViewModel", "User not authenticated, signing in anonymously...")
+                authRepository.signInAnonymously()
             }
         }
     }
 
     fun retryInitialAuth() {
         Log.d("MainViewModel", "Retrying initialization...")
-        _uiState.value = MainUiState.Loading
         initialize()
     }
 

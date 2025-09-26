@@ -18,13 +18,14 @@ fun HomeContent(
     onNavigateToStampCard: (String) -> Unit,
     onNavigateToVoucher: (String) -> Unit,
     onNavigateToWeather: () -> Unit,
-    onRetryWeather: () -> Unit
+    onRetryWeather: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         state.dailySpecial?.let { special ->

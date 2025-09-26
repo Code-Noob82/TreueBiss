@@ -65,6 +65,7 @@ fun AppNavigation(
             StampCardScreen(
                 cardId = args.cardId,
                 snackBarHostState = snackBarHostState,
+                paddingValues = paddingValues
             )
         }
         // ---------- Voucher ----------

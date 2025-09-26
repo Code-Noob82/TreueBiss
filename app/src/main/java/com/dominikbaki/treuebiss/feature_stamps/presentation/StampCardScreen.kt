@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.collectLatest
 internal fun StampCardScreen(
     cardId: String,
     snackBarHostState: SnackbarHostState,
+    paddingValues: PaddingValues,
     viewModel: StampCardViewModel = hiltViewModel()
 ) {
     // Die Logik zum Beobachten des States bleibt unverändert.
@@ -47,7 +48,8 @@ internal fun StampCardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(paddingValues)
+            .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // --- Header Sektion ---
