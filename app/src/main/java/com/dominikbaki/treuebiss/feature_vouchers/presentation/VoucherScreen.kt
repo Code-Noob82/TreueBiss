@@ -26,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.EmptyState
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.RedeemConfirmDialog
+import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.VoucherDetailOverlay
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.VoucherItem
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,20 +40,44 @@ internal fun VoucherScreen(
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
 
+    // Zustand für den Bestätigungsdialog
+    var showConfirmDialog by remember { mutableStateOf(false) } // Dialog-Status
+    var selectedVoucherIdForConfirm by remember { mutableStateOf<String?>(null) } // ausgewählter Gutschein
 
-    var showDialog by remember { mutableStateOf(false) } // Dialog-Status
-    var selectedVoucherId by remember { mutableStateOf<String?>(null) } // ausgewählter Gutschein
+    // NEU: Zustand für das Detail-Overlay
+    var voucherToShowInOverlay by remember { mutableStateOf<Voucher?>(null) }
 
-    if (showDialog && selectedVoucherId != null) {
+    // --- Logik für die Anzeige der Composables ---
+
+    // 1. Wenn ein Gutschein im Overlay angezeigt werden soll...
+    voucherToShowInOverlay?.let { voucher ->
+        VoucherDetailOverlay(
+            voucher = voucher,
+            onDismiss = {
+                // HIER wird der Gutschein eingelöst, wenn der Nutzer das Overlay schließt
+                viewModel.onRedeemClicked(voucher.id)
+                voucherToShowInOverlay = null // Overlay schließen
+            }
+        )
+    }
+
+    // 2. Wenn der Bestätigungsdialog angezeigt werden soll...
+    if (showConfirmDialog && selectedVoucherIdForConfirm != null) {
         RedeemConfirmDialog(
             onConfirm = {
-                viewModel.onRedeemClicked(selectedVoucherId!!)
-                showDialog = false
-                selectedVoucherId = null
+                // Finde den vollständigen Gutschein zur ID
+                val voucherToRedeem = vouchers.find { it.id == selectedVoucherIdForConfirm }
+                if (voucherToRedeem != null) {
+                    // Zeige jetzt das Overlay an
+                    voucherToShowInOverlay = voucherToRedeem
+                }
+                // Schließe den Bestätigungsdialog
+                showConfirmDialog = false
+                selectedVoucherIdForConfirm = null
             },
             onDismiss = {
-                showDialog = false
-                selectedVoucherId = null
+                showConfirmDialog = false
+                selectedVoucherIdForConfirm = null
             }
         )
     }
@@ -92,8 +118,8 @@ internal fun VoucherScreen(
                     VoucherItem(
                         voucher = voucher,
                         onRedeem = {
-                            selectedVoucherId = voucher.id
-                            showDialog = true
+                            selectedVoucherIdForConfirm = voucher.id
+                            showConfirmDialog = true
                         }
                     )
                 }
