@@ -36,6 +36,7 @@ import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.Vouch
 @Composable
 internal fun VoucherScreen(
     voucherId: String,
+    paddingValues: PaddingValues,
     viewModel: VoucherViewModel = hiltViewModel()
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
@@ -85,6 +86,7 @@ internal fun VoucherScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(paddingValues)
             .padding(horizontal = 16.dp)
     ) {
         // --- Header Sektion ---

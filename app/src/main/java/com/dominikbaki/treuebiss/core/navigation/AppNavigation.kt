@@ -72,7 +72,8 @@ fun AppNavigation(
         composable<Screen.Voucher> { backStackEntry ->
             val args = backStackEntry.toRoute<Screen.Voucher>()
             VoucherScreen(
-                voucherId = args.voucherId
+                voucherId = args.voucherId,
+                paddingValues = paddingValues
             )
         }
         // ---------- Weather ----------
