@@ -1,7 +1,9 @@
 package com.dominikbaki.treuebiss.feature_vouchers.presentation.composables
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -66,7 +69,7 @@ internal fun VoucherItem(
             Icon(
                 imageVector = if (isExpired) Icons.Filled.Error else Icons.Filled.CheckCircle,
                 contentDescription = "Gutschein-Status",
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(32.dp),
                 tint = if (isExpired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
 
@@ -77,7 +80,7 @@ internal fun VoucherItem(
                     text = "Dein Treue-Gutschein",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = if (isExpired) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -86,27 +89,39 @@ internal fun VoucherItem(
                     color = if (isExpired) {
                         MaterialTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                            alpha = 0.7f
+                        )
                     }
                 )
             }
 
-            Spacer(Modifier.width(16.dp))
-
-            // NEU: Angepasste Button-Optik für beide Zustände
-            if (isExpired) {
-                TextButton(onClick = {}, enabled = false) {
-                    Text("Abgelaufen")
-                }
-            } else {
-                Button(onClick = onRedeem) {
-                    Icon(
-                        imageVector = Icons.Filled.QrCodeScanner,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Einlösen")
+            // Button-Container
+            Box {
+                if (isExpired) {
+                    TextButton(onClick = {}, enabled = false) {
+                        Text("Abgelaufen")
+                    }
+                } else {
+                    // NEU: Button-Stil an Screenshot angepasst (kleiner, andere Farbe/Form)
+                    Button(
+                        onClick = onRedeem,
+                        shape = MaterialTheme.shapes.medium,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        // Weniger Padding für einen kompakteren Button
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.QrCodeScanner,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Einlösen")
+                    }
                 }
             }
         }
