@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.core.navigation.AppNavigation
 import com.dominikbaki.treuebiss.core.navigation.Screen
+import com.dominikbaki.treuebiss.core.navigation.mapRouteToScreen
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeViewModel
@@ -48,19 +49,9 @@ fun MainScreen(
     val currentRoute = remember(navBackStackEntry) {
         try {
             navBackStackEntry?.toRoute<Screen>()
-        } catch (e: Exception) {
-            // Fallback, wenn toRoute fehlschlägt (z.B. während der Navigation)
-            navBackStackEntry?.destination?.route?.let { routeString ->
-                when {
-                    routeString.startsWith("home") -> Screen.Home
-                    routeString.startsWith("onboarding") -> Screen.Onboarding
-                    routeString.startsWith("stampCard") -> Screen.StampCard("")
-                    routeString.startsWith("voucher") -> Screen.Voucher("")
-                    routeString.startsWith("weather") -> Screen.Weather
-                    routeString.startsWith("settings") -> Screen.Settings
-                    else -> null
-                }
-            }
+        } catch (e: IllegalArgumentException) {
+            // Der neue, robuste Fallback mit einer Parsing-Funktion!
+            mapRouteToScreen(navBackStackEntry?.destination?.route)
         }
     }
 
