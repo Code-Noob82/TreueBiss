@@ -57,11 +57,11 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
 ## Design
 
 <p>
-  <img src="./img/Home.png" width="1080" alt="">
-  <img src="./img/StampCard.png" width="1080" alt="">
-  <img src="./img/Vouchers.png" width="1080" alt="">
-  <img src="./img/Weather.png" width="1080" alt="">
-  <img src="./img/Settings.png" width="1080" alt="">
+  <img src="./img/Home.png" width="200" alt="">
+  <img src="./img/StampCard.png" width="200" alt="">
+  <img src="./img/Vouchers.png" width="200" alt="">
+  <img src="./img/Weather.png" width="200" alt="">
+  <img src="./img/Settings.png" width="200" alt="">
 </p>
 
 ## Projektstruktur & Architektur Übersicht
