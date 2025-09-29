@@ -54,7 +54,7 @@ fun MainScreen(
                 when {
                     routeString.startsWith("home") -> Screen.Home
                     routeString.startsWith("onboarding") -> Screen.Onboarding
-                    routeString.startsWith("stamp_card") -> Screen.StampCard("")
+                    routeString.startsWith("stampCard") -> Screen.StampCard("")
                     routeString.startsWith("voucher") -> Screen.Voucher("")
                     routeString.startsWith("weather") -> Screen.Weather
                     routeString.startsWith("settings") -> Screen.Settings
