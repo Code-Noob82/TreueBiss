@@ -30,21 +30,18 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
 
 ## Kern-Features (MVP V1.0)
 
-- [ ] **Onboarding:** Vorstellung der Kernfunktionen beim Start.
-- [ ] **Digitale Stempelkarte:**
+- [x] **Onboarding:** Vorstellung der Kernfunktionen beim Start.
+- [x] **Digitale Stempelkarte:**
     - Sammeln von Stempeln (10er-Karte).
     - Automatische Erstellung eines Gutscheins nach 10 Stempeln.
-- [ ] **Gutscheinverwaltung:**
+- [x] **Gutscheinverwaltung:**
     - Anzeige offener Gutscheine.
     - Einlösen-Button (lokal + Supabase Sync).
-    - Gutscheinverfalls-Service (markiert abgelaufene).
-- [ ] **Supabase-Integration:**
+- [x] **Supabase-Integration:**
     - Sync von Stempeln und Gutscheinen.
     - RLS Policies pro Nutzer.
-- [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h.
-- [ ] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
-- [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt beim App-Start.
-- [ ] **Corporate Branding:** Zentrale Theme-Datei, BrandingConfig (Farben, Logo, Strings).
+- [x] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
+- [x] **Corporate Branding:** Zentrale Theme-Datei, BrandingConfig (Farben, Logo, Strings).
 
 ### Sicherheit & Datenschutz (pseudonyme Geräte-ID)
 
@@ -102,11 +99,16 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 ## Ausblick
 
 - [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
-- [ ] **Admin-Panel:** Angebot der Woche für Betriebe editierbar.
+- [ ] **Admin-Panel (z. B. Strapi):** Angebot der Woche für Betriebe editierbar.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.
+- [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt beim App-Start.
 - [ ] **Mehrsprachigkeit:** Erweiterung um weitere Dialekte/Sprachen.
 - [ ] **Cross-Platform:** iOS-Version mit SwiftUI.
+- [ ] **Gutscheinverwaltung:**
+      - Gutscheinverfalls-Service (markiert abgelaufene).
+- [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h.
+
 
 ---
 
