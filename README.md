@@ -24,7 +24,7 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
 ## Was macht die App anders/besser?
 
 - **White-Label ready:** Branding (Farben, Logo, Texte) kann pro Kunde zentral angepasst werden.
-- **Einfachheit:** Kein komplexes Kassensystem nötig, QR-Scan oder Button reicht für Stempel.
+- **Einfachheit:** Kein komplexes Kassensystem nötig, QR-Scan reicht für Stempel.
 - **Handwerk-Fokus:** Inhalte und Features orientieren sich an den Bedürfnissen des Lebensmittelhandwerks.
 - **Skalierbarkeit:** Architektur nach Best Practices (Hexagonal, Hilt, Repository Pattern).
 
@@ -41,7 +41,7 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
     - Sync von Stempeln und Gutscheinen.
     - RLS Policies pro Nutzer.
 - [x] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
-- [x] **Corporate Branding:** Zentrale Theme-Datei, BrandingConfig (Farben, Logo, Strings).
+- [x] **Corporate Branding:** BrandingConfig (Farben, Logo, Strings).
 
 ### Sicherheit & Datenschutz (pseudonyme Geräte-ID)
 
@@ -113,6 +113,7 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **Gutscheinverwaltung:**
       - Gutscheinverfalls-Service (markiert abgelaufene).
 - [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h.
+- [ ] **Corporate Branding:** Zentrale Theme-Datei
 
 
 ---
