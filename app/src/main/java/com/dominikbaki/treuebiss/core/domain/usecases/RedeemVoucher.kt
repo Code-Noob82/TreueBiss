@@ -11,6 +11,6 @@ class RedeemVoucher @Inject constructor(
 ) {
     suspend operator fun invoke(voucherId: String) {
         // Delegiert den Aufruf direkt an das Repository.
-        voucherRepository.redeem(voucherId)
+        voucherRepository.redeemVoucher(voucherId)
     }
 }

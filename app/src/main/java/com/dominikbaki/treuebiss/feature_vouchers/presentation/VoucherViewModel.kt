@@ -7,7 +7,6 @@ import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,10 +16,7 @@ class VoucherViewModel @Inject constructor(
     private val repository: VoucherRepository
 ): ViewModel() {
 
-    val vouchers: StateFlow<List<Voucher>> = repository.observeAll(includeRedeemed = false)
-        .map { allVouchers ->
-            allVouchers.filter { !it.isRedeemed }
-        }
+    val vouchers: StateFlow<List<Voucher>> = repository.observeOpenVouchers()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

@@ -6,13 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,9 +36,20 @@ import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.core.ui.utils.DateTimeFormatter
 import kotlinx.datetime.Instant
 
+/**
+ * Zeigt den QR-Code eines Gutscheins als Vollbild-Overlay.
+ *
+ * Wichtig: Das Anzeigen löst den Gutschein NICHT ein. Eingelöst wird erst,
+ * wenn der Nutzer [onRedeem] auslöst - so kostet ein versehentliches Öffnen
+ * (oder ein Blick auf den Code) den Gutschein nicht.
+ *
+ * @param onRedeem Wird ausgelöst, wenn der Nutzer den Gutschein einlösen möchte.
+ * @param onDismiss Schließt das Overlay, ohne etwas zu verändern.
+ */
 @Composable
-fun VoucherDetailOverlay(
+internal fun VoucherDetailOverlay(
     voucher: Voucher,
+    onRedeem: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val branding = LocalBrandingConfig.current // Branding-Informationen abrufen
@@ -92,7 +104,7 @@ fun VoucherDetailOverlay(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Zeige diesen Code an der Kasse vor, um deinen Gutschein einzulösen.",
+                    text = "Zeige diesen Code an der Kasse vor und tippe anschließend auf „Gutschein einlösen“.",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -117,11 +129,11 @@ fun VoucherDetailOverlay(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.QrCode2,
-                                contentDescription = "QR Code",
-                                modifier = Modifier.fillMaxSize(),
-                                tint = Color.Black
+                            // Der Code trägt die Gutschein-ID - genau den Wert,
+                            // den ein Kassen-Scanner zum Abgleich benötigt.
+                            QrCodeImage(
+                                data = voucher.id,
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                         Spacer(Modifier.height(24.dp))
@@ -138,6 +150,23 @@ fun VoucherDetailOverlay(
                         )
                     }
                 }
+
+                Spacer(Modifier.height(40.dp))
+
+                Button(
+                    onClick = onRedeem,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text("Gutschein einlösen")
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Solange du nicht einlöst, bleibt der Gutschein erhalten.",
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -8,7 +8,6 @@ import com.dominikbaki.treuebiss.feature_vouchers.data.local.dao.VoucherDao
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucher
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherDto
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherEntity
-import com.dominikbaki.treuebiss.feature_vouchers.data.remote.dto.VoucherDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -95,27 +94,7 @@ class VoucherRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun observeAll(includeRedeemed: Boolean): Flow<List<Voucher>> {
-        val voucherFlow = if (includeRedeemed) {
-            // Logik für alle Gutscheine (später für eine Historie nützlich)
-            // Fürs MVP konzentriere ich mich auf die offenen
-            dao.observeOpenVouchers()
-        } else {
-            dao.observeOpenVouchers()
-        }
-        return voucherFlow.map { entities -> entities.map { it.toVoucher() } }
-    }
-
-    override suspend fun redeem(voucherId: String) {
-        TODO("Not yet implemented")
-    }
-
-    // Die Logik für abgelaufene Gutscheine würde hier implementiert
-    override suspend fun markExpiredBefore(epochMillis: Long) {
-        TODO("Not yet implemented")
-    }
-
-    override fun getAllVouchers(): Flow<List<Voucher>> {
-        TODO("Not yet implemented")
+    override fun observeOpenVouchers(): Flow<List<Voucher>> {
+        return dao.observeOpenVouchers().map { entities -> entities.map { it.toVoucher() } }
     }
 }

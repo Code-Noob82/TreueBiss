@@ -13,12 +13,11 @@ internal fun RedeemConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Gutschein anzeigen?") },
-        // NEU: Angepasster Text für den neuen Ablauf
-        text = { Text("Möchtest du den QR-Code zum Einlösen anzeigen? Der Gutschein wird eingelöst, sobald du das Fenster schließt.") },
+        title = { Text("Gutschein einlösen?") },
+        text = { Text("Der Gutschein wird jetzt als eingelöst markiert. Das lässt sich nicht rückgängig machen.") },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text("QR-Code anzeigen")
+                Text("Jetzt einlösen")
             }
         },
         dismissButton = {

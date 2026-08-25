@@ -41,45 +41,33 @@ internal fun VoucherScreen(
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
 
-    // Zustand für den Bestätigungsdialog
-    var showConfirmDialog by remember { mutableStateOf(false) } // Dialog-Status
-    var selectedVoucherIdForConfirm by remember { mutableStateOf<String?>(null) } // ausgewählter Gutschein
-
-    // NEU: Zustand für das Detail-Overlay
+    // Der Gutschein, dessen QR-Code gerade als Overlay gezeigt wird.
+    // Das Anzeigen allein verändert nichts - eingelöst wird erst nach Bestätigung.
     var voucherToShowInOverlay by remember { mutableStateOf<Voucher?>(null) }
+
+    // Der Gutschein, für den die Einlöse-Rückfrage offen ist.
+    var voucherPendingRedeem by remember { mutableStateOf<Voucher?>(null) }
 
     // --- Logik für die Anzeige der Composables ---
 
-    // 1. Wenn ein Gutschein im Overlay angezeigt werden soll...
+    // 1. QR-Code-Overlay: nur Anzeige, plus expliziter Einlöse-Wunsch.
     voucherToShowInOverlay?.let { voucher ->
         VoucherDetailOverlay(
             voucher = voucher,
-            onDismiss = {
-                // HIER wird der Gutschein eingelöst, wenn der Nutzer das Overlay schließt
-                viewModel.onRedeemClicked(voucher.id)
-                voucherToShowInOverlay = null // Overlay schließen
-            }
+            onRedeem = { voucherPendingRedeem = voucher },
+            onDismiss = { voucherToShowInOverlay = null }
         )
     }
 
-    // 2. Wenn der Bestätigungsdialog angezeigt werden soll...
-    if (showConfirmDialog && selectedVoucherIdForConfirm != null) {
+    // 2. Rückfrage direkt vor dem einzigen Schritt, der nicht umkehrbar ist.
+    voucherPendingRedeem?.let { voucher ->
         RedeemConfirmDialog(
             onConfirm = {
-                // Finde den vollständigen Gutschein zur ID
-                val voucherToRedeem = vouchers.find { it.id == selectedVoucherIdForConfirm }
-                if (voucherToRedeem != null) {
-                    // Zeige jetzt das Overlay an
-                    voucherToShowInOverlay = voucherToRedeem
-                }
-                // Schließe den Bestätigungsdialog
-                showConfirmDialog = false
-                selectedVoucherIdForConfirm = null
+                viewModel.onRedeemClicked(voucher.id)
+                voucherPendingRedeem = null
+                voucherToShowInOverlay = null // Overlay nach dem Einlösen schließen
             },
-            onDismiss = {
-                showConfirmDialog = false
-                selectedVoucherIdForConfirm = null
-            }
+            onDismiss = { voucherPendingRedeem = null } // Overlay bleibt offen
         )
     }
     // NEU: Einheitliche Seitenstruktur mit Header
@@ -119,10 +107,7 @@ internal fun VoucherScreen(
                 items(vouchers, key = { it.id }) { voucher ->
                     VoucherItem(
                         voucher = voucher,
-                        onRedeem = {
-                            selectedVoucherIdForConfirm = voucher.id
-                            showConfirmDialog = true
-                        }
+                        onRedeem = { voucherToShowInOverlay = voucher }
                     )
                 }
             }

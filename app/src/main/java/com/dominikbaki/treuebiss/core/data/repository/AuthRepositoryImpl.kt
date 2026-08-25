@@ -21,15 +21,16 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Der Fehlerfall wird hier absichtlich nicht abgefangen: Ein geschluckter
+     * Fehler würde dazu führen, dass die UI unbegrenzt auf eine Session wartet,
+     * die nie kommt.
+     */
     override suspend fun signInAnonymously() {
-        try {
-            Log.d("AuthRepositoryImpl", "Signing in anonymously...")
-            supabaseClient.auth.signInAnonymously()
-            val logMessage =
-                "Successfully signed in. User ID: ${supabaseClient.auth.currentUserOrNull()?.id}"
-            Log.d("AuthRepositoryImpl", logMessage)
-        } catch (e: Exception) {
-            Log.e("AuthRepositoryImpl", "Error signing in anonymously: ${e.message}", e)
-        }
+        Log.d("AuthRepositoryImpl", "Signing in anonymously...")
+        supabaseClient.auth.signInAnonymously()
+        val logMessage =
+            "Successfully signed in. User ID: ${supabaseClient.auth.currentUserOrNull()?.id}"
+        Log.d("AuthRepositoryImpl", logMessage)
     }
 }
