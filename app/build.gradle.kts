@@ -106,6 +106,9 @@ dependencies {
     implementation(libs.supabase.storage)
     implementation(libs.ktor.client.okhttp)
 
+    // ZXing - QR-Code-Erzeugung für Gutscheine
+    implementation(libs.zxing.core)
+
     // Coroutines - Für async/await
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)

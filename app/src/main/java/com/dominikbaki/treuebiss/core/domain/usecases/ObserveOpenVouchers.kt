@@ -12,7 +12,6 @@ class ObserveOpenVouchers @Inject constructor(
     private val voucherRepository: VoucherRepository
 ) {
     operator fun invoke(): Flow<List<Voucher>> {
-        // Ruft die Repository-Funktion mit dem spezifischen Filter für offene Gutscheine auf.
-        return voucherRepository.observeAll(includeRedeemed = false)
+        return voucherRepository.observeOpenVouchers()
     }
 }

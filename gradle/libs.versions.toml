@@ -23,6 +23,7 @@ datastore = "1.1.1"
 kotlinx-datetime = "0.6.0"
 iconsExtended = "1.7.7"
 playServicesLocation = "21.3.0"
+zxing = "3.5.3"
 
 [libraries]
 # Core & UI
@@ -84,6 +85,9 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+
+# QR-Code-Erzeugung
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

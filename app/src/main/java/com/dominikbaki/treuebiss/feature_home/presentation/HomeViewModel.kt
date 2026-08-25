@@ -47,7 +47,7 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> =
         combine(
             stampRepository.observeStamps(),
-            voucherRepository.observeAll(includeRedeemed = false), // Nur die aktiven Gutscheine
+            voucherRepository.observeOpenVouchers(),
             _weatherState,
             _isWeatherLoading
         ) { stamps, vouchers, weatherResult, isWeatherLoading ->
