@@ -1,6 +1,8 @@
 package com.dominikbaki.treuebiss.core.presentation
 
 import android.util.Log
+import androidx.annotation.StringRes
+import com.dominikbaki.treuebiss.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 /**
@@ -30,11 +33,10 @@ sealed interface MainUiState {
     data class Success(
         val hasCompletedOnboarding: Boolean,
         val stampCount: Int,
-        val voucherCount: Int,
-        val currentStampCardId: String,
-        val currentVoucherId: String
+        val voucherCount: Int
     ) : MainUiState
-    data class Error(val message: String) : MainUiState
+    /** Die Meldung ist eine String-Ressource, damit sie übersetzbar bleibt. */
+    data class Error(@StringRes val messageRes: Int) : MainUiState
 }
 
 @HiltViewModel
@@ -76,35 +78,33 @@ class MainViewModel @Inject constructor(
                 // Schritt 1: Sicherstellen, dass eine gültige Session existiert.
                 ensureSignedIn()
 
-                // Schritt 2: Erst jetzt die restlichen Daten laden.
+                // Schritt 2: Nach einer Neuinstallation die Daten vom Server holen.
+                restoreRemoteDataOnce()
+
+                // Schritt 3: Erst jetzt die restlichen Daten laden.
                 combine(
                     userPreferencesRepository.hasCompletedOnboarding,
                     stampRepository.observeStamps(),
                     voucherRepository.observeOpenVouchers(),
                 ) { hasCompletedOnboarding, stamps, vouchers ->
+                    val now = Clock.System.now()
                     MainUiState.Success(
                         hasCompletedOnboarding = hasCompletedOnboarding,
                         stampCount = stamps.size,
-                        voucherCount = vouchers.size,
-                        currentStampCardId = stamps.lastOrNull()?.id ?: "default-card",
-                        currentVoucherId = vouchers.lastOrNull()?.id ?: "default-voucher"
+                        voucherCount = vouchers.count { it.isRedeemableAt(now) }
                     )
                 }.collect { successState ->
                     _uiState.value = successState
                 }
             } catch (e: TimeoutCancellationException) {
                 Log.e("MainViewModel", "Authentication timed out", e)
-                _uiState.value = MainUiState.Error(
-                    "Die Anmeldung dauert zu lange. Bitte prüfe deine Internetverbindung."
-                )
+                _uiState.value = MainUiState.Error(R.string.error_sign_in_timeout)
             } catch (e: CancellationException) {
                 // Regulärer Abbruch (z. B. durch einen Retry) - kein Fehlerzustand.
                 throw e
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Initialization failed: ${e.message}", e)
-                _uiState.value = MainUiState.Error(
-                    "Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung."
-                )
+                _uiState.value = MainUiState.Error(R.string.error_sign_in_failed)
             }
         }
     }
@@ -130,6 +130,29 @@ class MainViewModel @Inject constructor(
             authRepository.observeAuthState().first { it }
         }
         Log.d("MainViewModel", "User is authenticated, proceeding to load data.")
+    }
+
+    /**
+     * Holt Stempel und Gutscheine einmalig vom Server - der Fall
+     * "App neu installiert, Daten liegen noch im Backend".
+     *
+     * Fehler blockieren die App bewusst nicht: Ohne Verbindung startet sie
+     * mit dem lokalen Stand weiter, und der Versuch wird beim nächsten Start
+     * wiederholt.
+     */
+    private suspend fun restoreRemoteDataOnce() {
+        if (userPreferencesRepository.hasRestoredRemoteData.first()) return
+
+        try {
+            stampRepository.restoreFromRemote()
+            voucherRepository.restoreFromRemote()
+            userPreferencesRepository.setRemoteDataRestored(true)
+            Log.d("MainViewModel", "Remote data restored.")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Restoring remote data failed, continuing offline", e)
+        }
     }
 
     fun retryInitialAuth() {

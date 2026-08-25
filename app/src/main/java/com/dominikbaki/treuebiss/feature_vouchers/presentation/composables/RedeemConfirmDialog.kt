@@ -5,6 +5,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @Composable
 internal fun RedeemConfirmDialog(
@@ -13,16 +15,16 @@ internal fun RedeemConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Gutschein einlösen?") },
-        text = { Text("Der Gutschein wird jetzt als eingelöst markiert. Das lässt sich nicht rückgängig machen.") },
+        title = { Text(stringResource(R.string.voucher_confirm_title)) },
+        text = { Text(stringResource(R.string.voucher_confirm_text)) },
         confirmButton = {
             Button(onClick = onConfirm) {
-                Text("Jetzt einlösen")
+                Text(stringResource(R.string.voucher_confirm_action))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Abbrechen")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )

@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @Composable
 internal fun StampCircle(isStamped: Boolean) {
@@ -44,7 +46,7 @@ internal fun StampCircle(isStamped: Boolean) {
             // NEU: Ein Icon im Stempelkreis zur Bestätigung
             Icon(
                 imageVector = Icons.Filled.Check,
-                contentDescription = "Gestempelt",
+                contentDescription = stringResource(R.string.stamp_card_stamped),
                 tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(30.dp)
             )

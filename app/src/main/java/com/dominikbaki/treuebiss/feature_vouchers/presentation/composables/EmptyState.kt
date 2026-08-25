@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @Composable
 internal fun EmptyState() {
@@ -32,17 +34,17 @@ internal fun EmptyState() {
         ) {
             Icon(
                 imageVector = Icons.Filled.CardGiftcard,
-                contentDescription = "Keine Gutscheine",
+                contentDescription = stringResource(R.string.voucher_empty_icon),
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.surfaceVariant
             )
             Text(
-                text = "Du hast aktuell keine Gutscheine",
+                text = stringResource(R.string.voucher_empty_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Sammle weiter fleißig Stempel, um neue Prämien freizuschalten!",
+                text = stringResource(R.string.voucher_empty_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

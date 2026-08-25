@@ -38,18 +38,26 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
     - Anzeige offener Gutscheine.
     - Einlösen-Button (lokal + Supabase Sync).
 - [x] **Supabase-Integration:**
-    - Sync von Stempeln und Gutscheinen.
+    - Stempel und Gutscheine werden beim Anlegen zum Backend geschrieben.
+    - Nach einer Neuinstallation werden die Daten einmalig vom Server zurückgeholt.
     - RLS Policies pro Nutzer.
 - [x] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
 - [x] **Corporate Branding:** BrandingConfig (Farben, Logo, Strings).
 
-### Sicherheit & Datenschutz (pseudonyme Geräte-ID)
+### Sicherheit & Datenschutz (anonyme Anmeldung)
 
 - Keine personenbezogenen Daten (kein Name, keine E-Mail).
-- Beim ersten Start wird eine zufällige `UUID` als **Geräte-ID** erzeugt und lokal verschlüsselt gespeichert.
-- Die App erhält von einer Supabase **Edge Function** ein kurzlebiges JWT, das nur die Claims `device_id` und `tenant_id` enthält.
-- **RLS (Row Level Security)** in der Datenbank stellt sicher: Jede Aktion betrifft ausschließlich die eigenen Geräte-Daten im eigenen Mandanten.
-- Datenlöschung: In den App-Einstellungen kann eine vollständige Löschung aller Datensätze zur Geräte-ID angestoßen werden (Server-seitige Cleanup-Function).
+- Beim ersten Start meldet sich die App über **Supabase Anonymous Sign-in** an. Die
+  dabei vergebene `user_id` ist die einzige Kennung; sie wird nicht mit einer Person
+  verknüpft. Anonyme Anmeldungen müssen im Supabase-Projekt aktiviert sein.
+- **RLS (Row Level Security)** in der Datenbank stellt sicher: Jede Aktion betrifft
+  ausschließlich die eigenen Datensätze.
+- Beim Zurücksetzen der Stempelkarte werden die Stempel auch serverseitig gelöscht.
+
+> Geplant, aber noch **nicht** umgesetzt: eine pseudonyme Geräte-ID mit
+> mandantenfähigem JWT (`device_id`/`tenant_id`) über eine Supabase Edge Function
+> sowie eine vollständige Datenlöschung aus den App-Einstellungen heraus. Der
+> Einstellungs-Screen ist derzeit reine Oberfläche ohne Funktion.
 
 ## Design
 
@@ -65,6 +73,20 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
   <img src="./img/Weather.png" width="200" alt="">
   <img src="./img/Settings.png" width="200" alt="">
 </p>
+
+## Einrichtung
+
+1. `local.properties.example` nach `local.properties` kopieren.
+2. `SUPABASE_URL` und `SUPABASE_ANON_KEY` aus den Projekt-Einstellungen bei Supabase eintragen.
+3. Anonyme Anmeldungen im Supabase-Projekt aktivieren und die Tabellen `stamps`
+   und `vouchers` samt RLS-Policies anlegen.
+
+Ohne `local.properties` wird der Supabase-Client mit leerer URL erzeugt und die App
+startet nicht.
+
+```bash
+./gradlew assembleDebug
+```
 
 ## Projektstruktur & Architektur Übersicht
 
@@ -96,7 +118,7 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - **Supabase-kt:** Kotlin SDK für Supabase.
 - **Room:** SQLite Abstraktion für lokale Persistenz.
 - **Retrofit:** HTTP-Client für Wetter-API.
-- **WorkManager:** Hintergrundjobs (Sync).
+- **ZXing:** Erzeugung der Gutschein-QR-Codes.
 - **Kotlinx Coroutines & Flow:** Asynchrone Datenströme.
 
 ---
@@ -111,8 +133,15 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **Mehrsprachigkeit:** Erweiterung um weitere Dialekte/Sprachen.
 - [ ] **Cross-Platform:** iOS-Version mit SwiftUI.
 - [ ] **Gutscheinverwaltung:**
-      - Gutscheinverfalls-Service (markiert abgelaufene).
-- [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h.
+      - Aufräum-Service für lange abgelaufene Gutscheine. Abgelaufene Gutscheine
+        werden bereits als solche angezeigt und nicht mehr mitgezählt, bleiben
+        aber in der Liste stehen.
+- [ ] **WorkManager-Sync:** Automatischer Abgleich alle 24h. Aktuell wird nur
+      beim Anlegen geschrieben und einmalig nach einer Neuinstallation gelesen -
+      es gibt keinen laufenden Abgleich und keine Warteschlange für
+      fehlgeschlagene Schreibvorgänge.
+- [ ] **Einstellungen:** Funktionen hinterlegen (Dunkelmodus, Benachrichtigungen,
+      Datenlöschung) - der Screen ist bisher statisch.
 - [ ] **Corporate Branding:** Zentrale Theme-Datei
 
 

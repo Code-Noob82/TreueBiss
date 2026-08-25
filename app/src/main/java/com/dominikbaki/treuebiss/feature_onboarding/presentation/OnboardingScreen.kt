@@ -16,12 +16,7 @@ import androidx.compose.ui.unit.dp
 fun OnboardingScreen(
     onFinish: () -> Unit
 ) {
-    val pages = listOf(
-        OnboardingPage.First,
-        OnboardingPage.Second,
-        OnboardingPage.Third,
-        OnboardingPage.Fourth
-    )
+    val pages = OnboardingPage.pages
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
     Column(

@@ -9,8 +9,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 sealed interface Screen {
-    // HINZUGEFÜGT: Eine Basis-Eigenschaft für den Routennamen.
-    // Diese wird von der Fallback-Funktion für den Abgleich benötigt.
+    /** Basis-Eigenschaft für den Routennamen, wird für den Abgleich benötigt. */
     val routeBase: String
 
     @Serializable
@@ -27,13 +26,13 @@ sealed interface Screen {
 
     @Serializable
     @SerialName("stampCard")
-    data class StampCard(val cardId: String) : Screen {
+    data object StampCard : Screen {
         override val routeBase: String = "stampCard"
     }
 
     @Serializable
     @SerialName("voucher")
-    data class Voucher(val voucherId: String) : Screen {
+    data object Voucher : Screen {
         override val routeBase: String = "voucher"
     }
 
@@ -49,13 +48,12 @@ sealed interface Screen {
         override val routeBase: String = "settings"
     }
 
-    // HINZUGEFÜGT: Das Begleitobjekt, das die "Adressbuch"-Liste enthält.
     companion object {
         val allScreens: List<Screen> = listOf(
             Onboarding,
             Home,
-            StampCard(""), // Der Inhalt ("") ist hier egal, es dient nur als Vorlage.
-            Voucher(""),   // Dient ebenfalls nur als Vorlage für den Typabgleich.
+            StampCard,
+            Voucher,
             Weather,
             Settings
         )

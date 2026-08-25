@@ -7,7 +7,6 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
@@ -45,8 +44,10 @@ fun TreueBissTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
+            // Die Statusleiste wird nicht mehr eingefärbt: ab Android 15 ist
+            // Edge-to-Edge verpflichtend und `statusBarColor` wirkungslos.
+            // Gesteuert wird nur noch die Icon-Helligkeit.
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }

@@ -7,6 +7,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @Composable
 fun DemoAddStampButton(
@@ -18,6 +20,6 @@ fun DemoAddStampButton(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         enabled = enabled
     ) {
-        Text("Stempel hinzufügen (Demo)")
+        Text(stringResource(R.string.stamp_card_add_demo))
     }
 }

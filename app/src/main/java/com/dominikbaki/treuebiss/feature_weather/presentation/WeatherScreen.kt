@@ -5,10 +5,11 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.feature_weather.presentation.composables.ErrorContent
 import com.dominikbaki.treuebiss.feature_weather.presentation.composables.LoadingContent
 import com.dominikbaki.treuebiss.feature_weather.presentation.composables.WeatherContent
@@ -16,8 +17,6 @@ import com.dominikbaki.treuebiss.feature_weather.presentation.composables.Weathe
 // --- Hauptkomponente für die Wetteranzeige ---
 @Composable
 fun WeatherScreen(
-    modifier: Modifier = Modifier,
-    onNavigateUp: () -> Unit,
     viewModel: WeatherViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -57,11 +56,11 @@ fun WeatherScreen(
         is WeatherUiState.Loading -> LoadingContent()
         is WeatherUiState.Success -> WeatherContent(
             data = state.weatherData,
-            city = state.cityName ?: "Wetter"
+            city = stringResource(R.string.weather_screen_title)
         )
 
         is WeatherUiState.Error -> ErrorContent(
-            message = state.message,
+            message = stringResource(state.messageRes),
             onRetry = { viewModel.fetchWeatherDataForCurrentLocation() }
         )
     }

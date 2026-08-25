@@ -1,0 +1,11 @@
+# Kopiere diese Datei nach `local.properties` und trage deine Werte ein.
+# `local.properties` ist bewusst nicht eingecheckt (siehe .gitignore).
+
+# Pfad zum Android SDK - setzt Android Studio normalerweise selbst.
+sdk.dir=/Users/DEIN_NUTZER/Library/Android/sdk
+
+# Supabase-Projektdaten (Projekt-Einstellungen -> API).
+# Ohne diese Werte startet die App nicht: der Supabase-Client
+# wird dann mit leerer URL erzeugt.
+SUPABASE_URL=https://DEIN-PROJEKT.supabase.co
+SUPABASE_ANON_KEY=DEIN_ANON_KEY

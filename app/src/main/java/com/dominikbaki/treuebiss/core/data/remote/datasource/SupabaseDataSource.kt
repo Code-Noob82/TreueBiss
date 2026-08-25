@@ -7,21 +7,63 @@ import io.github.jan.supabase.postgrest.from
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Kapselt alle Postgrest-Zugriffe auf die Supabase-Tabellen.
+ *
+ * Die Filter auf `user_id` sind redundant zu den RLS-Policies, machen die
+ * Absicht aber im Code sichtbar und schützen davor, dass eine fehlende
+ * Policy unbemerkt fremde Zeilen liefert.
+ */
 @Singleton
 class SupabaseDataSource @Inject constructor(
     private val supabaseClient: SupabaseClient
 ) {
-    /**
-     * Fügt einen neuen Stempel in die 'stamps'-Tabelle bei Supabase ein.
-     */
+    private companion object {
+        const val TABLE_STAMPS = "stamps"
+        const val TABLE_VOUCHERS = "vouchers"
+    }
+
+    /** Fügt einen neuen Stempel in die 'stamps'-Tabelle bei Supabase ein. */
     suspend fun addStampToSupabase(stamp: StampDto) {
-        supabaseClient.from("stamps").insert(stamp)
+        supabaseClient.from(TABLE_STAMPS).insert(stamp)
+    }
+
+    /** Fügt einen neuen Gutschein in die 'vouchers'-Tabelle bei Supabase ein. */
+    suspend fun addVoucherToSupabase(voucher: VoucherDto) {
+        supabaseClient.from(TABLE_VOUCHERS).insert(voucher)
+    }
+
+    /** Lädt alle Stempel des Nutzers - Grundlage für die Wiederherstellung. */
+    suspend fun getStamps(userId: String): List<StampDto> {
+        return supabaseClient.from(TABLE_STAMPS).select {
+            filter { eq("user_id", userId) }
+        }.decodeList<StampDto>()
+    }
+
+    /** Lädt alle Gutscheine des Nutzers - Grundlage für die Wiederherstellung. */
+    suspend fun getVouchers(userId: String): List<VoucherDto> {
+        return supabaseClient.from(TABLE_VOUCHERS).select {
+            filter { eq("user_id", userId) }
+        }.decodeList<VoucherDto>()
     }
 
     /**
-     * Fügt einen neuen Gutschein in die 'vouchers'-Tabelle bei Supabase ein.
+     * Löscht alle Stempel des Nutzers.
+     * Gegenstück zum Zurücksetzen der Karte: ohne das würde die Tabelle
+     * unbegrenzt wachsen und vom lokalen Stand abdriften.
      */
-    suspend fun addVoucherToSupabase(voucher: VoucherDto) {
-        supabaseClient.from("vouchers").insert(voucher)
+    suspend fun deleteAllStamps(userId: String) {
+        supabaseClient.from(TABLE_STAMPS).delete {
+            filter { eq("user_id", userId) }
+        }
+    }
+
+    /** Markiert einen Gutschein serverseitig als eingelöst. */
+    suspend fun setVoucherRedeemed(voucherId: String) {
+        supabaseClient.from(TABLE_VOUCHERS).update({
+            set("is_redeemed", true)
+        }) {
+            filter { eq("id", voucherId) }
+        }
     }
 }

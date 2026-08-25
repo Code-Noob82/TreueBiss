@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.feature_home.presentation.StampCardState
 
@@ -70,7 +72,7 @@ fun StampCardProgress(state: StampCardState, onClick: () -> Unit) {
                 // NEU: Ein Icon, das thematisch passt und die Karte visuell aufwertet
                 Icon(
                     imageVector = Icons.Filled.CardGiftcard,
-                    contentDescription = "Geschenk-Icon",
+                    contentDescription = stringResource(R.string.home_gift_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
@@ -84,7 +86,7 @@ fun StampCardProgress(state: StampCardState, onClick: () -> Unit) {
                 verticalAlignment = Alignment.Bottom
             ) {
                 Text(
-                    text = "Gesammelt",
+                    text = stringResource(R.string.home_stamps_collected),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -13,7 +13,7 @@ import com.dominikbaki.treuebiss.feature_vouchers.data.local.entity.VoucherEntit
 @Database(
     entities = [StampEntity::class, VoucherEntity::class],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class TreueBissDatabase : RoomDatabase() {
     abstract fun stampDao(): StampDao

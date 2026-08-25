@@ -26,9 +26,9 @@ class StampRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
 ) : StampRepository {
 
-    override suspend fun addStamp(stamp: Stamp) {
+    override suspend fun addStamp(stamp: Stamp): Int {
         // 1. Lokal in Room speichern (Offline-First-Ansatz)
-        dao.insertStamp(stamp.toStampEntity())
+        val newCount = dao.insertStampAndCount(stamp.toStampEntity())
         // 2. Zu Supabase synchronisieren
         try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
@@ -43,6 +43,7 @@ class StampRepositoryImpl @Inject constructor(
             Log.e("StampRepositoryImpl", "Failed to sync stamp to supabase", e)
             // Fehlerbehandlung: Stempel als "nicht synchronisiert" markieren
         }
+        return newCount
     }
 
     override fun observeStamps(): Flow<List<Stamp>> {
@@ -51,17 +52,39 @@ class StampRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun count(): Int {
-        return dao.countStamps()
-    }
-
     override suspend fun clearStamps() {
-        Log.d("StampRepositoryImpl", "Clearing local stamps only...")
+        // Erst der Server: schlägt das fehl, bleiben die Stempel dort liegen -
+        // sichtbar im Log statt still auseinanderlaufend.
         try {
-            dao.clearStamps() // NEU: Funktion zum Löschen aller Stempel
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            if (currentUserId != null) {
+                remoteDataSource.deleteAllStamps(currentUserId)
+                Log.d("StampRepositoryImpl", "Cleared remote stamps.")
+            } else {
+                Log.w("StampRepositoryImpl", "User not logged in, cannot clear remote stamps")
+            }
+        } catch (e: Exception) {
+            Log.e("StampRepositoryImpl", "Failed to clear remote stamps", e)
+        }
+
+        try {
+            dao.clearStamps()
             Log.d("StampRepositoryImpl", "Successfully cleared local stamps.")
         } catch (e: Exception) {
             Log.e("StampRepositoryImpl", "Error clearing local stamps", e)
         }
+    }
+
+    override suspend fun restoreFromRemote() {
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+        if (currentUserId == null) {
+            Log.w("StampRepositoryImpl", "User not logged in, cannot restore stamps")
+            return
+        }
+        val remoteStamps = remoteDataSource.getStamps(currentUserId)
+        if (remoteStamps.isNotEmpty()) {
+            dao.insertStamps(remoteStamps.map { it.toStampEntity() })
+        }
+        Log.d("StampRepositoryImpl", "Restored ${remoteStamps.size} stamps from Supabase")
     }
 }

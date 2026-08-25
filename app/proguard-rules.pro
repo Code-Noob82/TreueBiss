@@ -20,7 +20,6 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
-# Keep the entire class generated from SerializationModule.kt and all its members.
-# This is the simplest and most robust way to ensure R8 doesn't remove the
-# AppSerializersModule, which is used indirectly by the serialization plugin.
--keep class com.dominikbaki.treuebiss.core.di.SerializersModuleKt { *; }
+# Ktor/Supabase ziehen slf4j-api mit, dessen Binder zur Laufzeit optional ist.
+# Ohne diese Regel bricht `minifyRelease` ab ("Missing class").
+-dontwarn org.slf4j.impl.StaticLoggerBinder

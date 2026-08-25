@@ -27,6 +27,16 @@ fun Voucher.toVoucherEntity(): VoucherEntity {
     )
 }
 
+// --- Von einer Supabase-Zeile zur Datenbank-Entität ---
+fun VoucherDto.toVoucherEntity(): VoucherEntity {
+    return VoucherEntity(
+        id = this.id,
+        creationDate = this.creationDate,
+        expiresAt = this.expiresAt,
+        isRedeemed = this.isRedeemed
+    )
+}
+
 // --- Vom Domain-Modell zum Data Transfer Object (für Supabase) ---
 fun Voucher.toVoucherDto(currentUserId: String): VoucherDto {
     return VoucherDto(

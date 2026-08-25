@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.feature_stamps.presentation.composables.DemoAddStampButton
 import com.dominikbaki.treuebiss.feature_stamps.presentation.composables.StampCircle
@@ -26,19 +28,20 @@ import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 internal fun StampCardScreen(
-    cardId: String,
     snackBarHostState: SnackbarHostState,
     paddingValues: PaddingValues,
     viewModel: StampCardViewModel = hiltViewModel()
 ) {
     // Die Logik zum Beobachten des States bleibt unverändert.
     val stamps by viewModel.stamps.collectAsState()
+    val isAddingStamp by viewModel.isAddingStamp.collectAsState()
     val stampCount = stamps.size
+    val voucherCreatedMessage = stringResource(R.string.stamp_card_voucher_created)
 
     LaunchedEffect(key1 = true) {
         viewModel.voucherCreatedEvent.collectLatest {
             snackBarHostState.showSnackbar(
-                message = "Glückwunsch! Ein neuer Gutschein wurde erstellt.",
+                message = voucherCreatedMessage,
                 duration = SnackbarDuration.Short
             )
         }
@@ -59,23 +62,26 @@ internal fun StampCardScreen(
         ) {
             Icon(
                 imageVector = Icons.Filled.Style, // Thematisch passendes Icon
-                contentDescription = "Stempelkarten-Icon",
+                contentDescription = stringResource(R.string.stamp_card_icon),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Meine Stempelkarte",
+                text = stringResource(R.string.stamp_card_title),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (stampCount < 10) {
-                    "Sammle 10 Stempel für eine tolle Prämie!"
+                text = if (stampCount < StampCardViewModel.STAMPS_PER_CARD) {
+                    stringResource(
+                        R.string.stamp_card_hint_collecting,
+                        StampCardViewModel.STAMPS_PER_CARD
+                    )
                 } else {
-                    "Glückwunsch! Du hast einen Gutschein erhalten."
+                    stringResource(R.string.stamp_card_hint_complete)
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
@@ -95,7 +101,7 @@ internal fun StampCardScreen(
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-                items(10) { index ->
+                items(StampCardViewModel.STAMPS_PER_CARD) { index ->
                     val isStamped = index < stampCount
                     StampCircle(isStamped = isStamped)
                 }
@@ -106,7 +112,7 @@ internal fun StampCardScreen(
         // KORREKTUR: Der Button wird in eine Box gewrappt, um den Modifier anwenden zu können.
         Box(modifier = Modifier.padding(bottom = 16.dp)) {
             DemoAddStampButton(
-                enabled = stampCount < 10,
+                enabled = !isAddingStamp && stampCount < StampCardViewModel.STAMPS_PER_CARD,
                 onClick = { viewModel.onAddStampClicked() }
             )
         }

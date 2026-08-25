@@ -15,14 +15,14 @@ import com.dominikbaki.treuebiss.feature_home.presentation.StampCardState
 fun HomeContent(
     state: HomeUiState,
     paddingValues: PaddingValues,
-    onNavigateToStampCard: (String) -> Unit,
-    onNavigateToVoucher: (String) -> Unit,
+    onNavigateToStampCard: () -> Unit,
+    onNavigateToVoucher: () -> Unit,
     onNavigateToWeather: () -> Unit,
     onRetryWeather: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(paddingValues),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
@@ -34,21 +34,16 @@ fun HomeContent(
         item {
             StampCardProgress(
                 state = StampCardState(currentStamps = state.stampCount),
-                onClick = {
-                    val id = state.currentStampCardId ?: "default-card"
-                    onNavigateToStampCard(id)
-                }
+                onClick = onNavigateToStampCard
             )
         }
         item {
             QuickActionsRow(
                 voucherCount = state.voucherCount,
                 weatherData = state.weatherData,
-                weatherError = state.weatherError,
+                weatherErrorRes = state.weatherErrorRes,
                 isWeatherLoading = state.isWeatherLoading,
-                onVoucherClick = {
-                    val id = state.currentVoucherId ?: "default-voucher"
-                    onNavigateToVoucher(id) },
+                onVoucherClick = onNavigateToVoucher,
                 onWeatherClick = onNavigateToWeather,
                 onRetryWeatherClick = onRetryWeather
             )

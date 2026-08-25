@@ -5,8 +5,6 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.realtime.Realtime
-import io.github.jan.supabase.storage.Storage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,8 +29,6 @@ object SupabaseModule {
                 autoLoadFromStorage = true
             }
             install(Postgrest)
-            install(Realtime)
-            install(Storage)
         }
     }
 }

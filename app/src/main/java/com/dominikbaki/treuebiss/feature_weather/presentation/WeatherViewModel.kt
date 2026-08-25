@@ -1,11 +1,9 @@
 package com.dominikbaki.treuebiss.feature_weather.presentation
 
-import android.Manifest
-import android.app.Application
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.location.LocationTracker
 import com.dominikbaki.treuebiss.feature_weather.domain.model.WeatherData
 import com.dominikbaki.treuebiss.feature_weather.domain.repository.WeatherRepository
@@ -17,16 +15,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 sealed interface WeatherUiState {
-    object Loading : WeatherUiState
-    data class Success(val weatherData: WeatherData, val cityName: String? = null) : WeatherUiState
-    data class Error(val message: String) : WeatherUiState
+    data object Loading : WeatherUiState
+    data class Success(val weatherData: WeatherData) : WeatherUiState
+
+    /** Die Meldung ist eine String-Ressource, damit sie übersetzbar bleibt. */
+    data class Error(@StringRes val messageRes: Int) : WeatherUiState
 }
 
 @HiltViewModel
 class WeatherViewModel @Inject constructor(
     private val weatherRepository: WeatherRepository,
-    private val locationTracker: LocationTracker,
-    private val appContext: Application
+    private val locationTracker: LocationTracker
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<WeatherUiState>(WeatherUiState.Loading)
@@ -36,22 +35,15 @@ class WeatherViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = WeatherUiState.Loading
 
-            // KORREKTUR: Wir prüfen die Berechtigungen und den GPS-Status
-            // jetzt direkt hier, um präzise Fehlermeldungen zu geben.
-
-            val hasPermission = ContextCompat.checkSelfPermission(
-                // KORREKTUR: Verwendung des umbenannten Kontexts
-                appContext,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (!hasPermission) {
-                _uiState.value = WeatherUiState.Error("Bitte erteile die Berechtigung, um das Wetter anzuzeigen.")
+            // Berechtigung und GPS-Status getrennt prüfen, um präzise
+            // Fehlermeldungen geben zu können.
+            if (!locationTracker.hasLocationPermission()) {
+                _uiState.value = WeatherUiState.Error(R.string.weather_error_no_permission)
                 return@launch
             }
 
             if (!locationTracker.isLocationEnabled()) {
-                _uiState.value = WeatherUiState.Error("Bitte aktiviere den Standort (GPS) auf deinem Gerät.")
+                _uiState.value = WeatherUiState.Error(R.string.weather_error_gps_off)
                 return@launch
             }
 
@@ -60,15 +52,15 @@ class WeatherViewModel @Inject constructor(
             if (location != null) {
                 weatherRepository.getCurrentWeather(location.latitude, location.longitude)
                     .onSuccess { data ->
-                        _uiState.value = WeatherUiState.Success(data, cityName = "Dein Wetter")
+                        _uiState.value = WeatherUiState.Success(data)
                     }
-                    .onFailure { error ->
-                        _uiState.value = WeatherUiState.Error(error.message ?: "Unbekannter Fehler")
+                    .onFailure {
+                        _uiState.value = WeatherUiState.Error(R.string.weather_error_unknown)
                     }
             } else {
                 // Diese Meldung erscheint jetzt nur noch bei einem technischen Fehler
                 // (z.B. kein GPS-Signal).
-                _uiState.value = WeatherUiState.Error("Der Standort konnte nicht ermittelt werden. Bitte versuche es später erneut.")
+                _uiState.value = WeatherUiState.Error(R.string.weather_error_no_location)
             }
         }
     }

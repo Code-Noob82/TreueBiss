@@ -1,3 +1,128 @@
 <resources>
     <string name="app_name">Treuebiss</string>
+
+    <!--
+      Alle sichtbaren Texte liegen hier, damit sie pro White-Label-Instanz
+      per Resource-Overlay oder Product-Flavor ersetzt werden können - und
+      damit Übersetzungen möglich sind. Rein betriebsspezifische Begriffe
+      (Geschäftsname, Bezeichnung der Treuepunkte) kommen weiterhin aus
+      der BrandingConfig.
+    -->
+
+    <!-- Navigation & Gerüst -->
+    <string name="nav_home">Start</string>
+    <string name="nav_back">Zurück</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="action_retry">Wiederholen</string>
+
+    <!-- Start / Anmeldung -->
+    <string name="error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung.</string>
+    <string name="error_sign_in_timeout">Die Anmeldung dauert zu lange. Bitte prüfe deine Internetverbindung.</string>
+
+    <!-- Home -->
+    <string name="home_daily_special_title">Unser Dinkel-Kracher</string>
+    <string name="home_daily_special_description">Heute frisch aus dem Ofen, nur 3,50 €!</string>
+    <string name="home_daily_special_icon">Tagesangebot-Icon</string>
+    <string name="home_vouchers_available">%1$d verfügbar</string>
+    <string name="home_stamps_collected">Gesammelt</string>
+    <string name="home_gift_icon">Geschenk-Icon</string>
+    <string name="home_location_denied">Ohne Standorterlaubnis kann das Wetter nicht angezeigt werden.</string>
+
+    <!-- Wetter-Kachel auf dem Home-Screen -->
+    <string name="weather_tile_loading">Wird geladen…</string>
+    <string name="weather_tile_error">Fehler beim Laden</string>
+    <string name="weather_tile_empty">Wetter anzeigen</string>
+
+    <!-- Stempelkarte -->
+    <string name="stamp_card_title">Meine Stempelkarte</string>
+    <string name="stamp_card_icon">Stempelkarten-Icon</string>
+    <string name="stamp_card_hint_collecting">Sammle %1$d Stempel für eine tolle Prämie!</string>
+    <string name="stamp_card_hint_complete">Glückwunsch! Du hast einen Gutschein erhalten.</string>
+    <string name="stamp_card_add_demo">Stempel hinzufügen (Demo)</string>
+    <string name="stamp_card_stamped">Gestempelt</string>
+    <string name="stamp_card_voucher_created">Glückwunsch! Ein neuer Gutschein wurde erstellt.</string>
+
+    <!-- Gutscheine -->
+    <string name="vouchers_title">Meine Gutscheine</string>
+    <string name="vouchers_icon">Gutschein-Icon</string>
+    <string name="voucher_name">Dein Treue-Gutschein</string>
+    <string name="voucher_status_icon">Gutschein-Status</string>
+    <string name="voucher_valid_until">Gültig bis: %1$s</string>
+    <string name="voucher_expired">Abgelaufen</string>
+    <string name="voucher_redeem">Einlösen</string>
+    <string name="voucher_empty_icon">Keine Gutscheine</string>
+    <string name="voucher_empty_title">Du hast aktuell keine Gutscheine</string>
+    <string name="voucher_empty_subtitle">Sammle weiter fleißig Stempel, um neue Prämien freizuschalten!</string>
+
+    <!-- Gutschein-Overlay -->
+    <string name="voucher_overlay_instruction">Zeige diesen Code an der Kasse vor und tippe anschließend auf „Gutschein einlösen“.</string>
+    <string name="voucher_overlay_redeem">Gutschein einlösen</string>
+    <string name="voucher_overlay_safe_hint">Solange du nicht einlöst, bleibt der Gutschein erhalten.</string>
+    <string name="voucher_qr_description">QR-Code zum Einlösen des Gutscheins</string>
+
+    <!-- Einlöse-Rückfrage -->
+    <string name="voucher_confirm_title">Gutschein einlösen?</string>
+    <string name="voucher_confirm_text">Der Gutschein wird jetzt als eingelöst markiert. Das lässt sich nicht rückgängig machen.</string>
+    <string name="voucher_confirm_action">Jetzt einlösen</string>
+    <string name="action_cancel">Abbrechen</string>
+
+    <!-- Wetter -->
+    <string name="weather_screen_title">Dein Wetter</string>
+    <string name="weather_loading">Wetterdaten werden geladen…</string>
+    <string name="weather_error_icon">Fehler</string>
+    <string name="weather_error_prefix">Fehler: %1$s</string>
+    <string name="weather_error_no_permission">Bitte erteile die Berechtigung, um das Wetter anzuzeigen.</string>
+    <string name="weather_error_gps_off">Bitte aktiviere den Standort (GPS) auf deinem Gerät.</string>
+    <string name="weather_error_no_location">Der Standort konnte nicht ermittelt werden. Bitte versuche es später erneut.</string>
+    <string name="weather_error_unknown">Die Wetterdaten konnten nicht geladen werden.</string>
+    <string name="weather_detail_humidity">Feuchte</string>
+    <string name="weather_detail_wind">Wind</string>
+    <string name="weather_detail_pressure">Druck</string>
+    <string name="weather_value_temperature">%1$d°C</string>
+    <string name="weather_value_humidity">%1$d %%</string>
+    <string name="weather_value_wind">%1$s km/h</string>
+    <string name="weather_value_pressure">%1$s hPa</string>
+
+    <!-- Wetterlagen (WMO-Codes) -->
+    <string name="weather_type_clear_sky">Klarer Himmel</string>
+    <string name="weather_type_mainly_clear">Größtenteils klar</string>
+    <string name="weather_type_partly_cloudy">Teilweise bewölkt</string>
+    <string name="weather_type_overcast">Bedeckt</string>
+    <string name="weather_type_fog">Nebel</string>
+    <string name="weather_type_rain">Regen</string>
+    <string name="weather_type_snow">Schnee</string>
+    <string name="weather_type_thunderstorm">Gewitter</string>
+    <string name="weather_type_unknown">Unbekanntes Wetter</string>
+    <string name="weather_type_with_intensity">%1$s (%2$s)</string>
+    <string name="weather_intensity_light">leicht</string>
+    <string name="weather_intensity_moderate">mäßig</string>
+    <string name="weather_intensity_heavy">stark</string>
+    <string name="weather_intensity_freezing">gefrierend</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_finish">Los geht\'s!</string>
+    <string name="onboarding_1_title">Bonuspunkte sammeln</string>
+    <string name="onboarding_1_description">Sammle bei jedem Einkauf Punkte und vergiss nie wieder deine Bonuskarte.</string>
+    <string name="onboarding_2_title">Gutscheine sichern</string>
+    <string name="onboarding_2_description">Volle Karte? Erhalte automatisch einen Gutschein für deinen nächsten Einkauf.</string>
+    <string name="onboarding_3_title">Immer informiert</string>
+    <string name="onboarding_3_description">Checke das lokale Wetter, bevor du losgehst – direkt in deiner App.</string>
+    <string name="onboarding_4_title">Ganz wie dahäm</string>
+    <string name="onboarding_4_description">Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_section_general">Allgemein</string>
+    <string name="settings_dark_mode">Dunkelmodus</string>
+    <string name="settings_dark_mode_subtitle">Reduziert die Belastung für die Augen.</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_notifications_subtitle">Angebote &amp; Gutscheine erhalten.</string>
+    <string name="settings_section_account">Konto</string>
+    <string name="settings_edit_profile">Profil bearbeiten</string>
+    <string name="settings_edit_profile_subtitle">Namen und persönliche Daten ändern.</string>
+    <string name="settings_logout">Abmelden</string>
+    <string name="settings_logout_subtitle">Du wirst von diesem Gerät abgemeldet.</string>
+    <string name="settings_section_legal">Rechtliches &amp; Info</string>
+    <string name="settings_privacy">Datenschutz</string>
+    <string name="settings_imprint">Impressum</string>
+    <string name="settings_app_version">App-Version</string>
 </resources>

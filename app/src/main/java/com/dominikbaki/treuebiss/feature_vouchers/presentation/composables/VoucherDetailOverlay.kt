@@ -29,6 +29,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
@@ -84,7 +86,7 @@ internal fun VoucherDetailOverlay(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Zurück",
+                    contentDescription = stringResource(R.string.nav_back),
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -104,7 +106,7 @@ internal fun VoucherDetailOverlay(
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Zeige diesen Code an der Kasse vor und tippe anschließend auf „Gutschein einlösen“.",
+                    text = stringResource(R.string.voucher_overlay_instruction),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -138,13 +140,13 @@ internal fun VoucherDetailOverlay(
                         }
                         Spacer(Modifier.height(24.dp))
                         Text(
-                            text = "Dein Treue-Gutschein",
+                            text = stringResource(R.string.voucher_name),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "Gültig bis: $expiresAtFormatted",
+                            text = stringResource(R.string.voucher_valid_until, expiresAtFormatted),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -158,11 +160,11 @@ internal fun VoucherDetailOverlay(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Text("Gutschein einlösen")
+                    Text(stringResource(R.string.voucher_overlay_redeem))
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Solange du nicht einlöst, bleibt der Gutschein erhalten.",
+                    text = stringResource(R.string.voucher_overlay_safe_hint),
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
