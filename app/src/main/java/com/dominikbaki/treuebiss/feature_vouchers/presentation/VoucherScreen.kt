@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.EmptyState
@@ -35,7 +37,6 @@ import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.Vouch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun VoucherScreen(
-    voucherId: String,
     paddingValues: PaddingValues,
     viewModel: VoucherViewModel = hiltViewModel()
 ) {
@@ -85,12 +86,12 @@ internal fun VoucherScreen(
         ) {
             Icon(
                 imageVector = Icons.Filled.ConfirmationNumber,
-                contentDescription = "Gutschein-Icon",
+                contentDescription = stringResource(R.string.vouchers_icon),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(40.dp)
             )
             Text(
-                text = "Meine Gutscheine",
+                text = stringResource(R.string.vouchers_title),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold
             )

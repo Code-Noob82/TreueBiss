@@ -1,5 +1,8 @@
 package com.dominikbaki.treuebiss.feature_weather.presentation.composables
 
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +24,6 @@ internal fun LoadingContent() {
     ) {
         CircularProgressIndicator()
         Spacer(Modifier.height(16.dp))
-        Text("Wetterdaten werden geladen...")
+        Text(stringResource(R.string.weather_loading))
     }
 }

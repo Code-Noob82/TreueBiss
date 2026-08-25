@@ -1,5 +1,9 @@
 package com.dominikbaki.treuebiss.feature_weather.presentation.composables
 
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.feature_weather.presentation.weatherTypeLabel
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,13 +37,13 @@ import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherDetails
 // --- Datenklasse für die visuellen Elemente ---
 internal data class WeatherVisuals(
     val gradientColors: List<Color>,
-    val icon: ImageVector,
-    val label: String
+    val icon: ImageVector
 )
 
 @Composable
 internal fun WeatherContent(data: WeatherData, city: String) {
     val visuals = getWeatherVisuals(data.weatherType)
+    val label = weatherTypeLabel(data.weatherType)
 
     val backgroundBrush = Brush.verticalGradient(colors = visuals.gradientColors)
 
@@ -62,18 +66,18 @@ internal fun WeatherContent(data: WeatherData, city: String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 imageVector = visuals.icon,
-                contentDescription = visuals.label,
+                contentDescription = label,
                 modifier = Modifier.size(120.dp),
                 tint = Color.White
             )
             Text(
-                text = "${data.temperature.toInt()}°C",
+                text = stringResource(R.string.weather_value_temperature, data.temperature.toInt()),
                 fontSize = 80.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
             Text(
-                text = visuals.label,
+                text = label,
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White
             )
@@ -92,9 +96,21 @@ internal fun WeatherContent(data: WeatherData, city: String) {
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                WeatherDetails(icon = Icons.Default.WaterDrop, label = "Feuchte", value = "${data.humidity}%")
-                WeatherDetails(icon = Icons.Default.WindPower, label = "Wind", value = "${data.windSpeed} km/h")
-                WeatherDetails(icon = Icons.Default.Compress, label = "Druck", value = "${data.pressure} hPa")
+                WeatherDetails(
+                    icon = Icons.Default.WaterDrop,
+                    label = stringResource(R.string.weather_detail_humidity),
+                    value = stringResource(R.string.weather_value_humidity, data.humidity)
+                )
+                WeatherDetails(
+                    icon = Icons.Default.WindPower,
+                    label = stringResource(R.string.weather_detail_wind),
+                    value = stringResource(R.string.weather_value_wind, data.windSpeed.toString())
+                )
+                WeatherDetails(
+                    icon = Icons.Default.Compress,
+                    label = stringResource(R.string.weather_detail_pressure),
+                    value = stringResource(R.string.weather_value_pressure, data.pressure.toString())
+                )
             }
         }
     }

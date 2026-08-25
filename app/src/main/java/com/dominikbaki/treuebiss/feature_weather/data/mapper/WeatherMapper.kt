@@ -32,16 +32,16 @@ private fun mapWeatherCodeToType(code: Int): WeatherType {
         2 -> WeatherType.PartlyCloudy
         3 -> WeatherType.Overcast
         45, 48 -> WeatherType.Fog
-        51, 53, 55 -> WeatherType.Rain("leicht")
-        56, 57 -> WeatherType.Rain("gefrierend")
-        61, 63, 65 -> WeatherType.Rain("mäßig")
-        66, 67 -> WeatherType.Rain("starker gefrierender Regen")
-        80, 81, 82 -> WeatherType.Rain("stark")
-        71, 73, 75 -> WeatherType.Snow("mäßig")
-        77 -> WeatherType.Snow("Schneekörner")
-        85, 86 -> WeatherType.Snow("stark")
-        95 -> WeatherType.Thunderstorm("leicht bis mäßig")
-        96, 99 -> WeatherType.Thunderstorm("mit Hagel")
+        51, 53, 55 -> WeatherType.Rain(WeatherType.Intensity.Light)          // Niesel
+        56, 57 -> WeatherType.Rain(WeatherType.Intensity.Freezing)           // gefrierender Niesel
+        61, 63, 65 -> WeatherType.Rain(WeatherType.Intensity.Moderate)
+        66, 67 -> WeatherType.Rain(WeatherType.Intensity.Freezing)
+        80, 81, 82 -> WeatherType.Rain(WeatherType.Intensity.Heavy)          // Schauer
+        71, 73, 75 -> WeatherType.Snow(WeatherType.Intensity.Moderate)
+        77 -> WeatherType.Snow(WeatherType.Intensity.Light)                  // Schneekörner
+        85, 86 -> WeatherType.Snow(WeatherType.Intensity.Heavy)
+        95 -> WeatherType.Thunderstorm(WeatherType.Intensity.Moderate)
+        96, 99 -> WeatherType.Thunderstorm(WeatherType.Intensity.Heavy)      // mit Hagel
         else -> WeatherType.Unknown
     }
 }

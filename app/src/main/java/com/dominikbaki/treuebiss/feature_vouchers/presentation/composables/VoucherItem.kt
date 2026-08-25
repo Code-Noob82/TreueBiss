@@ -28,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.ui.utils.DateTimeFormatter
 import kotlinx.datetime.Clock
@@ -40,7 +42,7 @@ internal fun VoucherItem(
 ) {
     val expiresAtInstant = Instant.fromEpochMilliseconds(voucher.expiresAt)
     val expiresAtFormatted = DateTimeFormatter.formatInstant(expiresAtInstant)
-    val isExpired = Clock.System.now() > expiresAtInstant
+    val isExpired = voucher.isExpiredAt(Clock.System.now())
 
     // NEU: Einheitliches Kartendesign mit stärkerer Abrundung und angepassten Farben
     Card(
@@ -68,7 +70,7 @@ internal fun VoucherItem(
             // NEU: Icon zur visuellen Unterstützung
             Icon(
                 imageVector = if (isExpired) Icons.Filled.Error else Icons.Filled.CheckCircle,
-                contentDescription = "Gutschein-Status",
+                contentDescription = stringResource(R.string.voucher_status_icon),
                 modifier = Modifier.size(32.dp),
                 tint = if (isExpired) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
@@ -77,14 +79,14 @@ internal fun VoucherItem(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Dein Treue-Gutschein",
+                    text = stringResource(R.string.voucher_name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (isExpired) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = "Gültig bis: $expiresAtFormatted",
+                    text = stringResource(R.string.voucher_valid_until, expiresAtFormatted),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isExpired) {
                         MaterialTheme.colorScheme.error
@@ -100,7 +102,7 @@ internal fun VoucherItem(
             Box {
                 if (isExpired) {
                     TextButton(onClick = {}, enabled = false) {
-                        Text("Abgelaufen")
+                        Text(stringResource(R.string.voucher_expired))
                     }
                 } else {
                     // NEU: Button-Stil an Screenshot angepasst (kleiner, andere Farbe/Form)
@@ -120,7 +122,7 @@ internal fun VoucherItem(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text("Einlösen")
+                        Text(stringResource(R.string.voucher_redeem))
                     }
                 }
             }

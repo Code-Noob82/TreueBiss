@@ -17,6 +17,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @Composable
 internal fun OnboardingPageContent(page: OnboardingPage) {
@@ -29,18 +31,18 @@ internal fun OnboardingPageContent(page: OnboardingPage) {
     ) {
         Image(
             painter = painterResource(id = page.imageRes),
-            contentDescription = page.title,
+            contentDescription = stringResource(page.titleRes),
             modifier = Modifier.size(150.dp)
         )
         Spacer(modifier = Modifier.height(40.dp))
         Text(
-            text = page.title,
+            text = stringResource(page.titleRes),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = page.description,
+            text = stringResource(page.descriptionRes),
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )

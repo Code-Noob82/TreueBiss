@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -33,7 +35,7 @@ internal fun FinishButton(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                Text(text = "Los geht's!")
+                Text(text = stringResource(R.string.onboarding_finish))
             }
         }
     }

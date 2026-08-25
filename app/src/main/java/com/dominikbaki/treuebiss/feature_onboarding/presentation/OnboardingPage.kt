@@ -1,34 +1,43 @@
 package com.dominikbaki.treuebiss.feature_onboarding.presentation
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import com.dominikbaki.treuebiss.R
 
+/**
+ * Eine Seite des Onboardings. Texte als String-Ressourcen, damit sie pro
+ * White-Label-Instanz austauschbar und übersetzbar sind.
+ */
 internal sealed class OnboardingPage(
-    val title: String,
-    val description: String,
+    @StringRes val titleRes: Int,
+    @StringRes val descriptionRes: Int,
     @DrawableRes val imageRes: Int
 ) {
-    object First : OnboardingPage(
-        title = "Bonuspunkte sammeln",
-        description = "Sammle bei jedem Einkauf Punkte und vergiss nie wieder deine Bonuskarte",
+    data object First : OnboardingPage(
+        titleRes = R.string.onboarding_1_title,
+        descriptionRes = R.string.onboarding_1_description,
         imageRes = R.drawable.bonuskarte
     )
 
-    object Second : OnboardingPage(
-        title = "Gutscheine sichern",
-        description = "Volle Karte? Erhalte automatisch einen Gutschein für deinen nächsten Einkauf.",
+    data object Second : OnboardingPage(
+        titleRes = R.string.onboarding_2_title,
+        descriptionRes = R.string.onboarding_2_description,
         imageRes = R.drawable.gutschein
     )
 
-    object Third : OnboardingPage(
-        title = "Immer informiert",
-        description = "Checke das lokale Wetter, bevor du losgehst - direkt in deiner App.",
+    data object Third : OnboardingPage(
+        titleRes = R.string.onboarding_3_title,
+        descriptionRes = R.string.onboarding_3_description,
         imageRes = R.drawable.wetter
     )
 
-    object Fourth : OnboardingPage(
-        title = "Ganz wie dahäm",
-        description = "Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.",
+    data object Fourth : OnboardingPage(
+        titleRes = R.string.onboarding_4_title,
+        descriptionRes = R.string.onboarding_4_description,
         imageRes = R.drawable.einstellungen
     )
+
+    companion object {
+        val pages: List<OnboardingPage> = listOf(First, Second, Third, Fourth)
+    }
 }

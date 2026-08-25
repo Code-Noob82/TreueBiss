@@ -15,6 +15,7 @@ class UserPreferencesRepositoryImpl @Inject constructor(
 ) : UserPreferencesRepository {
     private companion object {
         val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
+        val REMOTE_DATA_RESTORED_KEY = booleanPreferencesKey("remote_data_restored")
     }
 
     override val hasCompletedOnboarding = dataStore.data
@@ -25,6 +26,17 @@ class UserPreferencesRepositoryImpl @Inject constructor(
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { preferences ->
             preferences[ONBOARDING_COMPLETED_KEY] = completed
+        }
+    }
+
+    override val hasRestoredRemoteData = dataStore.data
+        .map { preferences ->
+            preferences[REMOTE_DATA_RESTORED_KEY] == true
+        }
+
+    override suspend fun setRemoteDataRestored(restored: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[REMOTE_DATA_RESTORED_KEY] = restored
         }
     }
 }

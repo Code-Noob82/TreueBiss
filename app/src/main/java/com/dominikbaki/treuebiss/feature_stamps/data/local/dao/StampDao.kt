@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.dominikbaki.treuebiss.feature_stamps.data.local.entity.StampEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -23,6 +24,13 @@ interface StampDao {
      * Beobachtet alle Stempel in der Datenbank und gibt sie als Flow zurück.
      * Der Flow emittiert automatisch neue Listen, wenn sich die Daten ändern.
      */
+    /**
+     * Fügt mehrere Stempel ein. Bestehende IDs werden ersetzt, damit die
+     * Wiederherstellung vom Server wiederholbar ist.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStamps(stamps: List<StampEntity>)
+
     @Query("SELECT * FROM stamps ORDER BY timestamp DESC")
     fun observeAllStamps(): Flow<List<StampEntity>>
 
@@ -33,5 +41,18 @@ interface StampDao {
     suspend fun countStamps(): Int
 
     @Query("DELETE FROM stamps")
-    suspend fun clearStamps() // NEU: Funktion zum Löschen aller Stempel
+    suspend fun clearStamps()
+
+    /**
+     * Fügt einen Stempel ein und liefert die neue Gesamtzahl zurück.
+     *
+     * Beides läuft in einer Transaktion: Würde die UI stattdessen ihren
+     * zuletzt beobachteten Stand hochzählen, könnten schnelle Klicks
+     * dieselbe Zahl zweimal sehen und die 10er-Grenze verpassen.
+     */
+    @Transaction
+    suspend fun insertStampAndCount(stamp: StampEntity): Int {
+        insertStamp(stamp)
+        return countStamps()
+    }
 }

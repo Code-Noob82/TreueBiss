@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.WriterException
@@ -50,7 +52,7 @@ internal fun QrCodeImage(
     if (qrBitmap != null) {
         Image(
             bitmap = qrBitmap,
-            contentDescription = "QR-Code zum Einlösen des Gutscheins",
+            contentDescription = stringResource(R.string.voucher_qr_description),
             modifier = modifier,
             // Ohne Interpolation bleiben die Kanten scharf und der Code scanbar.
             filterQuality = FilterQuality.None

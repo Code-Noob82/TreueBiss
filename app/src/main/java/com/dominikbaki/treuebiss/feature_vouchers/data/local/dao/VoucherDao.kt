@@ -19,6 +19,13 @@ interface VoucherDao {
     suspend fun insertVoucher(voucher: VoucherEntity)
 
     /**
+     * Fügt mehrere Gutscheine ein. Bestehende IDs werden ersetzt, damit die
+     * Wiederherstellung vom Server wiederholbar ist.
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVouchers(vouchers: List<VoucherEntity>)
+
+    /**
      * Beobachtet alle nicht eingelösten Gutscheine.
      */
     @Query("SELECT * FROM vouchers WHERE isRedeemed = 0 ORDER BY creationDate DESC")

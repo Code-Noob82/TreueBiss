@@ -15,4 +15,10 @@ interface VoucherRepository {
 
     /** Markiert einen Gutschein als eingelöst (lokal, danach Sync zu Supabase). */
     suspend fun redeemVoucher(voucherId: String)
+
+    /**
+     * Holt die Gutscheine dieser Geräte-Identität vom Server in die lokale
+     * Datenbank. Gedacht für den ersten Start nach einer Neuinstallation.
+     */
+    suspend fun restoreFromRemote()
 }

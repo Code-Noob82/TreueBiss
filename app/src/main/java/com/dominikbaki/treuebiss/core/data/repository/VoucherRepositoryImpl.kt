@@ -10,7 +10,6 @@ import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherDto
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherEntity
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -75,14 +74,7 @@ class VoucherRepositoryImpl @Inject constructor(
             // --- Schritt 2: Den neuen Status an Supabase senden
             try {
                 Log.d("VoucherRepoImpl", "Syncing redeemed status to Supabase. ID: $voucherId")
-                supabaseClient.postgrest["vouchers"]
-                    .update({
-                        set("is_redeemed", true)
-                    }) {
-                        filter {
-                            eq("id", voucherId)
-                        }
-                    }
+                remoteDataSource.setVoucherRedeemed(voucherId)
                 Log.d(
                     "VoucherRepoImpl",
                     "Successfully synced redeemed status for voucher $voucherId."
@@ -96,5 +88,18 @@ class VoucherRepositoryImpl @Inject constructor(
 
     override fun observeOpenVouchers(): Flow<List<Voucher>> {
         return dao.observeOpenVouchers().map { entities -> entities.map { it.toVoucher() } }
+    }
+
+    override suspend fun restoreFromRemote() {
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+        if (currentUserId == null) {
+            Log.w("VoucherRepositoryImpl", "User not logged in, cannot restore vouchers")
+            return
+        }
+        val remoteVouchers = remoteDataSource.getVouchers(currentUserId)
+        if (remoteVouchers.isNotEmpty()) {
+            dao.insertVouchers(remoteVouchers.map { it.toVoucherEntity() })
+        }
+        Log.d("VoucherRepositoryImpl", "Restored ${remoteVouchers.size} vouchers from Supabase")
     }
 }

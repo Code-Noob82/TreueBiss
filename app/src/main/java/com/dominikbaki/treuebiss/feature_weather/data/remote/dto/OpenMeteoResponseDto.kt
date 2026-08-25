@@ -16,14 +16,7 @@ data class OpenMeteoResponseDto(
     // Annahme: Das 'current'-Feld könnte in einer reinen Vorhersage-Antwort fehlen,
     // daher machen wir es optional (nullable).
     @SerialName("current")
-    val current: CurrentWeatherDto? = null,
-
-    // KORREKTUR: Diese Felder sind optional, da wir sie nicht immer anfordern.
-    // Wir machen sie nullable und geben ihnen einen Default-Wert von null.
-    @SerialName("hourly")
-    val hourly: HourlyDto? = null,
-    @SerialName("hourly_units")
-    val hourlyUnits: HourlyUnitsDto? = null
+    val current: CurrentWeatherDto? = null
 )
 
 /**
@@ -45,30 +38,4 @@ data class CurrentWeatherDto(
     val humidity: Int,
     @SerialName("pressure_msl")
     val pressure: Double
-)
-
-/**
- * NEU: DTO für den "hourly"-Block, der die Vorhersagedaten als Listen enthält.
- */
-@Serializable
-data class HourlyDto(
-    @SerialName("time")
-    val time: List<String>,
-    @SerialName("temperature_2m")
-    val temperatures: List<Double>,
-    @SerialName("precipitation")
-    val precipitations: List<Double>
-)
-
-/**
- * NEU: DTO für den "hourly_units"-Block, der die Einheiten für die Vorhersagedaten enthält.
- */
-@Serializable
-data class HourlyUnitsDto(
-    @SerialName("time")
-    val time: String,
-    @SerialName("temperature_2m")
-    val temperature: String,
-    @SerialName("precipitation")
-    val precipitation: String
 )

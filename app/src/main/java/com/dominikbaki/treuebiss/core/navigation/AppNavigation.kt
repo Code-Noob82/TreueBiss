@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.toRoute
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeScreen
 import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScreen
 import com.dominikbaki.treuebiss.feature_settings.presentation.SettingsScreen
@@ -58,43 +57,31 @@ fun AppNavigation(
         // ---------- Home ----------
         composable<Screen.Home> {
             HomeScreen(
-                onNavigateToStampCard = { cardId ->
-                    navController.navigate(Screen.StampCard(cardId))
-                },
-                onNavigateToVoucher = { voucherId ->
-                    navController.navigate(Screen.Voucher(voucherId))
-                },
+                onNavigateToStampCard = { navController.navigate(Screen.StampCard) },
+                onNavigateToVoucher = { navController.navigate(Screen.Voucher) },
                 onNavigateToWeather = { navController.navigate(Screen.Weather) },
-                onNavigateToSettings = { navController.navigate(Screen.Settings) },
+                snackBarHostState = snackBarHostState,
                 paddingValues = paddingValues
             )
         }
         // ---------- StampCard ----------
-        composable<Screen.StampCard> { backStackEntry ->
-            val args = backStackEntry.toRoute<Screen.StampCard>()
+        composable<Screen.StampCard> {
             StampCardScreen(
-                cardId = args.cardId,
                 snackBarHostState = snackBarHostState,
                 paddingValues = paddingValues
             )
         }
         // ---------- Voucher ----------
-        composable<Screen.Voucher> { backStackEntry ->
-            val args = backStackEntry.toRoute<Screen.Voucher>()
-            VoucherScreen(
-                voucherId = args.voucherId,
-                paddingValues = paddingValues
-            )
+        composable<Screen.Voucher> {
+            VoucherScreen(paddingValues = paddingValues)
         }
         // ---------- Weather ----------
         composable<Screen.Weather> {
-            WeatherScreen(onNavigateUp = { navController.navigateUp() })
+            WeatherScreen()
         }
         // ---------- Settings ----------
         composable<Screen.Settings> {
-            SettingsScreen(
-                onNavigateUp = { navController.navigateUp() }
-            )
+            SettingsScreen()
         }
     }
 }

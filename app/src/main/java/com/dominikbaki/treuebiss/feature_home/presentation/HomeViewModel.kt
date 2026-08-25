@@ -1,8 +1,10 @@
 package com.dominikbaki.treuebiss.feature_home.presentation
 
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.location.LocationTracker
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 // Ein Daten-Container, der alle dynamischen Informationen für den HomeScreen bündelt.
@@ -22,12 +25,11 @@ import javax.inject.Inject
 data class HomeUiState(
     val stampCount: Int = 0,
     val voucherCount: Int = 0,
-    val currentStampCardId: String? = null,
-    val currentVoucherId: String? = null,
     val dailySpecial: DailySpecial? = null, // Vorerst optional
     val isWeatherLoading: Boolean = false, // Startwert kann false sein, da der init-Block das Laden steuert
     val weatherData: WeatherData? = null,
-    val weatherError: String? = null
+    /** Fehlermeldung als String-Ressource, damit sie übersetzbar bleibt. */
+    @StringRes val weatherErrorRes: Int? = null
 )
 
 @HiltViewModel
@@ -40,7 +42,8 @@ class HomeViewModel @Inject constructor(
 
 
     // Ein interner StateFlow nur für das Ergebnis des Wetter API-Calls
-    private val _weatherState = MutableStateFlow<Result<WeatherData>?>(null)
+    private val _weatherState = MutableStateFlow<WeatherData?>(null)
+    private val _weatherErrorRes = MutableStateFlow<Int?>(null)
     private val _isWeatherLoading = MutableStateFlow(false) // Startet jetzt mit false
 
     // Wir kombinieren die Live-Daten aus beiden Repositories in einen einzigen State.
@@ -48,21 +51,22 @@ class HomeViewModel @Inject constructor(
         combine(
             stampRepository.observeStamps(),
             voucherRepository.observeOpenVouchers(),
-            _weatherState,
+            combine(_weatherState, _weatherErrorRes) { data, errorRes -> data to errorRes },
             _isWeatherLoading
-        ) { stamps, vouchers, weatherResult, isWeatherLoading ->
+        ) { stamps, vouchers, weather, isWeatherLoading ->
+            val now = Clock.System.now()
             HomeUiState(
                 stampCount = stamps.size,
-                voucherCount = vouchers.size,
-                currentStampCardId = stamps.firstOrNull()?.id ?: "default-card",
-                currentVoucherId = vouchers.firstOrNull()?.id ?: "default-voucher",
+                // Abgelaufene Gutscheine sind nicht mehr einlösbar und
+                // dürfen die angezeigte Anzahl nicht aufblähen.
+                voucherCount = vouchers.count { it.isRedeemableAt(now) },
                 dailySpecial = DailySpecial( // Dummy-Daten für das Tagesangebot
-                    title = "Unser Dinkel-Kracher",
-                    description = "Heute frisch aus dem Ofen, nur 3,50€!",
+                    titleRes = R.string.home_daily_special_title,
+                    descriptionRes = R.string.home_daily_special_description,
                     imageUrl = null
                 ),
-                weatherData = weatherResult?.getOrNull(),
-                weatherError = weatherResult?.exceptionOrNull()?.message,
+                weatherData = weather.first,
+                weatherErrorRes = weather.second,
                 isWeatherLoading = isWeatherLoading
             )
         }.stateIn(
@@ -95,7 +99,7 @@ class HomeViewModel @Inject constructor(
             Log.d("HomeViewModel_Weather",
                 "fetchWeather() called")
             _isWeatherLoading.value = true
-            _weatherState.value = null // Fehler vom vorherigen Versuch zurücksetzen
+            _weatherErrorRes.value = null // Fehler vom vorherigen Versuch zurücksetzen
 
             val location = locationTracker.getCurrentLocation()
 
@@ -105,27 +109,16 @@ class HomeViewModel @Inject constructor(
                     "HomeViewModel_Weather",
                     "Location received: Lat=${location.latitude}, Lon=${location.longitude}"
                 )
-                val result = weatherRepository.getCurrentWeather(
+                weatherRepository.getCurrentWeather(
                     latitude = location.latitude,
                     longitude = location.longitude
-                )
-                _weatherState.value = result
-
-                // LOG 4: War der API-Aufruf erfolgreich oder ist er fehlgeschlagen?
-                result
-                    .onSuccess {
-                        Log.d(
-                            "HomeViewModel_Weather",
-                            "Weather API call was successful."
-                        )
-                    }
-                    .onFailure { error ->
-                        Log.e(
-                            "HomeViewModel_Weather",
-                            "Weather API call failed!",
-                            error
-                        )
-                    }
+                ).onSuccess { data ->
+                    Log.d("HomeViewModel_Weather", "Weather API call was successful.")
+                    _weatherState.value = data
+                }.onFailure { error ->
+                    Log.e("HomeViewModel_Weather", "Weather API call failed!", error)
+                    _weatherErrorRes.value = R.string.weather_error_unknown
+                }
 
             } else {
                 // LOG 3: Der Standort ist null - das ist der wahrscheinlichste Fehlerpunkt.
@@ -133,9 +126,7 @@ class HomeViewModel @Inject constructor(
                     "HomeViewModel_Weather",
                     "locationTracker.getCurrentLocation() returned NULL."
                 )
-                _weatherState.value = Result.failure(
-                    Exception("Standort konnte nicht abgerufen werden.")
-                )
+                _weatherErrorRes.value = R.string.weather_error_no_location
             }
             _isWeatherLoading.value = false
         }

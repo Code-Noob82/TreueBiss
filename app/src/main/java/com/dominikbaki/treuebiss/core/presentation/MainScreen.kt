@@ -9,8 +9,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -20,27 +21,13 @@ import com.dominikbaki.treuebiss.core.navigation.AppNavigation
 import com.dominikbaki.treuebiss.core.navigation.Screen
 import com.dominikbaki.treuebiss.core.navigation.mapRouteToScreen
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
-import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
-import com.dominikbaki.treuebiss.feature_home.presentation.HomeViewModel
-
-
-// ------------------
-// Mapping BottomNavItem -> Screen
-// ------------------
-private fun BottomNavItem.toScreen(): Screen = when (this) {
-    is BottomNavItem.Home -> Screen.Home
-    is BottomNavItem.StampCard -> Screen.StampCard(cardId)
-    is BottomNavItem.Vouchers -> Screen.Voucher(voucherId)
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    mainViewModel: MainViewModel = hiltViewModel(),
-    homeViewModel: HomeViewModel = hiltViewModel()
+    mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val uiState by mainViewModel.uiState.collectAsState()
-    val homeUiState by homeViewModel.uiState.collectAsState()
     val snackBarHostState = remember { SnackbarHostState() }
 
     // EIN NavController (Single-Backstack)
@@ -50,7 +37,7 @@ fun MainScreen(
         try {
             navBackStackEntry?.toRoute<Screen>()
         } catch (e: IllegalArgumentException) {
-            // Der neue, robuste Fallback mit einer Parsing-Funktion!
+            // Fallback, wenn die Route nicht typisiert aufgelöst werden kann.
             mapRouteToScreen(navBackStackEntry?.destination?.route)
         }
     }
@@ -70,7 +57,7 @@ fun MainScreen(
                                 is Screen.StampCard -> branding.loyaltyPointsTitle
                                 is Screen.Voucher -> branding.vouchersTitle
                                 is Screen.Weather -> branding.weatherTitle
-                                is Screen.Settings -> "Einstellungen"
+                                is Screen.Settings -> stringResource(R.string.settings_title)
                                 else -> ""
                             }
                         )
@@ -82,7 +69,7 @@ fun MainScreen(
                             IconButton(onClick = { navController.navigateUp() }) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Zurück"
+                                    contentDescription = stringResource(R.string.nav_back)
                                 )
                             }
                         }
@@ -92,7 +79,7 @@ fun MainScreen(
                             IconButton(onClick = { navController.navigate(Screen.Settings) }) {
                                 Icon(
                                     imageVector = Icons.Filled.Settings,
-                                    contentDescription = "Einstellungen"
+                                    contentDescription = stringResource(R.string.settings_title)
                                 )
                             }
                         }
@@ -101,32 +88,15 @@ fun MainScreen(
             }
         },
         bottomBar = {
-            if (uiState is MainUiState.Success && showBars) {
-                val items = listOf(
-                    BottomNavItem.Home,
-                    BottomNavItem.StampCard(
-                        cardId = homeUiState.currentStampCardId ?: "default-card"
-                    ),
-                    BottomNavItem.Vouchers(
-                        voucherId = homeUiState.currentVoucherId ?: "default-voucher"
-                    )
-                )
-
+            if (showBars) {
                 NavigationBar {
-                    items.forEach { item ->
+                    BottomNavItem.items.forEach { item ->
                         NavigationBarItem(
                             label = { Text(item.title()) },
                             icon = { Icon(item.icon, contentDescription = null) },
-                            // --- FIX: Die Logik zur Auswahl des Items wurde direkt hier implementiert ---
-                            // Das ist stabiler, als zu versuchen, die komplexe Route zu parsen.
-                            selected = when (currentRoute) {
-                                is Screen.Home -> item is BottomNavItem.Home
-                                is Screen.StampCard -> item is BottomNavItem.StampCard
-                                is Screen.Voucher -> item is BottomNavItem.Vouchers
-                                else -> false
-                            },
+                            selected = currentRoute == item.screen,
                             onClick = {
-                                navController.navigate(item.toScreen()) {
+                                navController.navigate(item.screen) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         inclusive = false
                                     }
@@ -164,22 +134,13 @@ fun MainScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(state.message, textAlign = TextAlign.Center)
+                    Text(stringResource(state.messageRes), textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { mainViewModel.retryInitialAuth() }) {
-                        Text("Wiederholen")
+                        Text(stringResource(R.string.action_retry))
                     }
                 }
             }
         }
-    }
-}
-
-
-@Preview
-@Composable
-fun MainScreenPreview() {
-    TreueBissTheme {
-        MainScreen()
     }
 }

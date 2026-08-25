@@ -57,6 +57,19 @@ android {
         buildConfig = true
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            // Ohne das wirft jeder Aufruf von android.util.Log im JVM-Test -
+            // auch der im catch-Block, wodurch Fehlerzustände nie gesetzt würden.
+            isReturnDefaultValues = true
+        }
+    }
+}
+
+// Room-Schemas versionieren, damit spätere Migrationen diffbar sind.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -102,8 +115,6 @@ dependencies {
     implementation(platform(libs.supabase.bom))
     implementation(libs.supabase.gotrue)
     implementation(libs.supabase.postgrest)
-    implementation(libs.supabase.realtime)
-    implementation(libs.supabase.storage)
     implementation(libs.ktor.client.okhttp)
 
     // ZXing - QR-Code-Erzeugung für Gutscheine
@@ -115,6 +126,8 @@ dependencies {
 
     // Test-Abhänigkeiten
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

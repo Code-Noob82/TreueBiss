@@ -7,14 +7,21 @@ import kotlinx.coroutines.flow.Flow
  * Port für alle Operationen, die Stempel betreffen.
  */
 interface StampRepository {
-    /** Fügt einen neuen Stempel hinzu (setzt device_id/tenant_id intern). */
-    suspend fun addStamp(stamp: Stamp)
+    /**
+      * Fügt einen neuen Stempel hinzu und gibt die neue Gesamtzahl zurück.
+      * Die Zahl kommt aus derselben Transaktion wie das Einfügen.
+      */
+    suspend fun addStamp(stamp: Stamp): Int
 
     /** Beobachtet alle Stempel der aktuellen Installation als Flow. */
     fun observeStamps(): Flow<List<Stamp>>
 
-    /** Liefert die aktuelle Anzahl Stempel (z. B. für 10er-Logik). */
-    suspend fun count(): Int
+    /** Löscht alle Stempel - lokal und auf dem Server. */
+    suspend fun clearStamps()
 
-    suspend fun clearStamps() // NEU: Funktion zum Löschen aller Stempel
+    /**
+     * Holt die Stempel dieser Geräte-Identität vom Server in die lokale
+     * Datenbank. Gedacht für den ersten Start nach einer Neuinstallation.
+     */
+    suspend fun restoreFromRemote()
 }

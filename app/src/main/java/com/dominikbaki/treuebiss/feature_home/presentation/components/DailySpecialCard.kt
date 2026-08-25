@@ -25,6 +25,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.feature_home.presentation.DailySpecial
 
@@ -59,7 +61,7 @@ fun DailySpecialCard(special: DailySpecial) {
                 // NEU: Ein Icon, das den "Special"-Charakter unterstreicht
                 Icon(
                     imageVector = Icons.Filled.Star,
-                    contentDescription = "Tagesangebot-Icon",
+                    contentDescription = stringResource(R.string.home_daily_special_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
@@ -70,7 +72,7 @@ fun DailySpecialCard(special: DailySpecial) {
                 special.imageUrl?.let { imageResId ->
                     Image(
                         painter = painterResource(id = imageResId),
-                        contentDescription = special.title,
+                        contentDescription = stringResource(special.titleRes),
                         modifier = Modifier
                             .size(80.dp)
                             .clip(MaterialTheme.shapes.medium),
@@ -80,13 +82,13 @@ fun DailySpecialCard(special: DailySpecial) {
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = special.title,
+                        text = stringResource(special.titleRes),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        text = special.description,
+                        text = stringResource(special.descriptionRes),
                         style = MaterialTheme.typography.bodyMedium,
                         // NEU: Dezentere Farbe für die Beschreibung zur besseren Lesbarkeit
                         color = MaterialTheme.colorScheme.onSurfaceVariant

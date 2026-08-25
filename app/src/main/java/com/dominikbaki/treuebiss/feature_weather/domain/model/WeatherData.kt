@@ -12,18 +12,22 @@ data class WeatherData(
 )
 
 /**
- * Eine 'sealed class', um die verschiedenen WMO-Wetter-Codes abzubilden.
- * Das ermöglicht eine typsichere Behandlung in der UI.
+ * Bildet die WMO-Wetter-Codes typsicher ab.
+ *
+ * Bewusst ohne Anzeigetexte: Die Beschriftung ist Sache der UI-Schicht
+ * (siehe `weatherTypeLabel`), damit sie übersetzbar bleibt.
  */
-sealed class WeatherType(open val description: String) {
-    object ClearSky : WeatherType("Klarer Himmel")
-    object MainlyClear : WeatherType("Größtenteils klar")
-    object PartlyCloudy : WeatherType("Teilweise bewölkt")
-    object Overcast : WeatherType("Bedeckt")
-    object Fog : WeatherType("Nebel")
-    data class Rain(val intensity: String) : WeatherType("Regen")
-    data class Snow(val intensity: String) : WeatherType("Schnee")
-    data class Thunderstorm(override val description: String) : WeatherType("Gewitter")
-    object Unknown : WeatherType("Unbekanntes Wetter")
-}
+sealed interface WeatherType {
+    data object ClearSky : WeatherType
+    data object MainlyClear : WeatherType
+    data object PartlyCloudy : WeatherType
+    data object Overcast : WeatherType
+    data object Fog : WeatherType
+    data class Rain(val intensity: Intensity) : WeatherType
+    data class Snow(val intensity: Intensity) : WeatherType
+    data class Thunderstorm(val intensity: Intensity) : WeatherType
+    data object Unknown : WeatherType
 
+    /** Stärke eines Niederschlags- oder Gewitterereignisses. */
+    enum class Intensity { Light, Moderate, Heavy, Freezing }
+}

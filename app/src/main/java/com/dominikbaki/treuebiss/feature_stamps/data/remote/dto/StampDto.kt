@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.feature_stamps.data.remote.dto
 
+import kotlinx.datetime.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -11,8 +12,10 @@ import kotlinx.serialization.Serializable
 data class StampDto(
     @SerialName("id")
     val id: String,
+    // Instant statt String: Supabase erwartet für `timestamptz` einen
+    // ISO-8601-String, den die Bibliothek selbst erzeugt und wieder einliest.
     @SerialName("created_at")
-    val timeStamp: String,
+    val createdAt: Instant,
     @SerialName("user_id")
     val userId: String
 )

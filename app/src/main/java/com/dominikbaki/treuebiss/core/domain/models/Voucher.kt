@@ -1,36 +1,31 @@
 package com.dominikbaki.treuebiss.core.domain.models
 
 import kotlinx.datetime.Instant
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
  * Repräsentiert einen Gutschein in der Domain-Schicht (die "saubere" Logik).
+ *
+ * Bewusst ohne Serialisierungs-Annotationen: Das Mapping auf die
+ * Supabase-Spaltennamen übernimmt [com.dominikbaki.treuebiss.feature_vouchers.data.remote.dto.VoucherDto].
+ * Die alte Annotation hier wich davon ab ("created_date" statt "creation_date").
  */
-@Serializable
 data class Voucher(
-    @SerialName("id")
     val id: String = UUID.randomUUID().toString(),
-
-    // 'created_at' ist ein echter Zeitstempel (timestamptz)
-    @SerialName("created_at")
     val createdAt: Instant,
-
-    // 'creation_date' ist eine Zahl (int8), also ein Long in Kotlin.
-    // Stellt normalerweise einen Unix-Timestamp dar.
-    @SerialName("created_date")
+    /** Erstellungszeitpunkt als Unix-Timestamp in Millisekunden. */
     val creationDate: Long,
-
-    // 'expires_at' ist ebenfalls eine Zahl (int8), also ein Long.
-    @SerialName("expires_at")
+    /** Ablaufzeitpunkt als Unix-Timestamp in Millisekunden. */
     val expiresAt: Long,
-
-
-    @SerialName("is_redeemed")
     val isRedeemed: Boolean = false,
-
-
-    @SerialName("user_id")
     val userId: String? = null
-)
+) {
+    /**
+     * Ein Gutschein ist abgelaufen, wenn sein Ablaufzeitpunkt überschritten ist.
+     * Abgelaufene Gutscheine bleiben sichtbar (als "Abgelaufen" markiert),
+     * zählen aber nicht mehr als einlösbar.
+     */
+    fun isExpiredAt(now: Instant): Boolean = now.toEpochMilliseconds() > expiresAt
+
+    fun isRedeemableAt(now: Instant): Boolean = !isRedeemed && !isExpiredAt(now)
+}

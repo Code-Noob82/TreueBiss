@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.core.di
 
+import com.dominikbaki.treuebiss.BuildConfig
 import com.dominikbaki.treuebiss.feature_weather.data.remote.api.WeatherApiService
 import dagger.Module
 import dagger.Provides
@@ -24,7 +25,13 @@ object NetworkModule {
     fun provideOkHttpClient(): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                // Im Release-Build wuerden sonst komplette Request- und
+                // Response-Bodies im Logcat landen.
+                level = if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BODY
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
             })
             .build()
     }
