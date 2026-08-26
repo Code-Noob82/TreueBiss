@@ -28,16 +28,10 @@ internal sealed class OnboardingPage(
     data object Third : OnboardingPage(
         titleRes = R.string.onboarding_3_title,
         descriptionRes = R.string.onboarding_3_description,
-        imageRes = R.drawable.wetter
-    )
-
-    data object Fourth : OnboardingPage(
-        titleRes = R.string.onboarding_4_title,
-        descriptionRes = R.string.onboarding_4_description,
         imageRes = R.drawable.einstellungen
     )
 
     companion object {
-        val pages: List<OnboardingPage> = listOf(First, Second, Third, Fourth)
+        val pages: List<OnboardingPage> = listOf(First, Second, Third)
     }
 }

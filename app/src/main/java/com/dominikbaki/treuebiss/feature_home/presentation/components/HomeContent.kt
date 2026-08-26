@@ -3,11 +3,17 @@ package com.dominikbaki.treuebiss.feature_home.presentation.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
 import com.dominikbaki.treuebiss.feature_home.presentation.HomeUiState
 import com.dominikbaki.treuebiss.feature_home.presentation.StampCardState
 
@@ -17,10 +23,10 @@ fun HomeContent(
     paddingValues: PaddingValues,
     onNavigateToStampCard: () -> Unit,
     onNavigateToVoucher: () -> Unit,
-    onNavigateToWeather: () -> Unit,
-    onRetryWeather: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val branding = LocalBrandingConfig.current
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -38,14 +44,12 @@ fun HomeContent(
             )
         }
         item {
-            QuickActionsRow(
-                voucherCount = state.voucherCount,
-                weatherData = state.weatherData,
-                weatherErrorRes = state.weatherErrorRes,
-                isWeatherLoading = state.isWeatherLoading,
-                onVoucherClick = onNavigateToVoucher,
-                onWeatherClick = onNavigateToWeather,
-                onRetryWeatherClick = onRetryWeather
+            ActionCard(
+                modifier = Modifier.fillMaxWidth(),
+                title = branding.vouchersTitle,
+                subtitle = stringResource(R.string.home_vouchers_available, state.voucherCount),
+                icon = Icons.Filled.Redeem,
+                onClick = onNavigateToVoucher
             )
         }
     }

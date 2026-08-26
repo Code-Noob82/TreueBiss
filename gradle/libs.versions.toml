@@ -14,15 +14,12 @@ hiltNavigationCompose = "1.2.0"
 navigationCompose = "2.9.4"
 kotlinxSerialization = "1.7.1"
 room = "2.6.1"
-retrofit = "2.11.0"
-okhttp = "4.12.0"
 supabaseBom = "2.5.3"
 ktor = "2.3.12"
 kotlinxCoroutines = "1.8.1"
 datastore = "1.1.1"
 kotlinx-datetime = "0.6.0"
 iconsExtended = "1.7.7"
-playServicesLocation = "21.3.0"
 zxing = "3.5.3"
 coroutinesTest = "1.8.1"
 turbine = "1.1.0"
@@ -62,12 +59,6 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 # Datastore
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 
-# Networking
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-retrofit-converter-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
-okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
-okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
-
 # Supabase
 supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabaseBom" }
 supabase-gotrue = { group = "io.github.jan-tennert.supabase", name = "gotrue-kt" }
@@ -86,7 +77,6 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 # QR-Code-Erzeugung
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }

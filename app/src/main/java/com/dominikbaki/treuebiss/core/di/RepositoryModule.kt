@@ -7,9 +7,7 @@ import com.dominikbaki.treuebiss.core.data.repository.StampRepositoryImpl
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.data.repository.VoucherRepositoryImpl
-import com.dominikbaki.treuebiss.core.data.repository.WeatherRepositoryImpl
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
-import com.dominikbaki.treuebiss.feature_weather.domain.repository.WeatherRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -46,10 +44,4 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         authRepositoryImpl: AuthRepositoryImpl
     ): AuthRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindWeatherRepository(
-        weatherRepositoryImpl: WeatherRepositoryImpl
-    ): WeatherRepository
 }

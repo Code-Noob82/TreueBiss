@@ -37,12 +37,6 @@ sealed interface Screen {
     }
 
     @Serializable
-    @SerialName("weather")
-    data object Weather : Screen {
-        override val routeBase: String = "weather"
-    }
-
-    @Serializable
     @SerialName("settings")
     data object Settings : Screen {
         override val routeBase: String = "settings"
@@ -54,7 +48,6 @@ sealed interface Screen {
             Home,
             StampCard,
             Voucher,
-            Weather,
             Settings
         )
     }

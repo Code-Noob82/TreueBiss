@@ -50,8 +50,10 @@ fun MainScreen(
     val offlineMessage = stringResource(R.string.sync_offline)
     val retryLabel = stringResource(R.string.action_retry)
     val syncStatus = (uiState as? MainUiState.Success)?.syncStatus
-    LaunchedEffect(syncStatus) {
-        if (syncStatus == SyncStatus.Offline) {
+    LaunchedEffect(syncStatus, currentRoute) {
+        // Im Onboarding nicht melden: Der Hinweis auf lokale Speicherung ergibt
+        // erst Sinn, wenn der Nutzer weiß, worum es in der App geht.
+        if (syncStatus == SyncStatus.Offline && currentRoute !is Screen.Onboarding) {
             val result = snackBarHostState.showSnackbar(
                 message = offlineMessage,
                 actionLabel = retryLabel,
@@ -74,7 +76,6 @@ fun MainScreen(
                                 is Screen.Home -> branding.businessName
                                 is Screen.StampCard -> branding.loyaltyPointsTitle
                                 is Screen.Voucher -> branding.vouchersTitle
-                                is Screen.Weather -> branding.weatherTitle
                                 is Screen.Settings -> stringResource(R.string.settings_title)
                                 else -> ""
                             }

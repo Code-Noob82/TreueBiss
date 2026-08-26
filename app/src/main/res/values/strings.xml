@@ -26,12 +26,7 @@
     <string name="home_vouchers_available">%1$d verfügbar</string>
     <string name="home_stamps_collected">Gesammelt</string>
     <string name="home_gift_icon">Geschenk-Icon</string>
-    <string name="home_location_denied">Ohne Standorterlaubnis kann das Wetter nicht angezeigt werden.</string>
 
-    <!-- Wetter-Kachel auf dem Home-Screen -->
-    <string name="weather_tile_loading">Wird geladen…</string>
-    <string name="weather_tile_error">Fehler beim Laden</string>
-    <string name="weather_tile_empty">Wetter anzeigen</string>
 
     <!-- Stempelkarte -->
     <string name="stamp_card_title">Meine Stempelkarte</string>
@@ -66,38 +61,6 @@
     <string name="voucher_confirm_action">Jetzt einlösen</string>
     <string name="action_cancel">Abbrechen</string>
 
-    <!-- Wetter -->
-    <string name="weather_screen_title">Dein Wetter</string>
-    <string name="weather_loading">Wetterdaten werden geladen…</string>
-    <string name="weather_error_icon">Fehler</string>
-    <string name="weather_error_prefix">Fehler: %1$s</string>
-    <string name="weather_error_no_permission">Bitte erteile die Berechtigung, um das Wetter anzuzeigen.</string>
-    <string name="weather_error_gps_off">Bitte aktiviere den Standort (GPS) auf deinem Gerät.</string>
-    <string name="weather_error_no_location">Der Standort konnte nicht ermittelt werden. Bitte versuche es später erneut.</string>
-    <string name="weather_error_unknown">Die Wetterdaten konnten nicht geladen werden.</string>
-    <string name="weather_detail_humidity">Feuchte</string>
-    <string name="weather_detail_wind">Wind</string>
-    <string name="weather_detail_pressure">Druck</string>
-    <string name="weather_value_temperature">%1$d°C</string>
-    <string name="weather_value_humidity">%1$d %%</string>
-    <string name="weather_value_wind">%1$s km/h</string>
-    <string name="weather_value_pressure">%1$s hPa</string>
-
-    <!-- Wetterlagen (WMO-Codes) -->
-    <string name="weather_type_clear_sky">Klarer Himmel</string>
-    <string name="weather_type_mainly_clear">Größtenteils klar</string>
-    <string name="weather_type_partly_cloudy">Teilweise bewölkt</string>
-    <string name="weather_type_overcast">Bedeckt</string>
-    <string name="weather_type_fog">Nebel</string>
-    <string name="weather_type_rain">Regen</string>
-    <string name="weather_type_snow">Schnee</string>
-    <string name="weather_type_thunderstorm">Gewitter</string>
-    <string name="weather_type_unknown">Unbekanntes Wetter</string>
-    <string name="weather_type_with_intensity">%1$s (%2$s)</string>
-    <string name="weather_intensity_light">leicht</string>
-    <string name="weather_intensity_moderate">mäßig</string>
-    <string name="weather_intensity_heavy">stark</string>
-    <string name="weather_intensity_freezing">gefrierend</string>
 
     <!-- Onboarding -->
     <string name="onboarding_finish">Los geht\'s!</string>
@@ -105,10 +68,8 @@
     <string name="onboarding_1_description">Sammle bei jedem Einkauf Punkte und vergiss nie wieder deine Bonuskarte.</string>
     <string name="onboarding_2_title">Gutscheine sichern</string>
     <string name="onboarding_2_description">Volle Karte? Erhalte automatisch einen Gutschein für deinen nächsten Einkauf.</string>
-    <string name="onboarding_3_title">Immer informiert</string>
-    <string name="onboarding_3_description">Checke das lokale Wetter, bevor du losgehst – direkt in deiner App.</string>
-    <string name="onboarding_4_title">Ganz wie dahäm</string>
-    <string name="onboarding_4_description">Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.</string>
+    <string name="onboarding_3_title">Ganz wie dahäm</string>
+    <string name="onboarding_3_description">Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.</string>
 
     <!-- Einstellungen -->
     <string name="settings_section_general">Allgemein</string>

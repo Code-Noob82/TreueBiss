@@ -9,7 +9,7 @@ Sie dient als White-Label-Grundlage für digitale Kundenbindungs-Apps im Lebensm
 
 ## Ziel der App
 
-Handwerksbetrieben im Lebensmittelbereich eine **einfache, sofort einsetzbare digitale Stempelkarte** zu bieten – als Ersatz oder Ergänzung zur klassischen Papierkarte. Die App soll die Kundenbindung stärken, Promotions vereinfachen und digitale Mehrwerte wie Push-Nachrichten oder Wetter-Infos bereitstellen.
+Handwerksbetrieben im Lebensmittelbereich eine **einfache, sofort einsetzbare digitale Stempelkarte** zu bieten – als Ersatz oder Ergänzung zur klassischen Papierkarte. Die App soll die Kundenbindung stärken und Promotions vereinfachen.
 
 ## Problemstellung
 
@@ -19,7 +19,7 @@ Gleichzeitig fehlt oft das Know-how oder Budget, um eigene Apps zu entwickeln.
 ## Lösungsansatz (MVP)
 
 TreueBiss stellt ein **White-Label-App-Framework** bereit, das individuell auf Betriebe angepasst werden kann (Corporate Design, Texte, Logos).  
-Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, Supabase-Backend-Sync, sowie Erweiterungen (z. B. Wetteranzeige, Dialektumschaltung).
+Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik und Supabase-Backend-Sync.
 
 ## Was macht die App anders/besser?
 
@@ -41,7 +41,6 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
     - Stempel und Gutscheine werden beim Anlegen zum Backend geschrieben.
     - Nach einer Neuinstallation werden die Daten einmalig vom Server zurückgeholt.
     - RLS Policies pro Nutzer.
-- [x] **Wetteranzeige:** Anzeige der aktuellen Wetterdaten (OpenMeteo API) auf dem HomeScreen.
 - [x] **Corporate Branding:** BrandingConfig (Farben, Logo, Strings).
 
 ### Sicherheit & Datenschutz (anonyme Anmeldung)
@@ -70,7 +69,6 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
   <img src="./img/StampCard.png" width="200" alt="">
   <img src="./img/Vouchers.png" width="200" alt="">
   <img src="./img/VouchersQR.png" width="200" alt="">
-  <img src="./img/Weather.png" width="200" alt="">
   <img src="./img/Settings.png" width="200" alt="">
 </p>
 
@@ -92,7 +90,7 @@ Verbindungsfehler und es erscheint der Fehlerbildschirm mit „Wiederholen“.
 ## Projektstruktur & Architektur Übersicht
 
 ### 1. Architektur: Hexagonal + MVVM
-- **Data-Layer:** Room (lokal), Retrofit (API), Supabase (Remote).
+- **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
@@ -111,18 +109,21 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - **Architektur:** MVVM + Hexagonal Architektur
 - **Dependency Injection:** Hilt
 - **Persistenz:** Room (lokal), Supabase (Backend-Sync)
-- **Networking:** Retrofit + Coroutines/Flow
 - **Navigation:** Compose Navigation (typisierte Routes)
 - **State Management:** StateFlow + ViewModelScope
 
 ### Externe Abhängigkeiten
 - **Supabase-kt:** Kotlin SDK für Supabase.
 - **Room:** SQLite Abstraktion für lokale Persistenz.
-- **Retrofit:** HTTP-Client für Wetter-API.
 - **ZXing:** Erzeugung der Gutschein-QR-Codes.
 - **Kotlinx Coroutines & Flow:** Asynchrone Datenströme.
 
 ---
+
+> **Hinweis zur Wetteranzeige:** Sie war eine Anforderung des Abschlussprojekts und
+> ist nach bestandener Prüfung entfernt worden. Für eine Stempelkarten-App brachte sie
+> keinen Nutzen, kostete aber zwei Standortberechtigungen und einen Berechtigungsdialog
+> beim ersten Start.
 
 ## Ausblick
 
@@ -156,5 +157,4 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 
 - Dank an die Dozenten & Tutoren des Syntax Instituts für Feedback und Begleitung.
 - Besonderer Dank an die Testbetriebe aus dem Lebensmittelhandwerk für erste Gespräche & Feedback.
-- Wetterdaten bereitgestellt durch die **OpenMeteo API**.
 - Backend-Dienste bereitgestellt durch **Supabase**.  
