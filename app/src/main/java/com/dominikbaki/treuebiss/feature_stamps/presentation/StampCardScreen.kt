@@ -33,9 +33,7 @@ internal fun StampCardScreen(
     viewModel: StampCardViewModel = hiltViewModel()
 ) {
     // Die Logik zum Beobachten des States bleibt unverändert.
-    val stamps by viewModel.stamps.collectAsState()
-    val isAddingStamp by viewModel.isAddingStamp.collectAsState()
-    val stampCount = stamps.size
+    val uiState by viewModel.uiState.collectAsState()
     val voucherCreatedMessage = stringResource(R.string.stamp_card_voucher_created)
 
     LaunchedEffect(key1 = true) {
@@ -75,11 +73,8 @@ internal fun StampCardScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (stampCount < StampCardViewModel.STAMPS_PER_CARD) {
-                    stringResource(
-                        R.string.stamp_card_hint_collecting,
-                        StampCardViewModel.STAMPS_PER_CARD
-                    )
+                text = if (!uiState.isComplete) {
+                    stringResource(R.string.stamp_card_hint_collecting, uiState.stampsPerCard)
                 } else {
                     stringResource(R.string.stamp_card_hint_complete)
                 },
@@ -101,8 +96,8 @@ internal fun StampCardScreen(
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-                items(StampCardViewModel.STAMPS_PER_CARD) { index ->
-                    val isStamped = index < stampCount
+                items(uiState.stampsPerCard) { index ->
+                    val isStamped = index < uiState.stampCount
                     StampCircle(isStamped = isStamped)
                 }
             }
@@ -112,7 +107,7 @@ internal fun StampCardScreen(
         // KORREKTUR: Der Button wird in eine Box gewrappt, um den Modifier anwenden zu können.
         Box(modifier = Modifier.padding(bottom = 16.dp)) {
             DemoAddStampButton(
-                enabled = !isAddingStamp && stampCount < StampCardViewModel.STAMPS_PER_CARD,
+                enabled = !uiState.isAddingStamp && !uiState.isComplete,
                 onClick = { viewModel.onAddStampClicked() }
             )
         }

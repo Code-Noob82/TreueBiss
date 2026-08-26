@@ -18,6 +18,7 @@ data class Voucher(
     /** Ablaufzeitpunkt als Unix-Timestamp in Millisekunden. */
     val expiresAt: Long,
     val isRedeemed: Boolean = false,
+    val tenantId: String,
     val userId: String? = null
 ) {
     /**

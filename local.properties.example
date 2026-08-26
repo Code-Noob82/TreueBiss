@@ -9,3 +9,7 @@ sdk.dir=/Users/DEIN_NUTZER/Library/Android/sdk
 # wird dann mit leerer URL erzeugt.
 SUPABASE_URL=https://DEIN-PROJEKT.supabase.co
 SUPABASE_ANON_KEY=DEIN_ANON_KEY
+
+# Der Betrieb, für den dieser Build gedacht ist (UUID aus der tenants-Tabelle).
+# Ohne Eintrag wird der Demo-Betrieb aus supabase/schema.sql verwendet.
+TENANT_ID=00000000-0000-4000-8000-000000000001

@@ -28,10 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
-import com.dominikbaki.treuebiss.feature_home.presentation.DailySpecial
+import com.dominikbaki.treuebiss.core.domain.models.Offer
 
 @Composable
-fun DailySpecialCard(special: DailySpecial) {
+fun DailySpecialCard(offer: Offer) {
     val branding = LocalBrandingConfig.current // Holt sich das Branding
     // NEU: Angepasst an das moderne Kartendesign
     Card(
@@ -69,30 +69,21 @@ fun DailySpecialCard(special: DailySpecial) {
             Spacer(Modifier.height(16.dp))
             // --- Inhalts-Sektion ---
             Row(verticalAlignment = Alignment.CenterVertically) {
-                special.imageUrl?.let { imageResId ->
-                    Image(
-                        painter = painterResource(id = imageResId),
-                        contentDescription = stringResource(special.titleRes),
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(MaterialTheme.shapes.medium),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(Modifier.width(16.dp))
-                }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(special.titleRes),
+                        text = offer.title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(special.descriptionRes),
-                        style = MaterialTheme.typography.bodyMedium,
-                        // NEU: Dezentere Farbe für die Beschreibung zur besseren Lesbarkeit
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    offer.description?.let { description ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            // Dezentere Farbe für die Beschreibung zur besseren Lesbarkeit
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }

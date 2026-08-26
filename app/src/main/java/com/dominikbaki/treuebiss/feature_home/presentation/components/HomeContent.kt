@@ -34,12 +34,15 @@ fun HomeContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        state.dailySpecial?.let { special ->
-            item { DailySpecialCard(special = special) }
+        state.offer?.let { offer ->
+            item { DailySpecialCard(offer = offer) }
         }
         item {
             StampCardProgress(
-                state = StampCardState(currentStamps = state.stampCount),
+                state = StampCardState(
+                    currentStamps = state.stampCount,
+                    totalStamps = state.stampsPerCard
+                ),
                 onClick = onNavigateToStampCard
             )
         }

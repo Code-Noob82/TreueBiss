@@ -35,5 +35,9 @@ data class VoucherDto(
 
     // Die User-ID wird vom Repository hinzugefügt.
     @SerialName("user_id")
-    val userId: String
+    val userId: String,
+
+    // Der Betrieb, zu dem der Gutschein gehört.
+    @SerialName("tenant_id")
+    val tenantId: String
 )

@@ -16,6 +16,12 @@ if (localPropertiesFile.exists()) {
 }
 val supabaseUrl = localProperties.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProperties.getProperty("SUPABASE_ANON_KEY") ?: ""
+
+// Der Betrieb, für den dieser Build gedacht ist. Bewusst die UUID und nicht
+// der Slug: Die App muss ihre lokalen Daten schon beim allerersten Start
+// zuordnen können, auch ohne Verbindung zum Backend.
+val tenantId = localProperties.getProperty("TENANT_ID")
+    ?: "00000000-0000-4000-8000-000000000001" // Demo-Betrieb aus supabase/schema.sql
 //val githubTokenSupabase = localProperties.getProperty("GITHUB_TOKEN_SUPABASE") ?: ""
 
 android {
@@ -36,6 +42,7 @@ android {
         all {
             buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
             buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+            buildConfigField("String", "TENANT_ID", "\"$tenantId\"")
         }
         release {
             isMinifyEnabled = true // R8 (Code shrinking/obfuscation)

@@ -1,7 +1,5 @@
 package com.dominikbaki.treuebiss.feature_home.presentation
 
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -9,23 +7,12 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.feature_home.presentation.components.HomeContent
 
-// ------------------
-// UI-Models
-// ------------------
+/** Fortschritt der Stempelkarte, wie ihn der HomeScreen anzeigt. */
 data class StampCardState(
     val currentStamps: Int,
-    val totalStamps: Int = 10
+    val totalStamps: Int
 )
 
-data class DailySpecial(
-    @StringRes val titleRes: Int,
-    @StringRes val descriptionRes: Int,
-    @DrawableRes val imageUrl: Int? // Ressourcen-ID oder null, falls kein Bild angezeigt werden soll
-)
-
-// ------------------
-// Composable Entry Point
-// ------------------
 @Composable
 internal fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),

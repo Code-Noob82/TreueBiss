@@ -7,7 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
 import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
+import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,8 +19,10 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -52,7 +56,8 @@ class MainViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val authRepository: AuthRepository,
     private val stampRepository: StampRepository,
-    private val voucherRepository: VoucherRepository
+    private val voucherRepository: VoucherRepository,
+    private val tenantRepository: TenantRepository
 ) : ViewModel() {
 
     private companion object {
@@ -71,6 +76,18 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     private val syncStatus = MutableStateFlow(SyncStatus.Connecting)
+
+    /**
+     * Der Betrieb, für den dieser Build gedacht ist. Speist Branding und
+     * Theme und steht sofort zur Verfügung - notfalls als Platzhalter,
+     * solange die Serverdaten fehlen.
+     */
+    val activeTenant: StateFlow<Tenant> = tenantRepository.observeActiveTenant()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = Tenant.fallback(tenantRepository.activeTenantId)
+        )
 
     private var connectJob: Job? = null
 
@@ -115,6 +132,10 @@ class MainViewModel @Inject constructor(
             syncStatus.value = SyncStatus.Connecting
             try {
                 ensureSignedIn()
+                // Betrieb und Angebote holen, Mitgliedschaft sicherstellen.
+                // Muss vor der Wiederherstellung laufen: Ohne Mitgliedschaft
+                // lehnen die RLS-Policies spätere Schreibvorgänge ab.
+                tenantRepository.syncFromRemote()
                 restoreRemoteDataOnce()
                 syncStatus.value = SyncStatus.Synced
             } catch (e: TimeoutCancellationException) {

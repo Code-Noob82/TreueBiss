@@ -12,8 +12,8 @@ fun VoucherEntity.toVoucher(): Voucher {
         createdAt = Instant.fromEpochMilliseconds(this.creationDate),
         creationDate = this.creationDate,
         expiresAt = this.expiresAt,
-        isRedeemed = this.isRedeemed
-
+        isRedeemed = this.isRedeemed,
+        tenantId = this.tenantId
     )
 }
 
@@ -23,7 +23,8 @@ fun Voucher.toVoucherEntity(): VoucherEntity {
         id = this.id,
         creationDate = this.creationDate,
         expiresAt = this.expiresAt,
-        isRedeemed = this.isRedeemed
+        isRedeemed = this.isRedeemed,
+        tenantId = this.tenantId
     )
 }
 
@@ -33,7 +34,8 @@ fun VoucherDto.toVoucherEntity(): VoucherEntity {
         id = this.id,
         creationDate = this.creationDate,
         expiresAt = this.expiresAt,
-        isRedeemed = this.isRedeemed
+        isRedeemed = this.isRedeemed,
+        tenantId = this.tenantId
     )
 }
 
@@ -45,6 +47,7 @@ fun Voucher.toVoucherDto(currentUserId: String): VoucherDto {
         creationDate = this.creationDate,
         expiresAt = this.expiresAt,
         isRedeemed = this.isRedeemed,
-        userId = currentUserId
+        userId = currentUserId,
+        tenantId = this.tenantId
     )
 }

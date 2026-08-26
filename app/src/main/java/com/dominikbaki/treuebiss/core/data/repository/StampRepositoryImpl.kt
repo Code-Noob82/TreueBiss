@@ -4,6 +4,7 @@ import android.util.Log
 import com.dominikbaki.treuebiss.core.data.remote.datasource.SupabaseDataSource
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.feature_stamps.data.local.dao.StampDao
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStamp
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStampDto
@@ -23,8 +24,11 @@ import javax.inject.Singleton
 class StampRepositoryImpl @Inject constructor(
     private val dao: StampDao,
     private val remoteDataSource: SupabaseDataSource,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    private val tenantRepository: TenantRepository
 ) : StampRepository {
+
+    private val tenantId: String get() = tenantRepository.activeTenantId
 
     override suspend fun addStamp(stamp: Stamp): Int {
         // 1. Lokal in Room speichern (Offline-First-Ansatz)
@@ -47,7 +51,7 @@ class StampRepositoryImpl @Inject constructor(
     }
 
     override fun observeStamps(): Flow<List<Stamp>> {
-        return dao.observeAllStamps().map { entities ->
+        return dao.observeAllStamps(tenantId).map { entities ->
             entities.map { it.toStamp() }
         }
     }
@@ -58,7 +62,7 @@ class StampRepositoryImpl @Inject constructor(
         try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
             if (currentUserId != null) {
-                remoteDataSource.deleteAllStamps(currentUserId)
+                remoteDataSource.deleteAllStamps(currentUserId, tenantId)
                 Log.d("StampRepositoryImpl", "Cleared remote stamps.")
             } else {
                 Log.w("StampRepositoryImpl", "User not logged in, cannot clear remote stamps")
@@ -68,7 +72,7 @@ class StampRepositoryImpl @Inject constructor(
         }
 
         try {
-            dao.clearStamps()
+            dao.clearStamps(tenantId)
             Log.d("StampRepositoryImpl", "Successfully cleared local stamps.")
         } catch (e: Exception) {
             Log.e("StampRepositoryImpl", "Error clearing local stamps", e)
@@ -81,7 +85,7 @@ class StampRepositoryImpl @Inject constructor(
             Log.w("StampRepositoryImpl", "User not logged in, cannot restore stamps")
             return
         }
-        val remoteStamps = remoteDataSource.getStamps(currentUserId)
+        val remoteStamps = remoteDataSource.getStamps(currentUserId, tenantId)
         if (remoteStamps.isNotEmpty()) {
             dao.insertStamps(remoteStamps.map { it.toStampEntity() })
         }

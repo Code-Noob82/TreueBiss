@@ -31,17 +31,17 @@ interface StampDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStamps(stamps: List<StampEntity>)
 
-    @Query("SELECT * FROM stamps ORDER BY timestamp DESC")
-    fun observeAllStamps(): Flow<List<StampEntity>>
+    @Query("SELECT * FROM stamps WHERE tenantId = :tenantId ORDER BY timestamp DESC")
+    fun observeAllStamps(tenantId: String): Flow<List<StampEntity>>
 
     /**
      * Zählt die Gesamtzahl der Stempel in der Datenbank.
      */
-    @Query("SELECT COUNT(id) FROM stamps")
-    suspend fun countStamps(): Int
+    @Query("SELECT COUNT(id) FROM stamps WHERE tenantId = :tenantId")
+    suspend fun countStamps(tenantId: String): Int
 
-    @Query("DELETE FROM stamps")
-    suspend fun clearStamps()
+    @Query("DELETE FROM stamps WHERE tenantId = :tenantId")
+    suspend fun clearStamps(tenantId: String)
 
     /**
      * Fügt einen Stempel ein und liefert die neue Gesamtzahl zurück.
@@ -53,6 +53,6 @@ interface StampDao {
     @Transaction
     suspend fun insertStampAndCount(stamp: StampEntity): Int {
         insertStamp(stamp)
-        return countStamps()
+        return countStamps(stamp.tenantId)
     }
 }

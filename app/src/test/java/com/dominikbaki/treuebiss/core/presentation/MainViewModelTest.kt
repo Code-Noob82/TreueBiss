@@ -4,8 +4,10 @@ import com.dominikbaki.treuebiss.MainDispatcherRule
 import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.fakes.FakeAuthRepository
 import com.dominikbaki.treuebiss.fakes.FakeStampRepository
+import com.dominikbaki.treuebiss.fakes.FakeTenantRepository
 import com.dominikbaki.treuebiss.fakes.FakeUserPreferencesRepository
 import com.dominikbaki.treuebiss.fakes.FakeVoucherRepository
+import com.dominikbaki.treuebiss.fakes.TEST_TENANT_ID
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -27,8 +29,9 @@ class MainViewModelTest {
         auth: FakeAuthRepository = FakeAuthRepository(),
         prefs: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
         stamps: FakeStampRepository = FakeStampRepository(),
-        vouchers: FakeVoucherRepository = FakeVoucherRepository()
-    ) = MainViewModel(prefs, auth, stamps, vouchers)
+        vouchers: FakeVoucherRepository = FakeVoucherRepository(),
+        tenants: FakeTenantRepository = FakeTenantRepository()
+    ) = MainViewModel(prefs, auth, stamps, vouchers, tenants)
 
     private fun MainUiState.asSuccess(): MainUiState.Success {
         assertTrue("Erwartet: Success, war: $this", this is MainUiState.Success)
@@ -80,28 +83,34 @@ class MainViewModelTest {
         runTest(mainDispatcherRule.dispatcher) {
             // Regression: Frueher kostete jeder Kaltstart ohne Session die volle
             // Wartezeit, weil "laedt noch" und "nicht angemeldet" beide false waren.
-            val auth = FakeAuthRepository(AuthStatus.NotAuthenticated)
+            var signInAt = -1L
+            val auth = FakeAuthRepository(AuthStatus.NotAuthenticated).apply {
+                onSignInStarted = { signInAt = testScheduler.currentTime }
+            }
             viewModel(auth = auth)
 
             advanceUntilIdle()
 
             assertEquals(1, auth.signInCallCount)
             assertTrue(
-                "Anmeldung startete erst nach ${testScheduler.currentTime} ms",
-                testScheduler.currentTime < authStatusTimeoutMs
+                "Anmeldung startete erst nach $signInAt ms",
+                signInAt in 0 until authStatusTimeoutMs
             )
         }
 
     @Test
     fun `meldet sich nach dem Sicherheitsnetz an, wenn der Status unklar bleibt`() =
         runTest(mainDispatcherRule.dispatcher) {
-            val auth = FakeAuthRepository(AuthStatus.Unknown)
+            var signInAt = -1L
+            val auth = FakeAuthRepository(AuthStatus.Unknown).apply {
+                onSignInStarted = { signInAt = testScheduler.currentTime }
+            }
             viewModel(auth = auth)
 
             advanceUntilIdle()
 
             assertEquals(1, auth.signInCallCount)
-            assertTrue(testScheduler.currentTime >= authStatusTimeoutMs)
+            assertTrue("Anmeldung startete nach $signInAt ms", signInAt >= authStatusTimeoutMs)
         }
 
     @Test
@@ -150,5 +159,32 @@ class MainViewModelTest {
             advanceUntilIdle()
 
             assertEquals(SyncStatus.Synced, vm.uiState.value.asSuccess().syncStatus)
+        }
+
+    @Test
+    fun `ein fehlgeschlagener Betriebs-Abgleich schaltet auf offline, blockiert aber nicht`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val tenants = FakeTenantRepository().apply {
+                syncError = IllegalStateException("offline")
+            }
+            val vm = viewModel(tenants = tenants)
+
+            advanceUntilIdle()
+
+            val state = vm.uiState.value.asSuccess()
+            assertEquals(SyncStatus.Offline, state.syncStatus)
+        }
+
+    @Test
+    fun `der Betrieb steht sofort zur Verfuegung, auch ohne Serverdaten`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val vm = viewModel()
+
+            // Noch vor advanceUntilIdle: Branding darf nie leer sein.
+            assertEquals(TEST_TENANT_ID, vm.activeTenant.value.id)
+            assertEquals(
+                com.dominikbaki.treuebiss.core.domain.models.Tenant.DEFAULT_STAMPS_PER_CARD,
+                vm.activeTenant.value.stampsPerCard
+            )
         }
 }

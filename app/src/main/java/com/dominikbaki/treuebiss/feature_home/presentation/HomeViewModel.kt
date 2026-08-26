@@ -2,8 +2,10 @@ package com.dominikbaki.treuebiss.feature_home.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.core.domain.models.Offer
+import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,32 +18,34 @@ import javax.inject.Inject
 /** Bündelt die dynamischen Informationen für den HomeScreen. */
 data class HomeUiState(
     val stampCount: Int = 0,
+    val stampsPerCard: Int = Tenant.DEFAULT_STAMPS_PER_CARD,
     val voucherCount: Int = 0,
-    val dailySpecial: DailySpecial? = null
+    /** Das aktuelle Angebot des Betriebs, oder null wenn keines hinterlegt ist. */
+    val offer: Offer? = null
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     stampRepository: StampRepository,
-    voucherRepository: VoucherRepository
+    voucherRepository: VoucherRepository,
+    tenantRepository: TenantRepository
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> =
         combine(
             stampRepository.observeStamps(),
-            voucherRepository.observeOpenVouchers()
-        ) { stamps, vouchers ->
+            voucherRepository.observeOpenVouchers(),
+            tenantRepository.observeActiveTenant(),
+            tenantRepository.observeOffers()
+        ) { stamps, vouchers, tenant, offers ->
             val now = Clock.System.now()
             HomeUiState(
                 stampCount = stamps.size,
+                stampsPerCard = tenant.stampsPerCard,
                 // Abgelaufene Gutscheine sind nicht mehr einlösbar und
                 // dürfen die angezeigte Anzahl nicht aufblähen.
                 voucherCount = vouchers.count { it.isRedeemableAt(now) },
-                dailySpecial = DailySpecial( // Dummy-Daten für das Tagesangebot
-                    titleRes = R.string.home_daily_special_title,
-                    descriptionRes = R.string.home_daily_special_description,
-                    imageUrl = null
-                )
+                offer = offers.firstOrNull()
             )
         }.stateIn(
             scope = viewModelScope,

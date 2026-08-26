@@ -11,7 +11,8 @@ import kotlinx.datetime.Instant
 fun StampEntity.toStamp(): Stamp {
     return Stamp(
         id = this.id,
-        timestamp = Instant.fromEpochMilliseconds(this.timestamp)
+        timestamp = Instant.fromEpochMilliseconds(this.timestamp),
+        tenantId = this.tenantId
     )
 }
 
@@ -21,7 +22,8 @@ fun StampEntity.toStamp(): Stamp {
 fun Stamp.toStampEntity(): StampEntity {
     return StampEntity(
         id = this.id,
-        timestamp = this.timestamp.toEpochMilliseconds()
+        timestamp = this.timestamp.toEpochMilliseconds(),
+        tenantId = this.tenantId
     )
 }
 
@@ -29,7 +31,8 @@ fun Stamp.toStampDto(currentUserId: String): StampDto {
     return StampDto(
         id = this.id,
         createdAt = this.timestamp,
-        userId = currentUserId
+        userId = currentUserId,
+        tenantId = this.tenantId
     )
 }
 
@@ -39,6 +42,7 @@ fun Stamp.toStampDto(currentUserId: String): StampDto {
 fun StampDto.toStampEntity(): StampEntity {
     return StampEntity(
         id = this.id,
-        timestamp = this.createdAt.toEpochMilliseconds()
+        timestamp = this.createdAt.toEpochMilliseconds(),
+        tenantId = this.tenantId
     )
 }
