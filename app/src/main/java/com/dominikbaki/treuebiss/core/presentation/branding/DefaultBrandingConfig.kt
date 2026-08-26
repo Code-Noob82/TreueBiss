@@ -7,6 +7,5 @@ val DefaultBrandingConfig = BrandingConfig(
     businessName = "Bäckerei Mustermann",
     dailySpecialTitle = "Schmankerl des Tages",
     loyaltyPointsTitle = "Treuepunkte",
-    vouchersTitle = "Gutscheine",
-    weatherTitle = "Aktuelles Wetter"
+    vouchersTitle = "Gutscheine"
 )

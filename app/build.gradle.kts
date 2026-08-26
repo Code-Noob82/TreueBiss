@@ -88,7 +88,6 @@ dependencies {
     // Hilt - Dependency Injection
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
-    implementation(libs.play.services.location)
     // implementation(libs.androidx.room.common.jvm)
     ksp(libs.hilt.compiler)
 
@@ -105,11 +104,6 @@ dependencies {
 
     // Datastore - Persistent Daten
     implementation(libs.androidx.datastore.preferences)
-
-    // Retrofit - Network für Wetter-API
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.converter.kotlinx.serialization)
-    implementation(libs.okhttp.logging.interceptor)
 
     // Supabase - Backend-as-s-Service
     implementation(platform(libs.supabase.bom))

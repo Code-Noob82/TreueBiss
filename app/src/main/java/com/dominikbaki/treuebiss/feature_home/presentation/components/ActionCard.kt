@@ -33,11 +33,10 @@ internal fun ActionCard(
     title: String,
     subtitle: String,
     icon: ImageVector,
-    isLoading: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.aspectRatio(1.5f), // Sorgt für eine angenehme Höhe
+        modifier = modifier,
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -56,18 +55,11 @@ internal fun ActionCard(
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = title,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
             Column {
                 Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)

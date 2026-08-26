@@ -6,8 +6,7 @@ data class BrandingConfig(
     val businessName: String,
     val dailySpecialTitle: String,
     val loyaltyPointsTitle: String,
-    val vouchersTitle: String,
-    val weatherTitle: String
+    val vouchersTitle: String
 )
 
 val LocalBrandingConfig = staticCompositionLocalOf<BrandingConfig> {

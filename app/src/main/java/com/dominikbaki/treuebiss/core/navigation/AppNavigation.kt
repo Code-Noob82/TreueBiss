@@ -17,7 +17,6 @@ import com.dominikbaki.treuebiss.feature_onboarding.presentation.OnboardingScree
 import com.dominikbaki.treuebiss.feature_settings.presentation.SettingsScreen
 import com.dominikbaki.treuebiss.feature_stamps.presentation.StampCardScreen
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherScreen
-import com.dominikbaki.treuebiss.feature_weather.presentation.WeatherScreen
 
 /**
  * Zentrale Navigationsfunktion.
@@ -59,8 +58,6 @@ fun AppNavigation(
             HomeScreen(
                 onNavigateToStampCard = { navController.navigate(Screen.StampCard) },
                 onNavigateToVoucher = { navController.navigate(Screen.Voucher) },
-                onNavigateToWeather = { navController.navigate(Screen.Weather) },
-                snackBarHostState = snackBarHostState,
                 paddingValues = paddingValues
             )
         }
@@ -74,10 +71,6 @@ fun AppNavigation(
         // ---------- Voucher ----------
         composable<Screen.Voucher> {
             VoucherScreen(paddingValues = paddingValues)
-        }
-        // ---------- Weather ----------
-        composable<Screen.Weather> {
-            WeatherScreen()
         }
         // ---------- Settings ----------
         composable<Screen.Settings> {
