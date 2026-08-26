@@ -16,8 +16,15 @@ interface VoucherRepository {
     /** Beobachtet alle noch nicht eingelösten Gutscheine. */
     fun observeOpenVouchers(): Flow<List<Voucher>>
 
-    /** Markiert einen Gutschein als eingelöst (lokal, danach Sync zu Supabase). */
-    suspend fun redeemVoucher(voucherId: String)
+    /**
+     * Löst einen Gutschein ein. Geprüft wird serverseitig gegen den
+     * Einlöse-Code des Betriebs, den das Personal an der Kasse eingibt.
+     *
+     * @throws InvalidRedeemCodeException bei falschem Code.
+     * @throws VoucherNotRedeemableException wenn der Gutschein bereits
+     *   eingelöst, abgelaufen oder unbekannt ist.
+     */
+    suspend fun redeemVoucher(voucherId: String, code: String)
 
     /**
      * Holt die Gutscheine dieser Geräte-Identität vom Server in die lokale

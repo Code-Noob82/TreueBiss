@@ -76,13 +76,20 @@ class SupabaseDataSource @Inject constructor(
         }.decodeList<VoucherDto>()
     }
 
-    /** Markiert einen Gutschein serverseitig als eingelöst. */
-    suspend fun setVoucherRedeemed(voucherId: String) {
-        supabaseClient.from(TABLE_VOUCHERS).update({
-            set("is_redeemed", true)
-        }) {
-            filter { eq("id", voucherId) }
-        }
+    /**
+     * Löst einen Gutschein ein - nur mit dem Einlöse-Code des Betriebs.
+     *
+     * Die App darf `vouchers` nicht aktualisieren; das erledigt diese
+     * Datenbankfunktion, nachdem sie den Code geprüft hat.
+     */
+    suspend fun redeemVoucher(voucherId: String, code: String) {
+        supabaseClient.postgrest.rpc(
+            function = "redeem_voucher",
+            parameters = buildJsonObject {
+                put("p_voucher_id", voucherId)
+                put("p_code", code)
+            }
+        )
     }
 
     /** Lädt die Stammdaten des Betriebs (Branding, Kartenregeln). */

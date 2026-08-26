@@ -57,7 +57,12 @@
 
     <!-- Einlöse-Rückfrage -->
     <string name="voucher_confirm_title">Gutschein einlösen?</string>
-    <string name="voucher_confirm_text">Der Gutschein wird jetzt als eingelöst markiert. Das lässt sich nicht rückgängig machen.</string>
+    <string name="voucher_confirm_text">Bitte lass die Verkaufskraft den Einlöse-Code eingeben. Der Gutschein wird danach als eingelöst markiert.</string>
+    <string name="voucher_code_label">Einlöse-Code</string>
+    <string name="voucher_redeemed">Gutschein eingelöst. Guten Appetit!</string>
+    <string name="voucher_error_wrong_code">Falscher Einlöse-Code.</string>
+    <string name="voucher_error_not_redeemable">Dieser Gutschein ist bereits eingelöst oder abgelaufen.</string>
+    <string name="voucher_error_offline">Einlösen braucht eine Verbindung zum Server. Bitte später erneut versuchen.</string>
     <string name="voucher_confirm_action">Jetzt einlösen</string>
     <string name="action_cancel">Abbrechen</string>
 

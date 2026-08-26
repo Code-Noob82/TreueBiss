@@ -1,7 +1,9 @@
 package com.dominikbaki.treuebiss.fakes
 
 import com.dominikbaki.treuebiss.core.domain.models.Offer
+import com.dominikbaki.treuebiss.core.domain.models.InvalidRedeemCodeException
 import com.dominikbaki.treuebiss.core.domain.models.ProofAlreadyUsedException
+import com.dominikbaki.treuebiss.core.domain.models.VoucherNotRedeemableException
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
 import com.dominikbaki.treuebiss.core.domain.models.StampIssueResult
 import com.dominikbaki.treuebiss.core.domain.models.StampProof
@@ -165,7 +167,20 @@ class FakeVoucherRepository(
 
     override fun observeOpenVouchers(): Flow<List<Voucher>> = vouchers.asStateFlow()
 
-    override suspend fun redeemVoucher(voucherId: String) {
+    /** Der Code, den der "Server" akzeptiert. */
+    var expectedCode: String = "1234"
+
+    /** Wird von [redeemVoucher] geworfen, wenn gesetzt. */
+    var redeemError: Exception? = null
+
+    override suspend fun redeemVoucher(voucherId: String, code: String) {
+        redeemError?.let { throw it }
+        if (code != expectedCode) {
+            throw InvalidRedeemCodeException("falscher Code")
+        }
+        if (vouchers.value.none { it.id == voucherId }) {
+            throw VoucherNotRedeemableException("unbekannt oder bereits eingelöst")
+        }
         redeemed += voucherId
         vouchers.value = vouchers.value.filterNot { it.id == voucherId }
     }

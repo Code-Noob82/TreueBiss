@@ -5,6 +5,12 @@
 -- Supabase-Studio, nicht aus der App. Genau hier dockt spaeter ein Admin-
 -- Backend an, ohne dass der Rest angefasst werden muss.
 
+-- pgcrypto liefert crypt()/gen_salt() fuer den Einloese-Code. In Supabase
+-- ist die Erweiterung bereits im Schema "extensions" installiert; die beiden
+-- Zeilen sind dort wirkungslos.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
 -- ---------------------------------------------------------------- Betriebe
 create table if not exists public.tenants (
     id                    uuid primary key default gen_random_uuid(),
@@ -20,8 +26,16 @@ create table if not exists public.tenants (
     stamps_per_card       int  not null default 10 check (stamps_per_card between 1 and 50),
     voucher_validity_days int  not null default 90 check (voucher_validity_days > 0),
     is_active             boolean not null default true,
+    -- bcrypt-Hash des Einloese-Codes, den das Personal an der Kasse eingibt.
+    -- Der Code selbst wird nie gespeichert.
+    redeem_code_hash      text,
     created_at            timestamptz not null default now()
 );
+
+-- Bestehende Projekte nachziehen: Das `create table if not exists` oben
+-- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
+-- Spalte. Muss vor allem stehen, was sie verwendet.
+alter table public.tenants add column if not exists redeem_code_hash text;
 
 -- ---------------------------------------------------------------- Angebote
 create table if not exists public.offers (
@@ -46,16 +60,101 @@ create table if not exists public.memberships (
     primary key (user_id, tenant_id)
 );
 
+-- ============================================ Einloesen (serverseitig)
+
+/*
+ * Loest einen Gutschein ein - aber nur gegen den Einloese-Code des Betriebs.
+ *
+ * Ohne diesen Schritt entscheidet das Kundengeraet allein, ob ein Gutschein
+ * verbraucht ist. Der Code liegt beim Personal; getippt wird er an der Kasse
+ * auf dem Kundengeraet.
+ *
+ * Laeuft als security definer, weil die App auf vouchers kein Schreibrecht
+ * hat. search_path schliesst extensions ein, damit crypt() gefunden wird -
+ * in Supabase liegt pgcrypto dort.
+ *
+ * Fehlercodes:
+ *   42501  falscher Code
+ *   22023  Gutschein unbekannt, bereits eingeloest oder abgelaufen
+ */
+create or replace function public.redeem_voucher(
+    p_voucher_id uuid,
+    p_code       text
+)
+returns table (voucher_id uuid, redeemed_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_user     uuid := auth.uid();
+    v_tenant   uuid;
+    v_redeemed boolean;
+    v_expires  int8;
+    v_hash     text;
+    v_now_ms   int8 := (extract(epoch from now()) * 1000)::int8;
+begin
+    if v_user is null then
+        raise exception 'not authenticated' using errcode = '28000';
+    end if;
+
+    select tenant_id, is_redeemed, expires_at
+      into v_tenant, v_redeemed, v_expires
+      from public.vouchers
+     where id = p_voucher_id and user_id = v_user;
+
+    if not found then
+        raise exception 'voucher not found' using errcode = '22023';
+    end if;
+    if v_redeemed then
+        raise exception 'voucher already redeemed' using errcode = '22023';
+    end if;
+    if v_expires < v_now_ms then
+        raise exception 'voucher expired' using errcode = '22023';
+    end if;
+
+    select redeem_code_hash into v_hash
+      from public.tenants where id = v_tenant and is_active;
+
+    if v_hash is null then
+        raise exception 'no redeem code configured for this tenant' using errcode = '22023';
+    end if;
+    if crypt(p_code, v_hash) <> v_hash then
+        raise exception 'invalid redeem code' using errcode = '42501';
+    end if;
+
+    update public.vouchers set is_redeemed = true where id = p_voucher_id;
+
+    return query select p_voucher_id, now();
+end;
+$$;
+
+revoke all on function public.redeem_voucher(uuid, text) from public;
+grant execute on function public.redeem_voucher(uuid, text) to authenticated;
+
 -- ==================================================== Beispiel-Betrieb (Demo)
 -- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
-insert into public.tenants (id, slug, name, daily_special_title, primary_color)
-values (
+-- Der Einloese-Code des Demo-Betriebs ist "1234". Vor einem Pilotbetrieb
+-- unbedingt aendern:
+--   update public.tenants
+--      set redeem_code_hash = extensions.crypt('DEIN_CODE', extensions.gen_salt('bf'))
+--    where id = '...';
+insert into public.tenants (
+    id, slug, name, daily_special_title, primary_color, redeem_code_hash
+) values (
     '00000000-0000-4000-8000-000000000001',
     'baeckerei-mustermann',
     'Bäckerei Mustermann',
     'Schmankerl des Tages',
-    '#4CAF50'
+    '#4CAF50',
+    extensions.crypt('1234', extensions.gen_salt('bf'))
 ) on conflict (id) do nothing;
+
+-- Bestehende Betriebe ohne Code bekommen den Demo-Code, damit das Einloesen
+-- nach dem Upgrade nicht stumm blockiert.
+update public.tenants
+   set redeem_code_hash = extensions.crypt('1234', extensions.gen_salt('bf'))
+ where redeem_code_hash is null;
 
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (
@@ -180,11 +279,9 @@ create policy stamps_select_own on public.stamps
 
 create policy vouchers_select_own on public.vouchers
     for select to authenticated using (auth.uid() = user_id);
--- Einloesen: Das Update filtert clientseitig nur nach id - diese Policy ist
--- das Einzige, was verhindert, dass eine fremde Gutschein-ID getroffen wird.
-create policy vouchers_update_own on public.vouchers
-    for update to authenticated
-    using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- Bewusst keine update-Policy: Sonst koennte die App Gutscheine selbst als
+-- eingeloest markieren - oder eben nicht, und sie beliebig oft vorzeigen.
+-- Eingeloest wird ausschliesslich ueber redeem_voucher().
 
 -- ============================================== Stempelvergabe (serverseitig)
 

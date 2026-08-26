@@ -2,7 +2,9 @@ package com.dominikbaki.treuebiss.core.data.repository
 
 import android.util.Log
 import com.dominikbaki.treuebiss.core.data.remote.datasource.SupabaseDataSource
+import com.dominikbaki.treuebiss.core.domain.models.InvalidRedeemCodeException
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.core.domain.models.VoucherNotRedeemableException
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import com.dominikbaki.treuebiss.feature_vouchers.data.local.dao.VoucherDao
@@ -37,30 +39,24 @@ class VoucherRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun redeemVoucher(voucherId: String) {
+    override suspend fun redeemVoucher(voucherId: String, code: String) {
+        // Zuerst der Server: Nur dort laesst sich der Code pruefen. Lokal
+        // vorab zu markieren hiesse, bei falschem Code zuruecknehmen zu
+        // muessen - und bei Verbindungsverlust den Gutschein zu verlieren.
+        try {
+            remoteDataSource.redeemVoucher(voucherId, code)
+        } catch (e: Exception) {
+            throw e.toRedeemFailure(voucherId)
+        }
+
         withContext(Dispatchers.IO) {
-            // --- Schritt 1: Lokal den Status ändern (bereits vorhanden) ---
             try {
-                val logMessage1 = "Marking voucher as redeemed locally. ID: $voucherId"
-                Log.d("VoucherRepoImpl", logMessage1)
                 dao.markAsRedeemed(voucherId)
-                val logMessage2 = "Successfully marked voucher as redeemed locally."
-                Log.d("VoucherRepoImpl", logMessage2)
+                Log.d("VoucherRepositoryImpl", "Voucher $voucherId redeemed")
             } catch (e: Exception) {
-                Log.e("VoucherRepoImpl", "Failed to mark voucher as redeemed locally", e)
-                return@withContext
-            }
-            // --- Schritt 2: Den neuen Status an Supabase senden
-            try {
-                Log.d("VoucherRepoImpl", "Syncing redeemed status to Supabase. ID: $voucherId")
-                remoteDataSource.setVoucherRedeemed(voucherId)
-                Log.d(
-                    "VoucherRepoImpl",
-                    "Successfully synced redeemed status for voucher $voucherId."
-                )
-            } catch (e: Exception) {
-                Log.e("VoucherRepoImpl", "Failed to sync redeemed status to Supabase.", e)
-                // Fehlerbehandlung: Voucher als "nicht synchronisiert" markieren
+                // Serverseitig ist der Gutschein weg; der lokale Stand holt
+                // das beim naechsten Abgleich nach.
+                Log.e("VoucherRepositoryImpl", "Failed to mark voucher redeemed locally", e)
             }
         }
     }
@@ -80,5 +76,24 @@ class VoucherRepositoryImpl @Inject constructor(
             dao.insertVouchers(remoteVouchers.map { it.toVoucherEntity() })
         }
         Log.d("VoucherRepositoryImpl", "Restored ${remoteVouchers.size} vouchers from Supabase")
+    }
+}
+
+/**
+ * Übersetzt die Fehlercodes von `redeem_voucher` in Fälle, die die UI
+ * unterscheiden kann. Der Supabase-Client verpackt sie in die Meldung,
+ * deshalb die Textsuche.
+ */
+private fun Exception.toRedeemFailure(voucherId: String): Exception {
+    val text = (message ?: "") + (cause?.message ?: "")
+    return when {
+        text.contains("invalid redeem code") || text.contains("42501") ->
+            InvalidRedeemCodeException("Falscher Einlöse-Code für $voucherId")
+
+        text.contains("already redeemed") || text.contains("expired") ||
+            text.contains("not found") ->
+            VoucherNotRedeemableException(text)
+
+        else -> this
     }
 }

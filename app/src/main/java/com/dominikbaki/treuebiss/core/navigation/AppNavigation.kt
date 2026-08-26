@@ -70,7 +70,10 @@ fun AppNavigation(
         }
         // ---------- Voucher ----------
         composable<Screen.Voucher> {
-            VoucherScreen(paddingValues = paddingValues)
+            VoucherScreen(
+                paddingValues = paddingValues,
+                snackBarHostState = snackBarHostState
+            )
         }
         // ---------- Settings ----------
         composable<Screen.Settings> {

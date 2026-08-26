@@ -33,3 +33,9 @@ data class StampProof(
 
 /** Der Nachweis wurde bereits eingelöst - derselbe Beleg zählt nur einmal. */
 class ProofAlreadyUsedException(message: String) : Exception(message)
+
+/** Der eingegebene Einlöse-Code passt nicht zum Betrieb. */
+class InvalidRedeemCodeException(message: String) : Exception(message)
+
+/** Der Gutschein ist bereits eingelöst, abgelaufen oder unbekannt. */
+class VoucherNotRedeemableException(message: String) : Exception(message)
