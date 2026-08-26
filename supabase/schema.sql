@@ -46,6 +46,17 @@ create table if not exists public.memberships (
     primary key (user_id, tenant_id)
 );
 
+-- ==================================================== Beispiel-Betrieb (Demo)
+-- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
+insert into public.tenants (id, slug, name, daily_special_title, primary_color)
+values (
+    '00000000-0000-4000-8000-000000000001',
+    'baeckerei-mustermann',
+    'Bäckerei Mustermann',
+    'Schmankerl des Tages',
+    '#4CAF50'
+) on conflict (id) do nothing;
+
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (
     id         uuid primary key,
@@ -53,7 +64,6 @@ create table if not exists public.stamps (
     user_id    uuid not null references auth.users(id) on delete cascade,
     tenant_id  uuid not null references public.tenants(id) on delete cascade
 );
-create index if not exists stamps_user_tenant_idx on public.stamps (user_id, tenant_id);
 
 -- --------------------------------------------------------------- Gutscheine
 create table if not exists public.vouchers (
@@ -65,6 +75,47 @@ create table if not exists public.vouchers (
     user_id       uuid not null references auth.users(id) on delete cascade,
     tenant_id     uuid not null references public.tenants(id) on delete cascade
 );
+
+-- ================================ Upgrade bestehender Installationen
+-- Projekte, die vor der Mandantenfaehigkeit eingerichtet wurden, haben stamps
+-- und vouchers ohne tenant_id. Das `create table if not exists` oben laesst
+-- solche Tabellen unveraendert - die Spalte muss hier nachgezogen werden,
+-- sonst scheitert alles Folgende mit "column tenant_id does not exist".
+--
+-- Bestehende Zeilen werden dem Demo-Betrieb zugeordnet. Wenn deine Daten zu
+-- einem anderen Betrieb gehoeren, passe v_default_tenant an.
+do $$
+declare
+    v_default_tenant uuid := '00000000-0000-4000-8000-000000000001';
+    v_table          text;
+begin
+    foreach v_table in array array['stamps', 'vouchers'] loop
+        if to_regclass('public.' || v_table) is not null and not exists (
+            select 1 from information_schema.columns
+            where table_schema = 'public'
+              and table_name = v_table
+              and column_name = 'tenant_id'
+        ) then
+            execute format('alter table public.%I add column tenant_id uuid', v_table);
+            execute format(
+                'update public.%I set tenant_id = %L where tenant_id is null',
+                v_table, v_default_tenant
+            );
+            execute format(
+                'alter table public.%I alter column tenant_id set not null', v_table
+            );
+            execute format(
+                'alter table public.%I add constraint %I foreign key (tenant_id) '
+                || 'references public.tenants(id) on delete cascade',
+                v_table, v_table || '_tenant_id_fkey'
+            );
+            raise notice 'Spalte tenant_id in % ergaenzt und auf den Demo-Betrieb gesetzt', v_table;
+        end if;
+    end loop;
+end
+$$;
+
+create index if not exists stamps_user_tenant_idx on public.stamps (user_id, tenant_id);
 create index if not exists vouchers_user_tenant_idx on public.vouchers (user_id, tenant_id);
 
 -- ======================================================== Row Level Security
@@ -73,6 +124,25 @@ alter table public.offers      enable row level security;
 alter table public.memberships enable row level security;
 alter table public.stamps      enable row level security;
 alter table public.vouchers    enable row level security;
+
+-- Bestehende Policies zuerst entfernen, damit dieses Skript auf einem schon
+-- eingerichteten Projekt wiederholbar ist.
+--
+-- Besonders wichtig sind die letzten drei: Sie stammen aus einer frueheren
+-- Fassung. Ohne das Loeschen duerfte die App weiterhin selbst in stamps und
+-- vouchers schreiben - die serverseitige Vergabe waere dann wirkungslos.
+drop policy if exists tenants_read             on public.tenants;
+drop policy if exists offers_read              on public.offers;
+drop policy if exists memberships_select_own   on public.memberships;
+drop policy if exists memberships_insert_own   on public.memberships;
+drop policy if exists memberships_delete_own   on public.memberships;
+drop policy if exists stamps_select_own        on public.stamps;
+drop policy if exists vouchers_select_own      on public.vouchers;
+drop policy if exists vouchers_update_own      on public.vouchers;
+
+drop policy if exists stamps_insert_own        on public.stamps;
+drop policy if exists stamps_delete_own        on public.stamps;
+drop policy if exists vouchers_insert_own      on public.vouchers;
 
 -- Betriebe und Angebote sind ein Katalog: lesbar fuer alle Angemeldeten,
 -- aus der App nicht schreibbar.
@@ -135,6 +205,7 @@ create table if not exists public.stamp_proofs (
 
 alter table public.stamp_proofs enable row level security;
 -- Nur lesen; geschrieben wird ausschliesslich in issue_stamp().
+drop policy if exists stamp_proofs_select_own on public.stamp_proofs;
 create policy stamp_proofs_select_own on public.stamp_proofs
     for select to authenticated using (auth.uid() = user_id);
 
@@ -221,20 +292,12 @@ $$;
 revoke all on function public.issue_stamp(uuid, text, text) from public;
 grant execute on function public.issue_stamp(uuid, text, text) to authenticated;
 
--- ==================================================== Beispiel-Betrieb (Demo)
--- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
-insert into public.tenants (id, slug, name, daily_special_title, primary_color)
-values (
-    '00000000-0000-4000-8000-000000000001',
-    'baeckerei-mustermann',
-    'Bäckerei Mustermann',
-    'Schmankerl des Tages',
-    '#4CAF50'
-) on conflict (id) do nothing;
-
+-- Beispiel-Angebot fuer den Demo-Betrieb.
 insert into public.offers (tenant_id, title, description)
-values (
-    '00000000-0000-4000-8000-000000000001',
-    'Unser Dinkel-Kracher',
-    'Heute frisch aus dem Ofen, nur 3,50 €!'
-) on conflict do nothing;
+select '00000000-0000-4000-8000-000000000001',
+       'Unser Dinkel-Kracher',
+       'Heute frisch aus dem Ofen, nur 3,50 €!'
+where not exists (
+    select 1 from public.offers
+    where tenant_id = '00000000-0000-4000-8000-000000000001'
+);
