@@ -98,6 +98,22 @@ Verbindungsfehler und es erscheint der Fehlerbildschirm mit „Wiederholen“.
 ./gradlew assembleDebug
 ```
 
+### Datenbank-Tests
+
+Das Schema und die Stempelvergabe lassen sich lokal prüfen, ohne ein
+Supabase-Projekt. Der Runner startet ein temporäres Postgres, spielt Schema und
+Tests ein und räumt danach auf:
+
+```bash
+./supabase/test/run.sh
+```
+
+Voraussetzung: `brew install postgresql@16`. Die Tests decken die Vergabe
+(Mitgliedschaft, doppelter Beleg, Gutschein bei voller Karte, Kartenreset) und
+die RLS-Policies ab. `supabase/test/00_supabase_stubs.sql` bildet die Teile von
+Supabase nach, die das Schema voraussetzt - insbesondere die Standardrechte für
+`anon` und `authenticated`, ohne die die Policies gar nicht zum Tragen kämen.
+
 ## Projektstruktur & Architektur Übersicht
 
 ### 0. Stempelvergabe
