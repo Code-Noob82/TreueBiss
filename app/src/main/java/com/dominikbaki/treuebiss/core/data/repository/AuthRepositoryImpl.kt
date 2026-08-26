@@ -18,7 +18,9 @@ class AuthRepositoryImpl @Inject constructor(
 
     override fun observeAuthStatus(): Flow<AuthStatus> {
         return supabaseClient.auth.sessionStatus.map { status ->
-            Log.d("AuthRepositoryImpl", "New auth status received: $status")
+            // Nur den Typ loggen: SessionStatus.Authenticated enthaelt das
+            // komplette UserSession-Objekt samt Access- und Refresh-Token.
+            Log.d("AuthRepositoryImpl", "New auth status: ${status::class.simpleName}")
             when (status) {
                 is SessionStatus.Authenticated -> AuthStatus.Authenticated
                 is SessionStatus.NotAuthenticated -> AuthStatus.NotAuthenticated
@@ -37,8 +39,6 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun signInAnonymously() {
         Log.d("AuthRepositoryImpl", "Signing in anonymously...")
         supabaseClient.auth.signInAnonymously()
-        val logMessage =
-            "Successfully signed in. User ID: ${supabaseClient.auth.currentUserOrNull()?.id}"
-        Log.d("AuthRepositoryImpl", logMessage)
+        Log.d("AuthRepositoryImpl", "Successfully signed in anonymously.")
     }
 }

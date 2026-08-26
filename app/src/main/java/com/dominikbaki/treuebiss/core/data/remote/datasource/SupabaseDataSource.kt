@@ -106,7 +106,13 @@ class SupabaseDataSource @Inject constructor(
      * jedes Einfügen würde serverseitig abgelehnt.
      */
     suspend fun ensureMembership(userId: String, tenantId: String) {
-        supabaseClient.from(TABLE_MEMBERSHIPS)
-            .upsert(MembershipDto(userId = userId, tenantId = tenantId))
+        // ignoreDuplicates erzeugt ON CONFLICT DO NOTHING statt DO UPDATE.
+        // Ein Update braeuchte zusaetzlich eine update-Policy auf memberships -
+        // und es gibt an einer bestehenden Mitgliedschaft nichts zu aendern.
+        supabaseClient.from(TABLE_MEMBERSHIPS).upsert(
+            values = listOf(MembershipDto(userId = userId, tenantId = tenantId)),
+            onConflict = "user_id,tenant_id",
+            ignoreDuplicates = true
+        )
     }
 }
