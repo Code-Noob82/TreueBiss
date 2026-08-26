@@ -81,8 +81,9 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik, 
 3. Anonyme Anmeldungen im Supabase-Projekt aktivieren und die Tabellen `stamps`
    und `vouchers` samt RLS-Policies anlegen.
 
-Ohne `local.properties` wird der Supabase-Client mit leerer URL erzeugt und die App
-startet nicht.
+Ohne die Supabase-Werte startet die App zwar, kann sich aber nicht anmelden: Der
+Client fällt auf `https://localhost` zurück, die Anmeldung läuft in einen
+Verbindungsfehler und es erscheint der Fehlerbildschirm mit „Wiederholen“.
 
 ```bash
 ./gradlew assembleDebug
