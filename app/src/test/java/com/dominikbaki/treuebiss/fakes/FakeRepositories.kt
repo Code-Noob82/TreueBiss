@@ -1,7 +1,10 @@
 package com.dominikbaki.treuebiss.fakes
 
 import com.dominikbaki.treuebiss.core.domain.models.Offer
+import com.dominikbaki.treuebiss.core.domain.models.ProofAlreadyUsedException
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.StampIssueResult
+import com.dominikbaki.treuebiss.core.domain.models.StampProof
 import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
@@ -14,6 +17,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.datetime.Instant
 
 /**
  * Handgeschriebene Fakes statt eines Mocking-Frameworks: Sie sind hier kurz
@@ -85,21 +89,50 @@ class FakeTenantRepository(
 }
 
 class FakeStampRepository(
-    initialStamps: List<Stamp> = emptyList()
+    initialStamps: List<Stamp> = emptyList(),
+    private val stampsPerCard: Int = Tenant.DEFAULT_STAMPS_PER_CARD
 ) : StampRepository {
 
     private val stamps = MutableStateFlow(initialStamps)
+
+    /** Nachweise, die der "Server" schon gesehen hat. */
+    private val usedProofs = mutableSetOf<String>()
+
+    /** Wird von [issueStamp] geworfen, wenn gesetzt - simuliert fehlende Verbindung. */
+    var issueError: Exception? = null
+
+    val currentStamps: List<Stamp> get() = stamps.value
+    val issuedProofs: List<String> get() = usedProofs.toList()
 
     var restoreCallCount: Int = 0
         private set
     var clearCallCount: Int = 0
         private set
 
-    val currentStamps: List<Stamp> get() = stamps.value
+    override suspend fun issueStamp(proof: StampProof): StampIssueResult {
+        issueError?.let { throw it }
+        if (!usedProofs.add(proof.reference)) {
+            throw ProofAlreadyUsedException(proof.reference)
+        }
 
-    override suspend fun addStamp(stamp: Stamp): Int {
+        val stamp = Stamp(
+            timestamp = Instant.fromEpochMilliseconds(stamps.value.size + 1L),
+            tenantId = TEST_TENANT_ID
+        )
         stamps.value = stamps.value + stamp
-        return stamps.value.size
+
+        val count = stamps.value.size
+        val voucher = if (count >= stampsPerCard) {
+            Voucher(
+                createdAt = Instant.fromEpochMilliseconds(0),
+                creationDate = 0,
+                expiresAt = 1,
+                tenantId = TEST_TENANT_ID
+            )
+        } else {
+            null
+        }
+        return StampIssueResult(stampId = stamp.id, stampCount = count, voucher = voucher)
     }
 
     override fun observeStamps(): Flow<List<Stamp>> = stamps.asStateFlow()
@@ -125,7 +158,7 @@ class FakeVoucherRepository(
     var restoreCallCount: Int = 0
         private set
 
-    override suspend fun createVoucher(voucher: Voucher) {
+    override suspend fun cacheVoucher(voucher: Voucher) {
         created += voucher
         vouchers.value = vouchers.value + voucher
     }

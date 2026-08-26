@@ -16,6 +16,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,14 +35,16 @@ internal fun StampCardScreen(
 ) {
     // Die Logik zum Beobachten des States bleibt unverändert.
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val voucherCreatedMessage = stringResource(R.string.stamp_card_voucher_created)
 
     LaunchedEffect(key1 = true) {
-        viewModel.voucherCreatedEvent.collectLatest {
-            snackBarHostState.showSnackbar(
-                message = voucherCreatedMessage,
-                duration = SnackbarDuration.Short
-            )
+        viewModel.events.collectLatest { event ->
+            val message = when (event) {
+                is StampCardEvent.VoucherCreated -> voucherCreatedMessage
+                is StampCardEvent.Failed -> context.getString(event.messageRes)
+            }
+            snackBarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
         }
     }
 
@@ -105,11 +108,13 @@ internal fun StampCardScreen(
 
         // --- Button am unteren Rand ---
         // KORREKTUR: Der Button wird in eine Box gewrappt, um den Modifier anwenden zu können.
-        Box(modifier = Modifier.padding(bottom = 16.dp)) {
-            DemoAddStampButton(
-                enabled = !uiState.isAddingStamp && !uiState.isComplete,
-                onClick = { viewModel.onAddStampClicked() }
-            )
+        if (uiState.isDemoEnabled) {
+            Box(modifier = Modifier.padding(bottom = 16.dp)) {
+                DemoAddStampButton(
+                    enabled = !uiState.isIssuing && !uiState.isComplete,
+                    onClick = { viewModel.onDemoStampClicked() }
+                )
+            }
         }
     }
 }

@@ -2,23 +2,29 @@ package com.dominikbaki.treuebiss.core.data.repository
 
 import android.util.Log
 import com.dominikbaki.treuebiss.core.data.remote.datasource.SupabaseDataSource
+import com.dominikbaki.treuebiss.core.domain.models.ProofAlreadyUsedException
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.StampIssueResult
+import com.dominikbaki.treuebiss.core.domain.models.StampProof
+import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.feature_stamps.data.local.dao.StampDao
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStamp
-import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStampDto
 import com.dominikbaki.treuebiss.feature_stamps.data.mapper.toStampEntity
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Konkrete Implementierung des StampRepository.
- * Kapselt den Datenzugriff auf die lokale Room-Datenbank.
+ *
+ * Room ist hier nur noch Lesecache. Angelegt werden Stempel ausschließlich
+ * serverseitig - die App hat auf `stamps` kein Schreibrecht mehr.
  */
 @Singleton
 class StampRepositoryImpl @Inject constructor(
@@ -30,24 +36,49 @@ class StampRepositoryImpl @Inject constructor(
 
     private val tenantId: String get() = tenantRepository.activeTenantId
 
-    override suspend fun addStamp(stamp: Stamp): Int {
-        // 1. Lokal in Room speichern (Offline-First-Ansatz)
-        val newCount = dao.insertStampAndCount(stamp.toStampEntity())
-        // 2. Zu Supabase synchronisieren
-        try {
-            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-            if (currentUserId != null) {
-                val stampDto = stamp.toStampDto(currentUserId)
-                remoteDataSource.addStampToSupabase(stampDto)
-                Log.d("StampRepositoryImpl", "Stamp ${stamp.id} synced to Supabase")
-            } else {
-                Log.w("StampRepositoryImpl", "User not logged in, cannot sync stamp")
-            }
+    override suspend fun issueStamp(proof: StampProof): StampIssueResult {
+        val result = try {
+            remoteDataSource.issueStamp(
+                tenantId = tenantId,
+                proofRef = proof.reference,
+                source = proof.source.wireValue
+            )
         } catch (e: Exception) {
-            Log.e("StampRepositoryImpl", "Failed to sync stamp to supabase", e)
-            // Fehlerbehandlung: Stempel als "nicht synchronisiert" markieren
+            // Postgres meldet einen bereits verwendeten Beleg als
+            // unique_violation. Für die UI ist das kein Fehler, sondern
+            // eine Aussage: dieser Bon wurde schon eingelöst.
+            if (e.isUniqueViolation()) {
+                throw ProofAlreadyUsedException("Beleg bereits verwendet: ${proof.reference}")
+            }
+            throw e
         }
-        return newCount
+
+        // Den serverseitig erzeugten Stempel lokal spiegeln, damit die UI
+        // sofort reagiert.
+        val stamp = Stamp(
+            id = result.stampId,
+            timestamp = kotlinx.datetime.Clock.System.now(),
+            tenantId = tenantId
+        )
+        dao.insertStamp(stamp.toStampEntity())
+
+        val voucher = result.voucherId?.let { voucherId ->
+            val now = kotlinx.datetime.Clock.System.now()
+            Voucher(
+                id = voucherId,
+                createdAt = now,
+                creationDate = now.toEpochMilliseconds(),
+                expiresAt = result.voucherExpiresAt ?: now.toEpochMilliseconds(),
+                tenantId = tenantId
+            )
+        }
+
+        Log.d("StampRepositoryImpl", "Stamp issued (${result.stampCount}), voucher=${result.voucherId}")
+        return StampIssueResult(
+            stampId = result.stampId,
+            stampCount = result.stampCount,
+            voucher = voucher
+        )
     }
 
     override fun observeStamps(): Flow<List<Stamp>> {
@@ -57,20 +88,8 @@ class StampRepositoryImpl @Inject constructor(
     }
 
     override suspend fun clearStamps() {
-        // Erst der Server: schlägt das fehl, bleiben die Stempel dort liegen -
-        // sichtbar im Log statt still auseinanderlaufend.
-        try {
-            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-            if (currentUserId != null) {
-                remoteDataSource.deleteAllStamps(currentUserId, tenantId)
-                Log.d("StampRepositoryImpl", "Cleared remote stamps.")
-            } else {
-                Log.w("StampRepositoryImpl", "User not logged in, cannot clear remote stamps")
-            }
-        } catch (e: Exception) {
-            Log.e("StampRepositoryImpl", "Failed to clear remote stamps", e)
-        }
-
+        // Nur lokal: Serverseitig setzt `issue_stamp` die Karte in derselben
+        // Transaktion zurück, in der der Gutschein entsteht.
         try {
             dao.clearStamps(tenantId)
             Log.d("StampRepositoryImpl", "Successfully cleared local stamps.")
@@ -91,4 +110,13 @@ class StampRepositoryImpl @Inject constructor(
         }
         Log.d("StampRepositoryImpl", "Restored ${remoteStamps.size} stamps from Supabase")
     }
+}
+
+/**
+ * Erkennt den Postgres-Fehlercode für eine verletzte Eindeutigkeit (23505).
+ * Der Supabase-Client verpackt ihn in die Fehlermeldung, deshalb die Textsuche.
+ */
+private fun Exception.isUniqueViolation(): Boolean {
+    val text = (message ?: "") + (cause?.message ?: "")
+    return text.contains("23505") || text.contains("duplicate key", ignoreCase = true)
 }

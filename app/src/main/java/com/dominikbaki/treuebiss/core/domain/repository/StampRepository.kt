@@ -1,6 +1,8 @@
 package com.dominikbaki.treuebiss.core.domain.repository
 
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.StampIssueResult
+import com.dominikbaki.treuebiss.core.domain.models.StampProof
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -8,10 +10,15 @@ import kotlinx.coroutines.flow.Flow
  */
 interface StampRepository {
     /**
-      * Fügt einen neuen Stempel hinzu und gibt die neue Gesamtzahl zurück.
-      * Die Zahl kommt aus derselben Transaktion wie das Einfügen.
-      */
-    suspend fun addStamp(stamp: Stamp): Int
+     * Lässt einen Stempel gegen einen Kaufnachweis vergeben.
+     *
+     * Die Vergabe läuft ausschließlich auf dem Server: Nur dort lässt sich
+     * prüfen, ob der Nachweis echt und noch unbenutzt ist. Ohne Verbindung
+     * ist keine Vergabe möglich.
+     *
+     * @throws ProofAlreadyUsedException wenn der Nachweis schon verwendet wurde.
+     */
+    suspend fun issueStamp(proof: StampProof): StampIssueResult
 
     /** Beobachtet alle Stempel der aktuellen Installation als Flow. */
     fun observeStamps(): Flow<List<Stamp>>

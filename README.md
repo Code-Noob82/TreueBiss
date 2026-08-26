@@ -32,8 +32,11 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 
 - [x] **Onboarding:** Vorstellung der Kernfunktionen beim Start.
 - [x] **Digitale Stempelkarte:**
-    - Sammeln von Stempeln (10er-Karte).
-    - Automatische Erstellung eines Gutscheins nach 10 Stempeln.
+    - Sammeln von Stempeln, Kartengröße pro Betrieb einstellbar.
+    - Automatische Erstellung eines Gutscheins bei voller Karte.
+- [x] **Serverseitige Stempelvergabe:** Stempel entstehen ausschließlich über die
+    Datenbankfunktion `issue_stamp` und nur gegen einen Kaufnachweis. Die App hat
+    auf `stamps` und `vouchers` kein Schreibrecht.
 - [x] **Gutscheinverwaltung:**
     - Anzeige offener Gutscheine.
     - Einlösen-Button (lokal + Supabase Sync).
@@ -97,7 +100,24 @@ Verbindungsfehler und es erscheint der Fehlerbildschirm mit „Wiederholen“.
 
 ## Projektstruktur & Architektur Übersicht
 
-### 0. Mandantenfähigkeit
+### 0. Stempelvergabe
+
+Ein Stempel entsteht nur serverseitig, gegen einen Kaufnachweis - beim
+Kassenbon die TSE-Transaktionsnummer. `issue_stamp` prüft Mitgliedschaft und
+Nachweis, legt bei voller Karte in derselben Transaktion den Gutschein an und
+setzt die Karte zurück. Ein `unique (tenant_id, proof_ref)` verhindert auf
+Datenbankebene, dass derselbe Beleg zweimal zählt.
+
+Die App darf in `stamps` und `vouchers` nicht schreiben. Das ist der Kern:
+Solange der Client selbst schreiben kann, ist jede Prüfung Fassade.
+
+Folge: **Stempeln braucht eine Verbindung.** Nur der Server kann beurteilen, ob
+ein Beleg echt und noch unbenutzt ist. Ohne Verbindung erscheint ein Hinweis,
+statt einen Stempel zu vergeben, der später zurückgenommen werden müsste.
+
+Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
+
+### 1. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -111,13 +131,13 @@ Schemaänderung mehr, nur noch die Oberfläche dafür.
 Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
 App - hier dockt später ein Admin-Backend an.
 
-### 1. Architektur: Hexagonal + MVVM
+### 2. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 2. Abstraktion der Datenquelle: Repository Pattern
+### 3. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 
@@ -152,9 +172,12 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
 - [ ] **Admin-Panel:** Oberfläche, über die Betriebe Angebote und Branding selbst
       pflegen. Datenseitig ist alles vorhanden, es fehlt die Bedienoberfläche.
-- [ ] **Stempelvergabe durch den Betrieb:** Aktuell vergibt sich der Kunde seine
-      Stempel selbst (Demo-Button) und löst auch selbst ein. Ohne serverseitige
-      Autorisierung ist das kein einsetzbares Treueprogramm.
+- [ ] **Beleg-Scanner:** ML Kit Barcode Scanning, um den QR-Code auf dem Kassenbon
+      einzulesen. Die serverseitige Vergabe dahinter steht bereits; es fehlt der
+      Scanner und das Auslesen der TSE-Transaktionsnummer.
+- [ ] **Einlösen serverseitig autorisieren:** Der Kunde markiert seinen Gutschein
+      weiterhin selbst als eingelöst. Für den Einsatz an der Kasse muss auch das
+      über eine geprüfte Funktion laufen.
 - [ ] **Beitritt per Code:** Mehrere Betriebe in einer App.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.

@@ -21,3 +21,17 @@ data class StampDto(
     @SerialName("tenant_id")
     val tenantId: String
 )
+
+/**
+ * Rückgabe der Datenbankfunktion `issue_stamp`.
+ *
+ * `voucherId` ist gesetzt, wenn dieser Stempel die Karte vollgemacht hat -
+ * der Gutschein entsteht dann in derselben Transaktion.
+ */
+@Serializable
+data class IssueStampResultDto(
+    @SerialName("stamp_id") val stampId: String,
+    @SerialName("stamp_count") val stampCount: Int,
+    @SerialName("voucher_id") val voucherId: String? = null,
+    @SerialName("voucher_expires_at") val voucherExpiresAt: Long? = null
+)

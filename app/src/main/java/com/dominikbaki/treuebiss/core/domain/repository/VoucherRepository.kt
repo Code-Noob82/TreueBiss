@@ -7,8 +7,11 @@ import kotlinx.coroutines.flow.Flow
  * Port für alle Operationen, die Gutscheine betreffen.
  */
 interface VoucherRepository {
-    /** Legt einen neuen Gutschein an (lokal, danach Sync zu Supabase). */
-    suspend fun createVoucher(voucher: Voucher)
+    /**
+     * Übernimmt einen serverseitig erzeugten Gutschein in die lokale Datenbank.
+     * Angelegt wird er ausschließlich vom Server - siehe `issue_stamp`.
+     */
+    suspend fun cacheVoucher(voucher: Voucher)
 
     /** Beobachtet alle noch nicht eingelösten Gutscheine. */
     fun observeOpenVouchers(): Flow<List<Voucher>>

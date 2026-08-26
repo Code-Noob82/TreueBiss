@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.core.data.remote.datasource
 
+import com.dominikbaki.treuebiss.feature_stamps.data.remote.dto.IssueStampResultDto
 import com.dominikbaki.treuebiss.feature_stamps.data.remote.dto.StampDto
 import com.dominikbaki.treuebiss.feature_tenant.data.remote.dto.MembershipDto
 import com.dominikbaki.treuebiss.feature_tenant.data.remote.dto.OfferDto
@@ -7,6 +8,10 @@ import com.dominikbaki.treuebiss.feature_tenant.data.remote.dto.TenantDto
 import com.dominikbaki.treuebiss.feature_vouchers.data.remote.dto.VoucherDto
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,14 +34,26 @@ class SupabaseDataSource @Inject constructor(
         const val TABLE_MEMBERSHIPS = "memberships"
     }
 
-    /** Fügt einen neuen Stempel in die 'stamps'-Tabelle bei Supabase ein. */
-    suspend fun addStampToSupabase(stamp: StampDto) {
-        supabaseClient.from(TABLE_STAMPS).insert(stamp)
-    }
-
-    /** Fügt einen neuen Gutschein in die 'vouchers'-Tabelle bei Supabase ein. */
-    suspend fun addVoucherToSupabase(voucher: VoucherDto) {
-        supabaseClient.from(TABLE_VOUCHERS).insert(voucher)
+    /**
+     * Lässt einen Stempel gegen einen Kaufnachweis vergeben.
+     *
+     * Die App darf in `stamps` und `vouchers` nicht schreiben - das erledigt
+     * diese Datenbankfunktion, die den Nachweis prüft und bei voller Karte
+     * gleich den Gutschein miterzeugt.
+     */
+    suspend fun issueStamp(
+        tenantId: String,
+        proofRef: String,
+        source: String
+    ): IssueStampResultDto {
+        return supabaseClient.postgrest.rpc(
+            function = "issue_stamp",
+            parameters = buildJsonObject {
+                put("p_tenant_id", tenantId)
+                put("p_proof_ref", proofRef)
+                put("p_source", source)
+            }
+        ).decodeList<IssueStampResultDto>().first()
     }
 
     /** Lädt alle Stempel des Nutzers - Grundlage für die Wiederherstellung. */
@@ -57,20 +74,6 @@ class SupabaseDataSource @Inject constructor(
                 eq("tenant_id", tenantId)
             }
         }.decodeList<VoucherDto>()
-    }
-
-    /**
-     * Löscht alle Stempel des Nutzers.
-     * Gegenstück zum Zurücksetzen der Karte: ohne das würde die Tabelle
-     * unbegrenzt wachsen und vom lokalen Stand abdriften.
-     */
-    suspend fun deleteAllStamps(userId: String, tenantId: String) {
-        supabaseClient.from(TABLE_STAMPS).delete {
-            filter {
-                eq("user_id", userId)
-                eq("tenant_id", tenantId)
-            }
-        }
     }
 
     /** Markiert einen Gutschein serverseitig als eingelöst. */
