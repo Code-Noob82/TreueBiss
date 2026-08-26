@@ -2,10 +2,11 @@ package com.dominikbaki.treuebiss.core.presentation
 
 import android.util.Log
 import androidx.annotation.StringRes
-import com.dominikbaki.treuebiss.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
+import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -21,39 +22,46 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.datetime.Clock
 import javax.inject.Inject
 
 /**
+ * Zustand der Verbindung zum Backend.
+ *
+ * Getrennt vom UI-Zustand: Die App ist auch ohne Backend bedienbar, deshalb
+ * darf ein Verbindungsproblem den Start nicht blockieren.
+ */
+enum class SyncStatus { Connecting, Synced, Offline }
+
+/**
  * Repräsentiert die möglichen Zustände der Haupt-UI.
- * Enthält jetzt auch einen Fehler-Zustand.
  */
 sealed interface MainUiState {
-    object Loading : MainUiState
+    data object Loading : MainUiState
+
     data class Success(
         val hasCompletedOnboarding: Boolean,
-        val stampCount: Int,
-        val voucherCount: Int
+        val syncStatus: SyncStatus
     ) : MainUiState
-    /** Die Meldung ist eine String-Ressource, damit sie übersetzbar bleibt. */
+
+    /** Nur für lokale Fehler - eine fehlende Backend-Verbindung gehört nicht hierher. */
     data class Error(@StringRes val messageRes: Int) : MainUiState
 }
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val authRepository: AuthRepository, // Neue Abhänigkeit
-    private val stampRepository: StampRepository, // Neue Abhängigkeit
-    private val voucherRepository: VoucherRepository // Neue Abhängigkeit
+    private val authRepository: AuthRepository,
+    private val stampRepository: StampRepository,
+    private val voucherRepository: VoucherRepository
 ) : ViewModel() {
 
     private companion object {
         /**
-         * Beim Start meldet Supabase kurz "nicht angemeldet", während eine
-         * gespeicherte Session aus dem Speicher geladen wird. So lange warten
-         * wir ab, bevor wir von "keine Session vorhanden" ausgehen.
+         * Sicherheitsnetz: So lange warten wir höchstens darauf, dass das SDK
+         * einen belastbaren Anmeldestatus meldet. Im Normalfall steht der nach
+         * wenigen Millisekunden fest.
          */
-        const val SESSION_RESTORE_TIMEOUT_MS = 2_000L
+        const val AUTH_STATUS_TIMEOUT_MS = 2_000L
 
         /** Zeitlimit für die anonyme Anmeldung selbst. */
         const val SIGN_IN_TIMEOUT_MS = 15_000L
@@ -62,64 +70,76 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Loading)
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
-    private var initJob: Job? = null
+    private val syncStatus = MutableStateFlow(SyncStatus.Connecting)
+
+    private var connectJob: Job? = null
 
     init {
-        initialize()
+        observeLocalState()
+        connect()
     }
 
-    private fun initialize() {
-        // Einen noch laufenden Versuch abbrechen. Sonst würde jeder Retry eine
-        // weitere Collector-Kette auf dieselben Flows legen.
-        initJob?.cancel()
-        initJob = viewModelScope.launch {
-            _uiState.value = MainUiState.Loading
+    /**
+     * Der Start hängt ausschließlich an lokalen Daten. Stempelkarte und
+     * Gutscheine liegen in Room; ohne Backend fehlt nur der Abgleich.
+     */
+    private fun observeLocalState() {
+        viewModelScope.launch {
             try {
-                // Schritt 1: Sicherstellen, dass eine gültige Session existiert.
-                ensureSignedIn()
-
-                // Schritt 2: Nach einer Neuinstallation die Daten vom Server holen.
-                restoreRemoteDataOnce()
-
-                // Schritt 3: Erst jetzt die restlichen Daten laden.
                 combine(
                     userPreferencesRepository.hasCompletedOnboarding,
-                    stampRepository.observeStamps(),
-                    voucherRepository.observeOpenVouchers(),
-                ) { hasCompletedOnboarding, stamps, vouchers ->
-                    val now = Clock.System.now()
+                    syncStatus
+                ) { hasCompletedOnboarding, sync ->
                     MainUiState.Success(
                         hasCompletedOnboarding = hasCompletedOnboarding,
-                        stampCount = stamps.size,
-                        voucherCount = vouchers.count { it.isRedeemableAt(now) }
+                        syncStatus = sync
                     )
-                }.collect { successState ->
-                    _uiState.value = successState
-                }
-            } catch (e: TimeoutCancellationException) {
-                Log.e("MainViewModel", "Authentication timed out", e)
-                _uiState.value = MainUiState.Error(R.string.error_sign_in_timeout)
+                }.collect { _uiState.value = it }
             } catch (e: CancellationException) {
-                // Regulärer Abbruch (z. B. durch einen Retry) - kein Fehlerzustand.
                 throw e
             } catch (e: Exception) {
-                Log.e("MainViewModel", "Initialization failed: ${e.message}", e)
-                _uiState.value = MainUiState.Error(R.string.error_sign_in_failed)
+                Log.e("MainViewModel", "Reading local preferences failed", e)
+                _uiState.value = MainUiState.Error(R.string.error_local_data_failed)
             }
         }
     }
 
     /**
-     * Stellt sicher, dass der Nutzer angemeldet ist, und wirft andernfalls.
-     *
-     * Wartet zuerst kurz auf eine gespeicherte Session, damit nicht bei jedem
-     * Start ein zweiter anonymer Account angelegt wird.
+     * Meldet sich an und holt einmalig die Serverdaten. Läuft im Hintergrund:
+     * Ein Fehler macht die App nicht unbenutzbar, er schaltet nur auf
+     * [SyncStatus.Offline].
+     */
+    private fun connect() {
+        connectJob?.cancel()
+        connectJob = viewModelScope.launch {
+            syncStatus.value = SyncStatus.Connecting
+            try {
+                ensureSignedIn()
+                restoreRemoteDataOnce()
+                syncStatus.value = SyncStatus.Synced
+            } catch (e: TimeoutCancellationException) {
+                // Muss vor CancellationException stehen: Ein Timeout ist ein
+                // Ausfall, kein regulaerer Abbruch des Jobs.
+                Log.e("MainViewModel", "Backend connection timed out", e)
+                syncStatus.value = SyncStatus.Offline
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Backend unreachable, continuing offline", e)
+                syncStatus.value = SyncStatus.Offline
+            }
+        }
+    }
+
+    /**
+     * Stellt sicher, dass eine Session existiert, und wirft andernfalls.
      */
     private suspend fun ensureSignedIn() {
-        val restoredSession = withTimeoutOrNull(SESSION_RESTORE_TIMEOUT_MS) {
-            authRepository.observeAuthState().first { it }
+        // Auf den ersten belastbaren Status warten - "lädt noch" ist keiner.
+        val status = withTimeoutOrNull(AUTH_STATUS_TIMEOUT_MS) {
+            authRepository.observeAuthStatus().first { it != AuthStatus.Unknown }
         }
-        if (restoredSession == true) {
+        if (status == AuthStatus.Authenticated) {
             Log.d("MainViewModel", "Existing session restored.")
             return
         }
@@ -127,37 +147,27 @@ class MainViewModel @Inject constructor(
         Log.d("MainViewModel", "No session found, signing in anonymously...")
         withTimeout(SIGN_IN_TIMEOUT_MS) {
             authRepository.signInAnonymously()
-            authRepository.observeAuthState().first { it }
+            authRepository.observeAuthStatus().first { it == AuthStatus.Authenticated }
         }
-        Log.d("MainViewModel", "User is authenticated, proceeding to load data.")
     }
 
     /**
      * Holt Stempel und Gutscheine einmalig vom Server - der Fall
      * "App neu installiert, Daten liegen noch im Backend".
-     *
-     * Fehler blockieren die App bewusst nicht: Ohne Verbindung startet sie
-     * mit dem lokalen Stand weiter, und der Versuch wird beim nächsten Start
-     * wiederholt.
      */
     private suspend fun restoreRemoteDataOnce() {
         if (userPreferencesRepository.hasRestoredRemoteData.first()) return
 
-        try {
-            stampRepository.restoreFromRemote()
-            voucherRepository.restoreFromRemote()
-            userPreferencesRepository.setRemoteDataRestored(true)
-            Log.d("MainViewModel", "Remote data restored.")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e("MainViewModel", "Restoring remote data failed, continuing offline", e)
-        }
+        stampRepository.restoreFromRemote()
+        voucherRepository.restoreFromRemote()
+        userPreferencesRepository.setRemoteDataRestored(true)
+        Log.d("MainViewModel", "Remote data restored.")
     }
 
-    fun retryInitialAuth() {
-        Log.d("MainViewModel", "Retrying initialization...")
-        initialize()
+    /** Erneuter Verbindungsversuch, ausgelöst vom Nutzer. */
+    fun retryConnection() {
+        Log.d("MainViewModel", "Retrying backend connection...")
+        connect()
     }
 
     fun onOnboardingFinished() {

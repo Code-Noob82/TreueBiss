@@ -3,6 +3,7 @@ package com.dominikbaki.treuebiss.fakes
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
+import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -16,21 +17,21 @@ import kotlinx.coroutines.flow.asStateFlow
  * genug und machen im Test sichtbar, welches Verhalten angenommen wird.
  */
 class FakeAuthRepository(
-    initiallyAuthenticated: Boolean = false
+    initialStatus: AuthStatus = AuthStatus.NotAuthenticated
 ) : AuthRepository {
 
-    private val authState = MutableStateFlow(initiallyAuthenticated)
+    private val status = MutableStateFlow(initialStatus)
 
     /** Wird von [signInAnonymously] geworfen, wenn gesetzt. */
     var signInError: Exception? = null
 
-    /** Wenn true, meldet sich der Fake nie an (simuliert eine hängende Anmeldung). */
+    /** Wenn true, kehrt die Anmeldung nie zurück (simuliert einen Hänger). */
     var signInNeverCompletes: Boolean = false
 
     var signInCallCount: Int = 0
         private set
 
-    override fun observeAuthState(): Flow<Boolean> = authState.asStateFlow()
+    override fun observeAuthStatus(): Flow<AuthStatus> = status.asStateFlow()
 
     override suspend fun signInAnonymously() {
         signInCallCount++
@@ -38,7 +39,7 @@ class FakeAuthRepository(
         if (signInNeverCompletes) {
             CompletableDeferred<Unit>().await() // wartet bis zum Timeout
         }
-        authState.value = true
+        status.value = AuthStatus.Authenticated
     }
 }
 

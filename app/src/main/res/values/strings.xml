@@ -15,9 +15,9 @@
     <string name="settings_title">Einstellungen</string>
     <string name="action_retry">Wiederholen</string>
 
-    <!-- Start / Anmeldung -->
-    <string name="error_sign_in_failed">Anmeldung fehlgeschlagen. Bitte prüfe deine Internetverbindung.</string>
-    <string name="error_sign_in_timeout">Die Anmeldung dauert zu lange. Bitte prüfe deine Internetverbindung.</string>
+    <!-- Start & Verbindung -->
+    <string name="error_local_data_failed">Die App-Daten konnten nicht gelesen werden.</string>
+    <string name="sync_offline">Keine Verbindung zum Server. Deine Stempel werden lokal gespeichert.</string>
 
     <!-- Home -->
     <string name="home_daily_special_title">Unser Dinkel-Kracher</string>

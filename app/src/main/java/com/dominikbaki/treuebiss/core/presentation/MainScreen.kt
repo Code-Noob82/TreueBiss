@@ -45,6 +45,24 @@ fun MainScreen(
     val branding = LocalBrandingConfig.current
     val showBars = uiState is MainUiState.Success && currentRoute !is Screen.Onboarding
 
+    // Fehlende Backend-Verbindung blockiert die App nicht mehr, sie wird nur
+    // gemeldet - mit der Möglichkeit, es erneut zu versuchen.
+    val offlineMessage = stringResource(R.string.sync_offline)
+    val retryLabel = stringResource(R.string.action_retry)
+    val syncStatus = (uiState as? MainUiState.Success)?.syncStatus
+    LaunchedEffect(syncStatus) {
+        if (syncStatus == SyncStatus.Offline) {
+            val result = snackBarHostState.showSnackbar(
+                message = offlineMessage,
+                actionLabel = retryLabel,
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                mainViewModel.retryConnection()
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackBarHostState) },
         topBar = {
@@ -133,13 +151,7 @@ fun MainScreen(
                     .padding(16.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(state.messageRes), textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { mainViewModel.retryInitialAuth() }) {
-                        Text(stringResource(R.string.action_retry))
-                    }
-                }
+                Text(stringResource(state.messageRes), textAlign = TextAlign.Center)
             }
         }
     }
