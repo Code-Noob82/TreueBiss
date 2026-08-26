@@ -21,6 +21,8 @@ PORT_BASE="${PGPORT_BASE:-55450}"
 FAILED=0
 
 run_scenario() {
+    # legacy: "no" = frisch, "yes" = Vor-Mandanten-Stand,
+    #         "previous" = zuletzt auf origin/main gemergtes Schema
     local label="$1" legacy="$2" port="$3"
     local tmp; tmp="$(mktemp -d)"
 
@@ -41,6 +43,23 @@ run_scenario() {
         "${psql[@]}" -c "insert into auth.users default values;" >/dev/null
         "${psql[@]}" -c "insert into public.stamps (id, user_id)
                          select gen_random_uuid(), id from auth.users;" >/dev/null
+    elif [ "$legacy" = "previous" ]; then
+        # Das zuletzt gemergte Schema als Ausgangsstand. Genau diesen Weg
+        # geht ein bestehendes Projekt - und genau hier sind bisher zweimal
+        # fehlende Spalten aufgefallen, weil `create table if not exists`
+        # vorhandene Tabellen unveraendert laesst.
+        if ! git -C "$ROOT" show origin/main:supabase/schema.sql \
+               > "$tmp/previous_schema.sql" 2>/dev/null; then
+            echo "  uebersprungen: origin/main:supabase/schema.sql nicht verfuegbar"
+            "$PGBIN/pg_ctl" -D "$tmp/data" -m immediate stop >/dev/null 2>&1 || true
+            rm -rf "$tmp"
+            return 0
+        fi
+        if ! "${psql[@]}" -f "$tmp/previous_schema.sql" >"$tmp/prev.log" 2>&1; then
+            echo "  Vorgaengerschema liess sich nicht einspielen:"
+            grep -E "ERROR" "$tmp/prev.log" | head -3
+            return 1
+        fi
     fi
 
     # Zweimal einspielen: Das Skript muss wiederholbar sein. NOTICEs ueber
@@ -57,11 +76,12 @@ run_scenario() {
     echo "Schema eingespielt (zweimal, ohne Fehler)."
 
     local files=()
-    if [ "$legacy" = "yes" ]; then
-        files=("$T/03_upgrade_test.sql")
-    else
-        files=("$T/01_issue_stamp_test.sql" "$T/02_rls_test.sql")
-    fi
+    case "$legacy" in
+        yes)      files=("$T/03_upgrade_test.sql") ;;
+        # Nach dem Upgrade muss die volle Funktion stehen, nicht nur das Schema.
+        previous) files=("$T/01_issue_stamp_test.sql" "$T/04_redeem_test.sql") ;;
+        *)        files=("$T/01_issue_stamp_test.sql" "$T/02_rls_test.sql" "$T/04_redeem_test.sql") ;;
+    esac
 
     local f
     for f in "${files[@]}"; do
@@ -75,8 +95,9 @@ run_scenario() {
     rm -rf "$tmp"
 }
 
-run_scenario "Frische Datenbank"      no  "$PORT_BASE"          || FAILED=1
-run_scenario "Upgrade vom Alt-Stand"  yes "$((PORT_BASE + 1))"  || FAILED=1
+run_scenario "Frische Datenbank"           no       "$PORT_BASE"          || FAILED=1
+run_scenario "Upgrade vom Alt-Stand"       yes      "$((PORT_BASE + 1))"  || FAILED=1
+run_scenario "Upgrade vom letzten Release" previous "$((PORT_BASE + 2))"  || FAILED=1
 
 if [ "$FAILED" -ne 0 ]; then
     echo "FEHLGESCHLAGEN"
