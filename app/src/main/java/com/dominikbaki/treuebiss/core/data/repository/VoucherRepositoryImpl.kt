@@ -3,6 +3,7 @@ package com.dominikbaki.treuebiss.core.data.repository
 import android.util.Log
 import com.dominikbaki.treuebiss.core.data.remote.datasource.SupabaseDataSource
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import com.dominikbaki.treuebiss.feature_vouchers.data.local.dao.VoucherDao
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucher
@@ -21,8 +22,11 @@ import javax.inject.Singleton
 class VoucherRepositoryImpl @Inject constructor(
     private val dao: VoucherDao,
     private val remoteDataSource: SupabaseDataSource,
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    private val tenantRepository: TenantRepository
 ) : VoucherRepository {
+
+    private val tenantId: String get() = tenantRepository.activeTenantId
     override suspend fun createVoucher(voucher: Voucher) {
         // --- SCHRITT 1: LOKAL IN ROOM SPEICHERN (MIT VERBESSERTEM DEBUGGING) ---
         try {
@@ -87,7 +91,7 @@ class VoucherRepositoryImpl @Inject constructor(
     }
 
     override fun observeOpenVouchers(): Flow<List<Voucher>> {
-        return dao.observeOpenVouchers().map { entities -> entities.map { it.toVoucher() } }
+        return dao.observeOpenVouchers(tenantId).map { entities -> entities.map { it.toVoucher() } }
     }
 
     override suspend fun restoreFromRemote() {
@@ -96,7 +100,7 @@ class VoucherRepositoryImpl @Inject constructor(
             Log.w("VoucherRepositoryImpl", "User not logged in, cannot restore vouchers")
             return
         }
-        val remoteVouchers = remoteDataSource.getVouchers(currentUserId)
+        val remoteVouchers = remoteDataSource.getVouchers(currentUserId, tenantId)
         if (remoteVouchers.isNotEmpty()) {
             dao.insertVouchers(remoteVouchers.map { it.toVoucherEntity() })
         }

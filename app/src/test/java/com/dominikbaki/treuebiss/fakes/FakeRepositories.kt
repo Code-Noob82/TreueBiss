@@ -1,10 +1,13 @@
 package com.dominikbaki.treuebiss.fakes
 
+import com.dominikbaki.treuebiss.core.domain.models.Offer
 import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
 import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -31,15 +34,53 @@ class FakeAuthRepository(
     var signInCallCount: Int = 0
         private set
 
+    /**
+     * Wird zu Beginn von [signInAnonymously] aufgerufen. Erlaubt dem Test,
+     * den genauen Zeitpunkt festzuhalten - `currentTime` nach
+     * `advanceUntilIdle()` taugt dafür nicht, weil andere Flows die
+     * virtuelle Uhr weiterschieben.
+     */
+    var onSignInStarted: (() -> Unit)? = null
+
     override fun observeAuthStatus(): Flow<AuthStatus> = status.asStateFlow()
 
     override suspend fun signInAnonymously() {
         signInCallCount++
+        onSignInStarted?.invoke()
         signInError?.let { throw it }
         if (signInNeverCompletes) {
             CompletableDeferred<Unit>().await() // wartet bis zum Timeout
         }
         status.value = AuthStatus.Authenticated
+    }
+}
+
+const val TEST_TENANT_ID = "test-tenant"
+
+class FakeTenantRepository(
+    tenant: Tenant = Tenant.fallback(TEST_TENANT_ID)
+) : TenantRepository {
+
+    private val tenantFlow = MutableStateFlow(tenant)
+    private val offersFlow = MutableStateFlow<List<Offer>>(emptyList())
+
+    var syncCallCount: Int = 0
+        private set
+    var syncError: Exception? = null
+
+    override val activeTenantId: String = tenant.id
+
+    override fun observeActiveTenant(): Flow<Tenant> = tenantFlow.asStateFlow()
+
+    override fun observeOffers(): Flow<List<Offer>> = offersFlow.asStateFlow()
+
+    override suspend fun syncFromRemote() {
+        syncCallCount++
+        syncError?.let { throw it }
+    }
+
+    fun setTenant(tenant: Tenant) {
+        tenantFlow.value = tenant
     }
 }
 

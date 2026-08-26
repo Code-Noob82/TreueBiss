@@ -14,7 +14,8 @@ class VoucherTest {
         createdAt = now,
         creationDate = now.toEpochMilliseconds(),
         expiresAt = expiresAt,
-        isRedeemed = isRedeemed
+        isRedeemed = isRedeemed,
+        tenantId = "test-tenant"
     )
 
     @Test

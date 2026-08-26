@@ -27,6 +27,9 @@ object DatabaseModule {
             TreueBissDatabase::class.java,
             TreueBissDatabase.DATABASE_NAME
         )
+            // Vor dem Launch gibt es keine schützenswerten Nutzerdaten. Sobald
+            // die App ausgeliefert ist, muss hier eine echte Migration stehen.
+            .fallbackToDestructiveMigration()
             .build()
 
     /**
@@ -42,4 +45,11 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideVoucherDao(database: TreueBissDatabase) = database.voucherDao()
+
+    /**
+     * Stellt das TenantDao bereit, das von der Datenbankinstanz abhängt.
+     */
+    @Provides
+    @Singleton
+    fun provideTenantDao(database: TreueBissDatabase) = database.tenantDao()
 }

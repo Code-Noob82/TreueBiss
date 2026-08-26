@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.dominikbaki.treuebiss.core.navigation.AppNavigation
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.core.presentation.MainScreen
-import com.dominikbaki.treuebiss.core.presentation.branding.DefaultBrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.MainViewModel
 import com.dominikbaki.treuebiss.core.presentation.branding.LocalBrandingConfig
+import com.dominikbaki.treuebiss.core.presentation.branding.toBrandingConfig
 import com.dominikbaki.treuebiss.core.theme.TreueBissTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -24,16 +27,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            TreueBissTheme {
-                // BrandingConfig hier setzen (später dynamisch laden)
-                val branding = DefaultBrandingConfig
+            // Dasselbe ViewModel wie in MainScreen - hiltViewModel() liefert
+            // hier den Activity-Scope, also dieselbe Instanz.
+            val mainViewModel: MainViewModel = hiltViewModel()
+            val tenant by mainViewModel.activeTenant.collectAsState()
 
-                CompositionLocalProvider(LocalBrandingConfig provides branding) {
+            TreueBissTheme(brandPrimaryColor = tenant.primaryColor) {
+                CompositionLocalProvider(LocalBrandingConfig provides tenant.toBrandingConfig()) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        MainScreen()
+                        MainScreen(mainViewModel = mainViewModel)
                     }
                 }
             }

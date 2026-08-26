@@ -13,5 +13,6 @@ import java.util.UUID
 data class Stamp(
     val id: String = UUID.randomUUID().toString(), // Generiere eine lokale UUID
     val timestamp: Instant,
+    val tenantId: String,
     val userId: String? = null
 )

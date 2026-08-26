@@ -41,7 +41,12 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
     - Stempel und Gutscheine werden beim Anlegen zum Backend geschrieben.
     - Nach einer Neuinstallation werden die Daten einmalig vom Server zurückgeholt.
     - RLS Policies pro Nutzer.
-- [x] **Corporate Branding:** BrandingConfig (Farben, Logo, Strings).
+- [x] **Mandantenfähigkeit:** Betriebe liegen als `tenants` im Backend. Ein Build
+  ist über `TENANT_ID` einem Betrieb zugeordnet; Name, Bezeichnungen, Primärfarbe
+  und die Kartenregeln (Stempel pro Karte, Gültigkeitsdauer) kommen von dort.
+- [x] **Angebote:** Werden im Backend gepflegt und auf dem HomeScreen angezeigt.
+- [x] **Corporate Branding:** Zur Laufzeit aus dem Betrieb, mit neutralem
+  Platzhalter solange keine Serverdaten vorliegen.
 
 ### Sicherheit & Datenschutz (anonyme Anmeldung)
 
@@ -76,8 +81,11 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 
 1. `local.properties.example` nach `local.properties` kopieren.
 2. `SUPABASE_URL` und `SUPABASE_ANON_KEY` aus den Projekt-Einstellungen bei Supabase eintragen.
-3. Anonyme Anmeldungen im Supabase-Projekt aktivieren und die Tabellen `stamps`
-   und `vouchers` samt RLS-Policies anlegen.
+3. Anonyme Anmeldungen im Supabase-Projekt aktivieren.
+4. `supabase/schema.sql` im SQL-Editor des Projekts ausführen. Das legt Tabellen,
+   RLS-Policies und einen Demo-Betrieb an.
+5. `TENANT_ID` in `local.properties` auf den gewünschten Betrieb setzen. Ohne
+   Eintrag wird der Demo-Betrieb aus dem Schema verwendet.
 
 Ohne die Supabase-Werte startet die App zwar, kann sich aber nicht anmelden: Der
 Client fällt auf `https://localhost` zurück, die Anmeldung läuft in einen
@@ -88,6 +96,20 @@ Verbindungsfehler und es erscheint der Fehlerbildschirm mit „Wiederholen“.
 ```
 
 ## Projektstruktur & Architektur Übersicht
+
+### 0. Mandantenfähigkeit
+
+Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
+(Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
+damit lokale Daten schon vor dem ersten Serverkontakt zugeordnet werden können -
+die App ist offline-fähig. Vom Server kommen nur Branding, Angebote und Regeln.
+
+Das Schema ist damit bereits auf mehrere Betriebe ausgelegt. Der Wechsel auf eine
+App mit Beitritt per Code (mehrere Betriebe gleichzeitig) braucht keine
+Schemaänderung mehr, nur noch die Oberfläche dafür.
+
+Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
+App - hier dockt später ein Admin-Backend an.
 
 ### 1. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
@@ -128,7 +150,12 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 ## Ausblick
 
 - [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
-- [ ] **Admin-Panel (z. B. Strapi):** Angebot der Woche für Betriebe editierbar.
+- [ ] **Admin-Panel:** Oberfläche, über die Betriebe Angebote und Branding selbst
+      pflegen. Datenseitig ist alles vorhanden, es fehlt die Bedienoberfläche.
+- [ ] **Stempelvergabe durch den Betrieb:** Aktuell vergibt sich der Kunde seine
+      Stempel selbst (Demo-Button) und löst auch selbst ein. Ohne serverseitige
+      Autorisierung ist das kein einsetzbares Treueprogramm.
+- [ ] **Beitritt per Code:** Mehrere Betriebe in einer App.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.
 - [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt beim App-Start.

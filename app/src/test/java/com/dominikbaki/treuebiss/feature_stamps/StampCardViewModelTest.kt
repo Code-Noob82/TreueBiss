@@ -1,7 +1,9 @@
 package com.dominikbaki.treuebiss.feature_stamps
 
 import com.dominikbaki.treuebiss.MainDispatcherRule
+import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.fakes.FakeStampRepository
+import com.dominikbaki.treuebiss.fakes.FakeTenantRepository
 import com.dominikbaki.treuebiss.fakes.FakeVoucherRepository
 import com.dominikbaki.treuebiss.feature_stamps.presentation.StampCardViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -16,11 +18,15 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class StampCardViewModelTest {
 
+    /** Kartengröße des Test-Betriebs. */
+    private val STAMPS_PER_CARD = Tenant.DEFAULT_STAMPS_PER_CARD
+
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var stamps: FakeStampRepository
     private lateinit var vouchers: FakeVoucherRepository
+    private lateinit var tenants: FakeTenantRepository
     private lateinit var viewModel: StampCardViewModel
 
     // Nicht als Feldinitialisierung: die läuft, bevor die Rule
@@ -29,7 +35,8 @@ class StampCardViewModelTest {
     fun setUp() {
         stamps = FakeStampRepository()
         vouchers = FakeVoucherRepository()
-        viewModel = StampCardViewModel(stamps, vouchers)
+        tenants = FakeTenantRepository()
+        viewModel = StampCardViewModel(stamps, vouchers, tenants)
     }
 
     @Test
@@ -45,7 +52,7 @@ class StampCardViewModelTest {
 
     @Test
     fun `erzeugt beim zehnten Stempel einen Gutschein und setzt die Karte zurueck`() = runTest(mainDispatcherRule.dispatcher) {
-        repeat(StampCardViewModel.STAMPS_PER_CARD) {
+        repeat(STAMPS_PER_CARD) {
             viewModel.onAddStampClicked()
             advanceUntilIdle()
         }
@@ -56,7 +63,7 @@ class StampCardViewModelTest {
 
     @Test
     fun `der Gutschein laeuft in der Zukunft ab`() = runTest(mainDispatcherRule.dispatcher) {
-        repeat(StampCardViewModel.STAMPS_PER_CARD) {
+        repeat(STAMPS_PER_CARD) {
             viewModel.onAddStampClicked()
             advanceUntilIdle()
         }

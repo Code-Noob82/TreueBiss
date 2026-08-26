@@ -14,5 +14,7 @@ import androidx.room.PrimaryKey
 data class StampEntity(
     @PrimaryKey
     val id: String,
-    val timestamp: Long
+    val timestamp: Long,
+    /** Der Betrieb, zu dem dieser Stempel gehört. */
+    val tenantId: String
 )

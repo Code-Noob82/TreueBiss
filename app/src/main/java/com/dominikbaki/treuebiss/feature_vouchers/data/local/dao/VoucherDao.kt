@@ -28,8 +28,11 @@ interface VoucherDao {
     /**
      * Beobachtet alle nicht eingelösten Gutscheine.
      */
-    @Query("SELECT * FROM vouchers WHERE isRedeemed = 0 ORDER BY creationDate DESC")
-    fun observeOpenVouchers(): Flow<List<VoucherEntity>>
+    @Query(
+        "SELECT * FROM vouchers WHERE tenantId = :tenantId AND isRedeemed = 0 " +
+            "ORDER BY creationDate DESC"
+    )
+    fun observeOpenVouchers(tenantId: String): Flow<List<VoucherEntity>>
 
     /**
      * Markiert einen spezifischen Gutschein als eingelöst.

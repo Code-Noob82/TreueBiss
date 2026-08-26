@@ -20,8 +20,6 @@
     <string name="sync_offline">Keine Verbindung zum Server. Deine Stempel werden lokal gespeichert.</string>
 
     <!-- Home -->
-    <string name="home_daily_special_title">Unser Dinkel-Kracher</string>
-    <string name="home_daily_special_description">Heute frisch aus dem Ofen, nur 3,50 €!</string>
     <string name="home_daily_special_icon">Tagesangebot-Icon</string>
     <string name="home_vouchers_available">%1$d verfügbar</string>
     <string name="home_stamps_collected">Gesammelt</string>

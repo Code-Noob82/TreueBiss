@@ -17,5 +17,7 @@ data class StampDto(
     @SerialName("created_at")
     val createdAt: Instant,
     @SerialName("user_id")
-    val userId: String
+    val userId: String,
+    @SerialName("tenant_id")
+    val tenantId: String
 )

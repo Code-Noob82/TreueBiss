@@ -8,5 +8,7 @@ data class VoucherEntity(
     val id: String,
     val creationDate: Long,
     val expiresAt: Long,
-    val isRedeemed: Boolean
+    val isRedeemed: Boolean,
+    /** Der Betrieb, zu dem dieser Gutschein gehört. */
+    val tenantId: String
 )

@@ -4,6 +4,8 @@ import com.dominikbaki.treuebiss.core.data.repository.AuthRepositoryImpl
 import com.dominikbaki.treuebiss.core.data.repository.UserPreferencesRepositoryImpl
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
 import com.dominikbaki.treuebiss.core.data.repository.StampRepositoryImpl
+import com.dominikbaki.treuebiss.core.data.repository.TenantRepositoryImpl
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.data.repository.VoucherRepositoryImpl
@@ -44,4 +46,10 @@ abstract class RepositoryModule {
     abstract fun bindAuthRepository(
         authRepositoryImpl: AuthRepositoryImpl
     ): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTenantRepository(
+        tenantRepositoryImpl: TenantRepositoryImpl
+    ): TenantRepository
 }
