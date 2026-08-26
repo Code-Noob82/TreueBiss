@@ -1,7 +1,7 @@
 package com.dominikbaki.treuebiss.core.presentation
 
 import com.dominikbaki.treuebiss.MainDispatcherRule
-import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.fakes.FakeAuthRepository
 import com.dominikbaki.treuebiss.fakes.FakeStampRepository
 import com.dominikbaki.treuebiss.fakes.FakeUserPreferencesRepository
@@ -17,6 +17,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
 
+    /** Spiegelt MainViewModel.AUTH_STATUS_TIMEOUT_MS (dort privat). */
+    private val authStatusTimeoutMs = 2_000L
+
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -27,73 +30,125 @@ class MainViewModelTest {
         vouchers: FakeVoucherRepository = FakeVoucherRepository()
     ) = MainViewModel(prefs, auth, stamps, vouchers)
 
-    @Test
-    fun `meldet sich anonym an und erreicht den Erfolgszustand`() = runTest(mainDispatcherRule.dispatcher) {
-        val auth = FakeAuthRepository(initiallyAuthenticated = false)
-        val vm = viewModel(auth = auth)
-
-        advanceUntilIdle()
-
-        assertTrue(vm.uiState.value is MainUiState.Success)
-        assertEquals(1, auth.signInCallCount)
+    private fun MainUiState.asSuccess(): MainUiState.Success {
+        assertTrue("Erwartet: Success, war: $this", this is MainUiState.Success)
+        return this as MainUiState.Success
     }
 
     @Test
-    fun `nutzt eine bestehende Session ohne neue Anmeldung`() = runTest(mainDispatcherRule.dispatcher) {
-        // Regression: fruehere Versionen legten hier einen zweiten anonymen
-        // Account an, weil sie die erste Emission des Auth-Status auswerteten.
-        val auth = FakeAuthRepository(initiallyAuthenticated = true)
-        val vm = viewModel(auth = auth)
+    fun `meldet sich anonym an, wenn keine Session existiert`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val auth = FakeAuthRepository(AuthStatus.NotAuthenticated)
+            val vm = viewModel(auth = auth)
 
-        advanceUntilIdle()
+            advanceUntilIdle()
 
-        assertTrue(vm.uiState.value is MainUiState.Success)
-        assertEquals(0, auth.signInCallCount)
-    }
-
-    @Test
-    fun `zeigt einen Fehler statt endlos zu laden wenn die Anmeldung fehlschlaegt`() = runTest(mainDispatcherRule.dispatcher) {
-        // Regression fuer den Haenger im Ladebildschirm.
-        val auth = FakeAuthRepository().apply {
-            signInError = IllegalStateException("offline")
+            assertEquals(1, auth.signInCallCount)
+            assertEquals(SyncStatus.Synced, vm.uiState.value.asSuccess().syncStatus)
         }
-        val vm = viewModel(auth = auth)
-
-        advanceUntilIdle()
-
-        val state = vm.uiState.value
-        assertTrue("Erwartet: Error, war: $state", state is MainUiState.Error)
-        assertEquals(R.string.error_sign_in_failed, (state as MainUiState.Error).messageRes)
-    }
 
     @Test
-    fun `laeuft in einen Timeout wenn die Anmeldung haengt`() = runTest(mainDispatcherRule.dispatcher) {
-        val auth = FakeAuthRepository().apply { signInNeverCompletes = true }
-        val vm = viewModel(auth = auth)
+    fun `nutzt eine bestehende Session ohne neue Anmeldung`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val auth = FakeAuthRepository(AuthStatus.Authenticated)
+            val vm = viewModel(auth = auth)
 
-        advanceUntilIdle()
+            advanceUntilIdle()
 
-        val state = vm.uiState.value
-        assertTrue("Erwartet: Error, war: $state", state is MainUiState.Error)
-        assertEquals(R.string.error_sign_in_timeout, (state as MainUiState.Error).messageRes)
-    }
+            assertEquals(0, auth.signInCallCount)
+            assertEquals(SyncStatus.Synced, vm.uiState.value.asSuccess().syncStatus)
+        }
 
     @Test
-    fun `stellt Daten nach einer Neuinstallation genau einmal wieder her`() = runTest(mainDispatcherRule.dispatcher) {
-        val stamps = FakeStampRepository()
-        val vouchers = FakeVoucherRepository()
-        val prefs = FakeUserPreferencesRepository(remoteDataRestored = false)
+    fun `die App ist ohne erreichbares Backend bedienbar`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Regression: Frueher blockierte eine fehlgeschlagene Anmeldung den
+            // kompletten Start, obwohl Stempel und Gutscheine lokal liegen.
+            val auth = FakeAuthRepository().apply {
+                signInError = IllegalStateException("offline")
+            }
+            val vm = viewModel(auth = auth)
 
-        val vm = viewModel(prefs = prefs, stamps = stamps, vouchers = vouchers)
-        advanceUntilIdle()
+            advanceUntilIdle()
 
-        assertEquals(1, stamps.restoreCallCount)
-        assertEquals(1, vouchers.restoreCallCount)
+            val state = vm.uiState.value.asSuccess()
+            assertEquals(SyncStatus.Offline, state.syncStatus)
+        }
 
-        // Ein Retry darf die Wiederherstellung nicht erneut ausloesen.
-        vm.retryInitialAuth()
-        advanceUntilIdle()
+    @Test
+    fun `wartet nicht auf das Sicherheitsnetz, wenn der Status sofort feststeht`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Regression: Frueher kostete jeder Kaltstart ohne Session die volle
+            // Wartezeit, weil "laedt noch" und "nicht angemeldet" beide false waren.
+            val auth = FakeAuthRepository(AuthStatus.NotAuthenticated)
+            viewModel(auth = auth)
 
-        assertEquals(1, stamps.restoreCallCount)
-    }
+            advanceUntilIdle()
+
+            assertEquals(1, auth.signInCallCount)
+            assertTrue(
+                "Anmeldung startete erst nach ${testScheduler.currentTime} ms",
+                testScheduler.currentTime < authStatusTimeoutMs
+            )
+        }
+
+    @Test
+    fun `meldet sich nach dem Sicherheitsnetz an, wenn der Status unklar bleibt`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val auth = FakeAuthRepository(AuthStatus.Unknown)
+            viewModel(auth = auth)
+
+            advanceUntilIdle()
+
+            assertEquals(1, auth.signInCallCount)
+            assertTrue(testScheduler.currentTime >= authStatusTimeoutMs)
+        }
+
+    @Test
+    fun `geht offline, wenn die Anmeldung haengt`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val auth = FakeAuthRepository().apply { signInNeverCompletes = true }
+            val vm = viewModel(auth = auth)
+
+            advanceUntilIdle()
+
+            assertEquals(SyncStatus.Offline, vm.uiState.value.asSuccess().syncStatus)
+        }
+
+    @Test
+    fun `stellt Daten nach einer Neuinstallation genau einmal wieder her`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val stamps = FakeStampRepository()
+            val vouchers = FakeVoucherRepository()
+            val prefs = FakeUserPreferencesRepository(remoteDataRestored = false)
+
+            val vm = viewModel(prefs = prefs, stamps = stamps, vouchers = vouchers)
+            advanceUntilIdle()
+
+            assertEquals(1, stamps.restoreCallCount)
+            assertEquals(1, vouchers.restoreCallCount)
+
+            // Ein erneuter Verbindungsversuch darf sie nicht noch einmal holen.
+            vm.retryConnection()
+            advanceUntilIdle()
+
+            assertEquals(1, stamps.restoreCallCount)
+        }
+
+    @Test
+    fun `ein erneuter Versuch kommt nach einem Ausfall zurueck auf synchronisiert`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val auth = FakeAuthRepository().apply {
+                signInError = IllegalStateException("offline")
+            }
+            val vm = viewModel(auth = auth)
+            advanceUntilIdle()
+            assertEquals(SyncStatus.Offline, vm.uiState.value.asSuccess().syncStatus)
+
+            auth.signInError = null
+            vm.retryConnection()
+            advanceUntilIdle()
+
+            assertEquals(SyncStatus.Synced, vm.uiState.value.asSuccess().syncStatus)
+        }
 }
