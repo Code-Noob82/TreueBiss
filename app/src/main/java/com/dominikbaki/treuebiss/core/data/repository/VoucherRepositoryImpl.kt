@@ -7,7 +7,6 @@ import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import com.dominikbaki.treuebiss.feature_vouchers.data.local.dao.VoucherDao
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucher
-import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherDto
 import com.dominikbaki.treuebiss.feature_vouchers.data.mapper.toVoucherEntity
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
@@ -27,38 +26,14 @@ class VoucherRepositoryImpl @Inject constructor(
 ) : VoucherRepository {
 
     private val tenantId: String get() = tenantRepository.activeTenantId
-    override suspend fun createVoucher(voucher: Voucher) {
-        // --- SCHRITT 1: LOKAL IN ROOM SPEICHERN (MIT VERBESSERTEM DEBUGGING) ---
+    override suspend fun cacheVoucher(voucher: Voucher) {
+        // Nur lokal spiegeln: Angelegt hat den Gutschein die Datenbankfunktion
+        // `issue_stamp`, in derselben Transaktion wie der zehnte Stempel.
         try {
-            Log.d(
-                "VoucherRepositoryImpl",
-                "Attempting to insert voucher locally. ID: ${voucher.id}"
-            )
             dao.insertVoucher(voucher.toVoucherEntity())
-            Log.d(
-                "VoucherRepositoryImpl",
-                "Successfully inserted voucher locally. ID: ${voucher.id}"
-            )
+            Log.d("VoucherRepositoryImpl", "Cached voucher ${voucher.id} locally")
         } catch (e: Exception) {
-            Log.e("VoucherRepositoryImpl", "Failed to insert voucher locally", e)
-            return
-        }
-        // --- SCHRITT 2: ZU SUPABASE SYNCHRONISIEREN ---
-        try {
-            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-            if (currentUserId != null) {
-                val voucherDto = voucher.toVoucherDto(currentUserId)
-                remoteDataSource.addVoucherToSupabase(voucherDto)
-                Log.d(
-                    "VoucherRepositoryImpl",
-                    "Voucher ${voucher.id} synced successfully with Supabase"
-                )
-            } else {
-                Log.w("VoucherRepositoryImpl", "User not logged in, cannot sync voucher")
-            }
-        } catch (e: Exception) {
-            Log.e("VoucherRepositoryImpl", "Failed to sync voucher to supabase", e)
-            // Fehlerbehandlung: Voucher als "nicht synchronisiert" markieren
+            Log.e("VoucherRepositoryImpl", "Failed to cache voucher locally", e)
         }
     }
 

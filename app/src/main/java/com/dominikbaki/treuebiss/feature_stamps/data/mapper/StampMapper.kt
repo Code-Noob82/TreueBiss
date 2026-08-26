@@ -27,14 +27,6 @@ fun Stamp.toStampEntity(): StampEntity {
     )
 }
 
-fun Stamp.toStampDto(currentUserId: String): StampDto {
-    return StampDto(
-        id = this.id,
-        createdAt = this.timestamp,
-        userId = currentUserId,
-        tenantId = this.tenantId
-    )
-}
 
 /**
  * Konvertiert eine von Supabase geladene Zeile in die Datenbank-Entität.

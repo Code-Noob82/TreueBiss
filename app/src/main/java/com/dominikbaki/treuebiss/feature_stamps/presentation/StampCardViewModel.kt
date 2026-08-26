@@ -1,11 +1,14 @@
 package com.dominikbaki.treuebiss.feature_stamps.presentation
 
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dominikbaki.treuebiss.core.domain.models.Stamp
+import com.dominikbaki.treuebiss.BuildConfig
+import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.core.domain.models.ProofAlreadyUsedException
+import com.dominikbaki.treuebiss.core.domain.models.StampProof
 import com.dominikbaki.treuebiss.core.domain.models.Tenant
-import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -17,22 +20,27 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import java.util.UUID
 import javax.inject.Inject
-import kotlin.time.Duration.Companion.days
 
 /** Zustand der Stempelkarte. Die Kartengröße kommt vom Betrieb. */
 data class StampCardUiState(
     val stampCount: Int = 0,
     val stampsPerCard: Int = Tenant.DEFAULT_STAMPS_PER_CARD,
-    val isAddingStamp: Boolean = false
+    val isIssuing: Boolean = false,
+    /** Nur in Debug-Builds: der Knopf, der ohne Beleg stempelt. */
+    val isDemoEnabled: Boolean = BuildConfig.DEBUG
 ) {
     val isComplete: Boolean get() = stampCount >= stampsPerCard
+}
+
+/** Einmalige Meldungen an die UI. */
+sealed interface StampCardEvent {
+    data class VoucherCreated(val voucherId: String) : StampCardEvent
+    data class Failed(@StringRes val messageRes: Int) : StampCardEvent
 }
 
 @HiltViewModel
@@ -50,18 +58,17 @@ class StampCardViewModel @Inject constructor(
         const val CARD_COMPLETE_VISIBLE_MS = 1_200L
     }
 
-    /** Verhindert, dass ein zweiter Klick startet, während der erste noch läuft. */
-    private val _isAddingStamp = MutableStateFlow(false)
+    private val _isIssuing = MutableStateFlow(false)
 
     val uiState: StateFlow<StampCardUiState> = combine(
         stampRepository.observeStamps(),
         tenantRepository.observeActiveTenant(),
-        _isAddingStamp
-    ) { stamps, tenant, isAdding ->
+        _isIssuing
+    ) { stamps, tenant, isIssuing ->
         StampCardUiState(
             stampCount = stamps.size,
             stampsPerCard = tenant.stampsPerCard,
-            isAddingStamp = isAdding
+            isIssuing = isIssuing
         )
     }.stateIn(
         scope = viewModelScope,
@@ -69,48 +76,54 @@ class StampCardViewModel @Inject constructor(
         initialValue = StampCardUiState()
     )
 
-    // Signalisiert der UI einmalig, dass ein neuer Gutschein erstellt wurde
-    private val _voucherCreatedEvent = MutableSharedFlow<String>()
-    val voucherCreatedEvent: SharedFlow<String> = _voucherCreatedEvent.asSharedFlow()
+    private val _events = MutableSharedFlow<StampCardEvent>()
+    val events: SharedFlow<StampCardEvent> = _events.asSharedFlow()
 
-    fun onAddStampClicked() {
-        if (_isAddingStamp.value) return
-        _isAddingStamp.value = true
+    /**
+     * Vergibt einen Stempel gegen einen gescannten Kassenbon.
+     *
+     * @param proofReference Eindeutige Kennung vom Beleg (TSE-Transaktionsnummer).
+     */
+    fun onReceiptScanned(proofReference: String) {
+        issue(StampProof(reference = proofReference, source = StampProof.Source.Receipt))
+    }
+
+    /**
+     * Vergibt einen Stempel ohne Beleg. Nur für Debug-Builds gedacht - der
+     * Nachweis ist eine zufällige Kennung und damit wertlos.
+     */
+    fun onDemoStampClicked() {
+        if (!BuildConfig.DEBUG) return
+        issue(StampProof(reference = "demo-${UUID.randomUUID()}", source = StampProof.Source.Demo))
+    }
+
+    private fun issue(proof: StampProof) {
+        if (_isIssuing.value) return
+        _isIssuing.value = true
 
         viewModelScope.launch {
             try {
-                val tenant = tenantRepository.observeActiveTenant().first()
+                val result = stampRepository.issueStamp(proof)
 
-                // Die neue Anzahl kommt aus derselben Transaktion wie das
-                // Einfügen - nicht aus dem zuletzt beobachteten UI-Stand.
-                val newStampCount = stampRepository.addStamp(
-                    Stamp(timestamp = Clock.System.now(), tenantId = tenant.id)
-                )
+                result.voucher?.let { voucher ->
+                    voucherRepository.cacheVoucher(voucher)
+                    _events.emit(StampCardEvent.VoucherCreated(voucher.id))
 
-                if (newStampCount >= tenant.stampsPerCard) {
-                    createVoucherAndResetCard(tenant)
+                    // Erst die volle Karte zeigen, dann zurücksetzen.
+                    delay(CARD_COMPLETE_VISIBLE_MS)
+                    stampRepository.clearStamps()
                 }
+            } catch (e: ProofAlreadyUsedException) {
+                Log.w("StampCardViewModel", "Proof already used", e)
+                _events.emit(StampCardEvent.Failed(R.string.stamp_error_proof_used))
             } catch (e: Exception) {
-                Log.e("StampCardViewModel", "Failed to add stamp", e)
+                // Ohne Verbindung ist keine Vergabe möglich: Nur der Server
+                // kann prüfen, ob der Beleg echt und unbenutzt ist.
+                Log.e("StampCardViewModel", "Failed to issue stamp", e)
+                _events.emit(StampCardEvent.Failed(R.string.stamp_error_offline))
             } finally {
-                _isAddingStamp.value = false
+                _isIssuing.value = false
             }
         }
-    }
-
-    private suspend fun createVoucherAndResetCard(tenant: Tenant) {
-        val now = Clock.System.now()
-        val newVoucher = Voucher(
-            createdAt = now,
-            creationDate = now.toEpochMilliseconds(),
-            expiresAt = now.plus(tenant.voucherValidityDays.days).toEpochMilliseconds(),
-            tenantId = tenant.id
-        )
-        voucherRepository.createVoucher(newVoucher)
-        _voucherCreatedEvent.emit(newVoucher.id)
-
-        // Erst die volle Karte zeigen, dann zurücksetzen.
-        delay(CARD_COMPLETE_VISIBLE_MS)
-        stampRepository.clearStamps()
     }
 }

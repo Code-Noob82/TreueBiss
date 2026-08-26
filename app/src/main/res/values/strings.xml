@@ -17,7 +17,7 @@
 
     <!-- Start & Verbindung -->
     <string name="error_local_data_failed">Die App-Daten konnten nicht gelesen werden.</string>
-    <string name="sync_offline">Keine Verbindung zum Server. Deine Stempel werden lokal gespeichert.</string>
+    <string name="sync_offline">Keine Verbindung zum Server. Stempeln ist gerade nicht möglich.</string>
 
     <!-- Home -->
     <string name="home_daily_special_icon">Tagesangebot-Icon</string>
@@ -33,6 +33,8 @@
     <string name="stamp_card_hint_complete">Glückwunsch! Du hast einen Gutschein erhalten.</string>
     <string name="stamp_card_add_demo">Stempel hinzufügen (Demo)</string>
     <string name="stamp_card_stamped">Gestempelt</string>
+    <string name="stamp_error_proof_used">Dieser Beleg wurde bereits eingelöst.</string>
+    <string name="stamp_error_offline">Stempel brauchen eine Verbindung zum Server. Bitte später erneut versuchen.</string>
     <string name="stamp_card_voucher_created">Glückwunsch! Ein neuer Gutschein wurde erstellt.</string>
 
     <!-- Gutscheine -->
