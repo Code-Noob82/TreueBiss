@@ -29,6 +29,11 @@ create table if not exists public.tenants (
     -- bcrypt-Hash des Einloese-Codes, den das Personal an der Kasse eingibt.
     -- Der Code selbst wird nie gespeichert.
     redeem_code_hash      text,
+    -- Wenn true, muss beim Einloesen der Code eingegeben werden. Standard ist
+    -- false: Der Kunde loest selbst ein, die App zeigt eine zeitgebundene
+    -- Bestaetigung, auf die das Personal nur kurz schaut. Betriebe, die es
+    -- strenger wollen, schalten das Flag ein.
+    requires_redeem_code  boolean not null default false,
     created_at            timestamptz not null default now()
 );
 
@@ -36,6 +41,8 @@ create table if not exists public.tenants (
 -- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
 -- Spalte. Muss vor allem stehen, was sie verwendet.
 alter table public.tenants add column if not exists redeem_code_hash text;
+alter table public.tenants
+    add column if not exists requires_redeem_code boolean not null default false;
 
 -- ---------------------------------------------------------------- Angebote
 create table if not exists public.offers (
@@ -79,7 +86,7 @@ create table if not exists public.memberships (
  */
 create or replace function public.redeem_voucher(
     p_voucher_id uuid,
-    p_code       text
+    p_code       text default null
 )
 returns table (voucher_id uuid, redeemed_at timestamptz)
 language plpgsql
@@ -92,6 +99,8 @@ declare
     v_redeemed boolean;
     v_expires  int8;
     v_hash     text;
+    v_requires boolean;
+    v_now      timestamptz := now();
     v_now_ms   int8 := (extract(epoch from now()) * 1000)::int8;
 begin
     if v_user is null then
@@ -113,19 +122,25 @@ begin
         raise exception 'voucher expired' using errcode = '22023';
     end if;
 
-    select redeem_code_hash into v_hash
+    select redeem_code_hash, requires_redeem_code
+      into v_hash, v_requires
       from public.tenants where id = v_tenant and is_active;
 
-    if v_hash is null then
-        raise exception 'no redeem code configured for this tenant' using errcode = '22023';
-    end if;
-    if crypt(p_code, v_hash) <> v_hash then
-        raise exception 'invalid redeem code' using errcode = '42501';
+    -- Der Code ist nur Pflicht, wenn der Betrieb ihn verlangt. Sonst loest
+    -- der Kunde selbst ein; das Personal prueft die Bestaetigung per Blick,
+    -- oder scannt den QR an der Kasse.
+    if v_requires then
+        if v_hash is null then
+            raise exception 'no redeem code configured for this tenant' using errcode = '22023';
+        end if;
+        if p_code is null or crypt(p_code, v_hash) <> v_hash then
+            raise exception 'invalid redeem code' using errcode = '42501';
+        end if;
     end if;
 
     update public.vouchers set is_redeemed = true where id = p_voucher_id;
 
-    return query select p_voucher_id, now();
+    return query select p_voucher_id, v_now;
 end;
 $$;
 
