@@ -1,5 +1,6 @@
 package com.dominikbaki.treuebiss.feature_vouchers.presentation.composables
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,8 @@ import kotlinx.datetime.Instant
 @Composable
 internal fun VoucherDetailOverlay(
     voucher: Voucher,
+    isRedeeming: Boolean,
+    @StringRes errorRes: Int?,
     onRedeem: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -158,17 +161,30 @@ internal fun VoucherDetailOverlay(
                 Button(
                     onClick = onRedeem,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
+                    shape = MaterialTheme.shapes.medium,
+                    enabled = !isRedeeming
                 ) {
                     Text(stringResource(R.string.voucher_overlay_redeem))
                 }
                 Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.voucher_overlay_safe_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // Der Fehler gehört hierher, nicht in eine Snackbar: Das
+                // Overlay ist ein eigenes Fenster, eine Snackbar dahinter
+                // sieht niemand. Ohne das bliebe ein Fehlschlag stumm.
+                if (errorRes != null) {
+                    Text(
+                        text = stringResource(errorRes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.voucher_overlay_safe_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
