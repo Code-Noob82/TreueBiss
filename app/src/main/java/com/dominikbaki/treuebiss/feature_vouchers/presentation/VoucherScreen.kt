@@ -94,7 +94,10 @@ internal fun VoucherScreen(
     voucherToShowInOverlay?.let { voucher ->
         VoucherDetailOverlay(
             voucher = voucher,
+            isRedeeming = isRedeeming,
+            errorRes = redeemError,
             onRedeem = {
+                redeemError = null
                 // Verlangt der Betrieb keinen Code, löst der Kunde direkt ein
                 // und zeigt dem Personal die Bestätigung. Sonst kommt die
                 // Code-Abfrage dazwischen.
@@ -104,7 +107,10 @@ internal fun VoucherScreen(
                     viewModel.onRedeemConfirmed(voucher.id)
                 }
             },
-            onDismiss = { voucherToShowInOverlay = null }
+            onDismiss = {
+                redeemError = null
+                voucherToShowInOverlay = null
+            }
         )
     }
 

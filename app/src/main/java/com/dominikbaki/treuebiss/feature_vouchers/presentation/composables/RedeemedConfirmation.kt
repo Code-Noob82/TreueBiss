@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -134,7 +135,15 @@ internal fun RedeemedConfirmation(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(Modifier.height(40.dp))
-                Button(onClick = onDismiss) {
+                // Fuellfarbe explizit invertieren: Der Hintergrund ist bereits
+                // colorScheme.primary, ein Standard-Button ginge darin unter.
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.onPrimary,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
                     Text(stringResource(R.string.action_done))
                 }
             }
