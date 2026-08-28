@@ -16,7 +16,8 @@ fun TenantDto.toTenantEntity() = TenantEntity(
     primaryColor = primaryColor,
     logoUrl = logoUrl,
     stampsPerCard = stampsPerCard,
-    voucherValidityDays = voucherValidityDays
+    voucherValidityDays = voucherValidityDays,
+    requiresRedeemCode = requiresRedeemCode
 )
 
 fun TenantEntity.toTenant() = Tenant(
@@ -28,7 +29,8 @@ fun TenantEntity.toTenant() = Tenant(
     primaryColor = primaryColor,
     logoUrl = logoUrl,
     stampsPerCard = stampsPerCard,
-    voucherValidityDays = voucherValidityDays
+    voucherValidityDays = voucherValidityDays,
+    requiresRedeemCode = requiresRedeemCode
 )
 
 fun OfferDto.toOfferEntity() = OfferEntity(

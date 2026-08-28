@@ -35,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.EmptyState
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.RedeemConfirmDialog
+import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.RedeemedConfirmation
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.VoucherDetailOverlay
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.composables.VoucherItem
 import kotlinx.coroutines.flow.collectLatest
@@ -48,6 +49,7 @@ internal fun VoucherScreen(
 ) {
     val vouchers by viewModel.vouchers.collectAsState()
     val isRedeeming by viewModel.isRedeeming.collectAsState()
+    val requiresCode by viewModel.requiresRedeemCode.collectAsState()
     val context = LocalContext.current
     val redeemedMessage = stringResource(R.string.voucher_redeemed)
 
@@ -61,6 +63,9 @@ internal fun VoucherScreen(
     // Fehler beim Einlösen, im Dialog angezeigt.
     var redeemError by remember { mutableStateOf<Int?>(null) }
 
+    // Zeigt nach erfolgreichem Einlösen die Bestätigung fürs Personal.
+    var showRedeemedConfirmation by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.events.collectLatest { event ->
             when (event) {
@@ -71,7 +76,7 @@ internal fun VoucherScreen(
                     redeemError = null
                     voucherPendingRedeem = null
                     voucherToShowInOverlay = null
-                    snackBarHostState.showSnackbar(redeemedMessage)
+                    showRedeemedConfirmation = true
                 }
 
                 is VoucherEvent.Failed -> redeemError = event.messageRes
@@ -82,10 +87,23 @@ internal fun VoucherScreen(
     // --- Logik für die Anzeige der Composables ---
 
     // 1. QR-Code-Overlay: nur Anzeige, plus expliziter Einlöse-Wunsch.
+    if (showRedeemedConfirmation) {
+        RedeemedConfirmation(onDismiss = { showRedeemedConfirmation = false })
+    }
+
     voucherToShowInOverlay?.let { voucher ->
         VoucherDetailOverlay(
             voucher = voucher,
-            onRedeem = { voucherPendingRedeem = voucher },
+            onRedeem = {
+                // Verlangt der Betrieb keinen Code, löst der Kunde direkt ein
+                // und zeigt dem Personal die Bestätigung. Sonst kommt die
+                // Code-Abfrage dazwischen.
+                if (requiresCode) {
+                    voucherPendingRedeem = voucher
+                } else {
+                    viewModel.onRedeemConfirmed(voucher.id)
+                }
+            },
             onDismiss = { voucherToShowInOverlay = null }
         )
     }

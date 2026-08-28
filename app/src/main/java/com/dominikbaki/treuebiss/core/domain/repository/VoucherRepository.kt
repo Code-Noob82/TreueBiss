@@ -24,7 +24,7 @@ interface VoucherRepository {
      * @throws VoucherNotRedeemableException wenn der Gutschein bereits
      *   eingelöst, abgelaufen oder unbekannt ist.
      */
-    suspend fun redeemVoucher(voucherId: String, code: String)
+    suspend fun redeemVoucher(voucherId: String, code: String? = null)
 
     /**
      * Holt die Gutscheine dieser Geräte-Identität vom Server in die lokale

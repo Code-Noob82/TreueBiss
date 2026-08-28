@@ -14,7 +14,8 @@ data class TenantDto(
     @SerialName("primary_color") val primaryColor: String? = null,
     @SerialName("logo_url") val logoUrl: String? = null,
     @SerialName("stamps_per_card") val stampsPerCard: Int,
-    @SerialName("voucher_validity_days") val voucherValidityDays: Int
+    @SerialName("voucher_validity_days") val voucherValidityDays: Int,
+    @SerialName("requires_redeem_code") val requiresRedeemCode: Boolean = false
 )
 
 @Serializable
