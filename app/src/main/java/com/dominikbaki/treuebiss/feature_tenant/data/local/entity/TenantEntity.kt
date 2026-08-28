@@ -14,7 +14,8 @@ data class TenantEntity(
     val primaryColor: String?,
     val logoUrl: String?,
     val stampsPerCard: Int,
-    val voucherValidityDays: Int
+    val voucherValidityDays: Int,
+    val requiresRedeemCode: Boolean
 )
 
 @Entity(tableName = "offers")

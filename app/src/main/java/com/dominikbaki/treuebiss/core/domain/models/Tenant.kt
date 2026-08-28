@@ -17,7 +17,12 @@ data class Tenant(
     val primaryColor: String?,
     val logoUrl: String?,
     val stampsPerCard: Int,
-    val voucherValidityDays: Int
+    val voucherValidityDays: Int,
+    /**
+     * Verlangt der Betrieb beim Einlösen einen Code? Standard ist `false`:
+     * Der Kunde löst selbst ein, das Personal prüft die Bestätigung per Blick.
+     */
+    val requiresRedeemCode: Boolean
 ) {
     companion object {
         const val DEFAULT_STAMPS_PER_CARD = 10
@@ -36,7 +41,8 @@ data class Tenant(
             primaryColor = null,
             logoUrl = null,
             stampsPerCard = DEFAULT_STAMPS_PER_CARD,
-            voucherValidityDays = DEFAULT_VOUCHER_VALIDITY_DAYS
+            voucherValidityDays = DEFAULT_VOUCHER_VALIDITY_DAYS,
+            requiresRedeemCode = false
         )
     }
 }

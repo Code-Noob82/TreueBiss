@@ -82,12 +82,13 @@ class SupabaseDataSource @Inject constructor(
      * Die App darf `vouchers` nicht aktualisieren; das erledigt diese
      * Datenbankfunktion, nachdem sie den Code geprüft hat.
      */
-    suspend fun redeemVoucher(voucherId: String, code: String) {
+    suspend fun redeemVoucher(voucherId: String, code: String?) {
         supabaseClient.postgrest.rpc(
             function = "redeem_voucher",
             parameters = buildJsonObject {
                 put("p_voucher_id", voucherId)
-                put("p_code", code)
+                // Nur mitschicken, wenn der Betrieb einen Code verlangt.
+                code?.let { put("p_code", it) }
             }
         )
     }

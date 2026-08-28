@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.dominikbaki.treuebiss.MainDispatcherRule
 import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
+import com.dominikbaki.treuebiss.fakes.FakeTenantRepository
 import com.dominikbaki.treuebiss.fakes.FakeVoucherRepository
 import com.dominikbaki.treuebiss.fakes.TEST_TENANT_ID
 import com.dominikbaki.treuebiss.feature_vouchers.presentation.VoucherEvent
@@ -32,12 +33,14 @@ class VoucherViewModelTest {
     )
 
     private lateinit var repository: FakeVoucherRepository
+    private lateinit var tenants: FakeTenantRepository
     private lateinit var viewModel: VoucherViewModel
 
     @Before
     fun setUp() {
         repository = FakeVoucherRepository(listOf(voucher))
-        viewModel = VoucherViewModel(repository)
+        tenants = FakeTenantRepository()
+        viewModel = VoucherViewModel(repository, tenants)
     }
 
     @Test
@@ -96,5 +99,21 @@ class VoucherViewModelTest {
             advanceUntilIdle()
 
             assertEquals(1, repository.redeemed.size)
+        }
+
+    @Test
+    fun `ohne geforderten Code wird direkt eingeloest`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Standardfall: Der Betrieb verlangt keinen Code, der Kunde löst
+            // selbst ein und zeigt dem Personal die Bestätigung.
+            repository.requiresCode = false
+
+            viewModel.events.test {
+                viewModel.onRedeemConfirmed(voucher.id)
+                advanceUntilIdle()
+
+                assertTrue(awaitItem() is VoucherEvent.Redeemed)
+            }
+            assertEquals(listOf(voucher.id), repository.redeemed)
         }
 }

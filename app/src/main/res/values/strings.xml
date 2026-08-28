@@ -60,6 +60,9 @@
     <string name="voucher_confirm_text">Bitte lass die Verkaufskraft den Einlöse-Code eingeben. Der Gutschein wird danach als eingelöst markiert.</string>
     <string name="voucher_code_label">Einlöse-Code</string>
     <string name="voucher_redeemed">Gutschein eingelöst. Guten Appetit!</string>
+    <string name="voucher_redeemed_title">Eingelöst!</string>
+    <string name="voucher_redeemed_countdown">Noch %1$d Sekunden gültig</string>
+    <string name="action_done">Fertig</string>
     <string name="voucher_error_wrong_code">Falscher Einlöse-Code.</string>
     <string name="voucher_error_not_redeemable">Dieser Gutschein ist bereits eingelöst oder abgelaufen.</string>
     <string name="voucher_error_offline">Einlösen braucht eine Verbindung zum Server. Bitte später erneut versuchen.</string>

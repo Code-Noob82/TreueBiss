@@ -39,7 +39,7 @@ class VoucherRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun redeemVoucher(voucherId: String, code: String) {
+    override suspend fun redeemVoucher(voucherId: String, code: String?) {
         // Zuerst der Server: Nur dort laesst sich der Code pruefen. Lokal
         // vorab zu markieren hiesse, bei falschem Code zuruecknehmen zu
         // muessen - und bei Verbindungsverlust den Gutschein zu verlieren.

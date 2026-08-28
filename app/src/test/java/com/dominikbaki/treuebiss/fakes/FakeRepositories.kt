@@ -173,9 +173,12 @@ class FakeVoucherRepository(
     /** Wird von [redeemVoucher] geworfen, wenn gesetzt. */
     var redeemError: Exception? = null
 
-    override suspend fun redeemVoucher(voucherId: String, code: String) {
+    /** Verlangt der "Betrieb" einen Code? Spiegelt tenants.requires_redeem_code. */
+    var requiresCode: Boolean = true
+
+    override suspend fun redeemVoucher(voucherId: String, code: String?) {
         redeemError?.let { throw it }
-        if (code != expectedCode) {
+        if (requiresCode && code != expectedCode) {
             throw InvalidRedeemCodeException("falscher Code")
         }
         if (vouchers.value.none { it.id == voucherId }) {

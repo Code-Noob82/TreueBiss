@@ -13,8 +13,9 @@ import com.dominikbaki.treuebiss.feature_vouchers.data.local.entity.VoucherEntit
 /**
  * Die zentrale Room-Datenbank-Klasse für die App.
  *
- * Version 2 führt die Mandantenfähigkeit ein: Stempel und Gutscheine tragen
- * eine `tenantId`, dazu kommen die Zwischenspeicher für Betrieb und Angebote.
+ * Version 2 führte die Mandantenfähigkeit ein: Stempel und Gutscheine tragen
+ * eine `tenantId`, dazu kamen die Zwischenspeicher für Betrieb und Angebote.
+ * Version 3 ergänzt `requiresRedeemCode` am Betrieb.
  */
 @Database(
     entities = [
@@ -23,7 +24,7 @@ import com.dominikbaki.treuebiss.feature_vouchers.data.local.entity.VoucherEntit
         TenantEntity::class,
         OfferEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class TreueBissDatabase : RoomDatabase() {

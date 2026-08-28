@@ -8,6 +8,7 @@ import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.models.InvalidRedeemCodeException
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.models.VoucherNotRedeemableException
+import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,8 +32,19 @@ sealed interface VoucherEvent {
 
 @HiltViewModel
 class VoucherViewModel @Inject constructor(
-    private val repository: VoucherRepository
+    private val repository: VoucherRepository,
+    tenantRepository: TenantRepository
 ): ViewModel() {
+
+    /** Verlangt der Betrieb einen Code beim Einlösen? */
+    val requiresRedeemCode: StateFlow<Boolean> =
+        tenantRepository.observeActiveTenant()
+            .map { it.requiresRedeemCode }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = false
+            )
 
     val vouchers: StateFlow<List<Voucher>> = repository.observeOpenVouchers()
         // Einlösbare Gutscheine zuerst, abgelaufene ans Ende der Liste.
@@ -55,7 +67,7 @@ class VoucherViewModel @Inject constructor(
      * Löst einen Gutschein gegen den Einlöse-Code des Betriebs ein.
      * Der Code kommt vom Personal an der Kasse.
      */
-    fun onRedeemConfirmed(voucherId: String, code: String) {
+    fun onRedeemConfirmed(voucherId: String, code: String? = null) {
         if (_isRedeeming.value) return
         _isRedeeming.value = true
 
