@@ -75,6 +75,38 @@ test("Fremder Schlüssel wird abgelehnt", async () => {
   gleich((await belegPruefen(f.join(";"))).gueltig, false, "fremder Schlüssel");
 });
 
+/*
+ * Ein echter Bon aus dem Lebensmitteleinzelhandel, August 2026. Er ist aus
+ * zwei Gründen hier:
+ *
+ * 1. Sein Schlüssel steht als DER-SPKI im QR, nicht als roher Punkt - eine
+ *    Form, die beide Referenzvektoren nicht haben und die der Prüfer vorher
+ *    mit "Schlüssel hat keine bekannte Form" abgewiesen hätte.
+ * 2. Er lässt sich mit dem bekannten Aufbau NICHT verifizieren, obwohl der
+ *    Schlüssel gültig ist (Punkt liegt auf secp384r1, r und s im Bereich).
+ *    480 Abwandlungen des Aufbaus wurden durchprobiert - keine passt. Der
+ *    Test hält diesen Stand fest: Der Prüfer muss so einen Beleg als
+ *    ungültig melden und dabei die Kurve richtig benennen, statt zu
+ *    behaupten, er könne den Schlüssel nicht lesen.
+ *
+ * Fällt dieser Test eines Tages um, weil "gueltig" true wird, ist das eine
+ * gute Nachricht - dann stimmt der Aufbau doch und die Erwartung gehört
+ * umgedreht.
+ */
+const QR_LEH_SPKI =
+  "V0;International.D.039.073.07;Kassenbeleg-V1;" +
+  "Beleg^17.67_38.71_0.00_0.00_0.00^56.38:Unbar;829153;1659992;" +
+  "2026-08-07T09:20:51.000Z;2026-08-07T09:21:55.000Z;ecdsa-plain-SHA384;unixTime;" +
+  "R29intMaHRAQE/aSM/Z+R/3XS4umfJBWTJXZv4Fr+PNQrjZCHat6CkGINcaPCIP8BkfsFMtc5u7QWoJQg3DA1eAQzJxhqesO57HNosOztOWC+eaXh0Z5/5oVVPrpRJZF;" +
+  "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEJc9CPoY7NA3CIVx1NxKZjMQac4AVq3+N+moSPHDw202KjVFv5QeTS/JMIcH34pxu8vjUb0kKwx3Qcagxq4vdL2KwQFo3AbEEfvBW299+yODBuDGfBKKpgxTi+v3eZYl+";
+
+test("Ein SPKI-Schlüssel wird gelesen und die Kurve benannt", async () => {
+  const e = await belegPruefen(QR_LEH_SPKI);
+  gleich(e.gueltig, false, "gueltig");
+  gleich(e.kurve, "secp384r1", "Kurve aus dem SPKI");
+  gleich(e.grund, "Signatur passt nicht zum Schlüssel (secp384r1)", "Grund");
+});
+
 test("Eine freie Zeichenkette ist kein Beleg", async () => {
   gleich((await belegPruefen("BON-4711")).gueltig, false, "freie Zeichenkette");
 });

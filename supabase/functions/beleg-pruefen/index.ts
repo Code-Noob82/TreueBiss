@@ -36,13 +36,14 @@ Deno.serve(async (req: Request) => {
   const jwt = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!jwt) return antwort({ fehler: "Keine Anmeldung." }, 401);
 
-  let tenant_id: string, qr: string;
+  let tenant_id: string, qr: string, nur_pruefen: boolean;
   try {
-    ({ tenant_id, qr } = await req.json());
+    ({ tenant_id, qr, nur_pruefen = false } = await req.json());
   } catch {
     return antwort({ fehler: "Anfrage nicht lesbar." }, 400);
   }
-  if (!tenant_id || !qr) return antwort({ fehler: "tenant_id und qr fehlen." }, 400);
+  if (!qr) return antwort({ fehler: "qr fehlt." }, 400);
+  if (!nur_pruefen && !tenant_id) return antwort({ fehler: "tenant_id fehlt." }, 400);
 
   const url = Deno.env.get("SUPABASE_URL")!;
 
@@ -55,6 +56,36 @@ Deno.serve(async (req: Request) => {
   if (authFehler || !user) return antwort({ fehler: "Anmeldung ungültig." }, 401);
 
   const geprueft = await belegPruefen(qr);
+
+  /*
+   * Nur nachsehen, nichts stempeln.
+   *
+   * Der Weg, mit dem ein Betrieb überhaupt erst herausfindet, ob seine Kasse
+   * einen brauchbaren QR-Code druckt - das muss vor dem Vertrag geklärt sein,
+   * nicht drei Wochen danach. Antwortet auch bei ungültiger Signatur mit 200:
+   * Die Auskunft ist das Ergebnis, nicht der Fehler.
+   */
+  if (nur_pruefen) {
+    const f = qr.split(";");
+    return antwort({
+      gueltig: geprueft.gueltig,
+      kurve: geprueft.kurve ?? null,
+      grund: geprueft.grund ?? null,
+      gelesen: geprueft.gueltig || f.length >= 12
+        ? {
+          kasse: f[1],
+          vorgang: f[2],
+          daten: f[3],
+          transaktion: f[4],
+          zaehler: f[5],
+          belegzeit: f[7],
+          verfahren: f[8],
+          zeitformat: f[9],
+        }
+        : null,
+    });
+  }
+
   if (!geprueft.gueltig) {
     // 422, nicht 400: Die Anfrage war in Ordnung, der Beleg ist es nicht.
     return antwort({ fehler: "Die Signatur des Belegs stimmt nicht.", grund: geprueft.grund }, 422);

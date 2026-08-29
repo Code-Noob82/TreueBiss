@@ -68,6 +68,77 @@ function zahlBytes(dez: string): number[] {
 
 const text = (s: string) => Array.from(new TextEncoder().encode(s));
 
+/* OIDs der Kurven, wie sie in einem SPKI stehen. */
+const KURVE_JE_OID: Record<string, string> = {
+  "1.2.840.10045.3.1.7": "secp256r1",
+  "1.3.132.0.34": "secp384r1",
+  "1.3.36.3.3.2.8.1.1.7": "brainpoolP256r1",
+  "1.3.36.3.3.2.8.1.1.11": "brainpoolP384r1",
+};
+
+export interface Schluessel {
+  punkt: Uint8Array;
+  /** Aus dem SPKI gelesen; bei einem rohen Punkt unbekannt. */
+  kurve: string | null;
+}
+
+/*
+ * Der Schlüssel steht im QR entweder als roher unkomprimierter Punkt
+ * (0x04 || X || Y) oder als DER-kodiertes SPKI. Beides kommt in freier
+ * Wildbahn vor: Die Testbelege tragen rohe Punkte, ein Bon aus dem
+ * Lebensmitteleinzelhandel ein SPKI. Das SPKI ist dabei die bessere Auskunft,
+ * weil es die Kurve mitnennt statt sie raten zu lassen.
+ */
+export function schluesselLesen(roh: Uint8Array): Schluessel | null {
+  if (roh[0] === 0x04 && (roh.length - 1) % 2 === 0) {
+    return { punkt: roh, kurve: null };
+  }
+  if (roh[0] !== 0x30) return null;
+
+  let i = 0;
+  const lies = (b: Uint8Array, pos: { i: number }) => {
+    const tag = b[pos.i++];
+    let len = b[pos.i++];
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      len = 0;
+      for (let k = 0; k < n; k++) len = (len << 8) | b[pos.i++];
+    }
+    const wert = b.slice(pos.i, pos.i + len);
+    pos.i += len;
+    return { tag, wert };
+  };
+  try {
+    const aussen = lies(roh, { i });
+    if (aussen.tag !== 0x30) return null;
+    const pos = { i: 0 };
+    const alg = lies(aussen.wert, pos);
+    const bits = lies(aussen.wert, pos);
+    if (alg.tag !== 0x30 || bits.tag !== 0x03) return null;
+
+    let kurve: string | null = null;
+    const ap = { i: 0 };
+    while (ap.i < alg.wert.length) {
+      const o = lies(alg.wert, ap);
+      if (o.tag !== 0x06) continue;
+      const t = [Math.floor(o.wert[0] / 40), o.wert[0] % 40];
+      let x = 0;
+      for (const byte of o.wert.slice(1)) {
+        x = (x << 7) | (byte & 0x7f);
+        if (!(byte & 0x80)) { t.push(x); x = 0; }
+      }
+      const name = KURVE_JE_OID[t.join(".")];
+      if (name) kurve = name;
+    }
+    // Erstes Byte des BIT STRING zählt die ungenutzten Bits.
+    const punkt = bits.wert.slice(1);
+    if (punkt[0] !== 0x04) return null;
+    return { punkt, kurve };
+  } catch {
+    return null;
+  }
+}
+
 export function ausBase64(s: string): Uint8Array {
   const roh = atob(s);
   const b = new Uint8Array(roh.length);
@@ -122,11 +193,14 @@ export async function belegPruefen(qr: string): Promise<Ergebnis> {
     return { gueltig: false, grund: "Signatur oder Schlüssel nicht lesbar" };
   }
 
-  const gr = (schluessel.length - 1) / 2;
-  const kandidaten = KURVEN_JE_GROESSE[gr];
-  if (!kandidaten || schluessel[0] !== 0x04) {
-    return { gueltig: false, grund: "Schlüssel hat keine bekannte Form" };
-  }
+  const gelesen = schluesselLesen(schluessel);
+  if (!gelesen) return { gueltig: false, grund: "Schlüssel hat keine bekannte Form" };
+
+  const gr = (gelesen.punkt.length - 1) / 2;
+  // Nennt das SPKI die Kurve, wird nicht geraten. Sonst bleibt die Größe -
+  // zwei 256-Bit-Kurven sind am rohen Punkt nicht zu unterscheiden.
+  const kandidaten = gelesen.kurve ? [gelesen.kurve] : KURVEN_JE_GROESSE[gr];
+  if (!kandidaten) return { gueltig: false, grund: "Kurvengröße unbekannt" };
   if (signatur.length !== gr * 2) {
     return { gueltig: false, grund: "Signaturlänge passt nicht zum Schlüssel" };
   }
@@ -147,9 +221,15 @@ export async function belegPruefen(qr: string): Promise<Ergebnis> {
   const s = zahl(signatur.slice(gr));
 
   for (const kurve of kandidaten) {
-    if (pruefeSignatur(kurve, schluessel, r, s, hash)) return { gueltig: true, kurve };
+    if (pruefeSignatur(kurve, gelesen.punkt, r, s, hash)) return { gueltig: true, kurve };
   }
-  return { gueltig: false, grund: "Signatur passt zu keiner bekannten Kurve" };
+  return {
+    gueltig: false,
+    kurve: gelesen.kurve ?? undefined,
+    grund: gelesen.kurve
+      ? `Signatur passt nicht zum Schlüssel (${gelesen.kurve})`
+      : "Signatur passt zu keiner bekannten Kurve",
+  };
 }
 
 export { KURVEN };

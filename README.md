@@ -218,6 +218,36 @@ Richtigkeit, und die ist geprüft:
 node --experimental-strip-types supabase/functions/beleg-pruefen/pruefung_test.ts
 ```
 
+**Der Schlüssel steht im QR in zwei Formen** — als roher unkomprimierter Punkt
+oder als DER-kodiertes SPKI. Beides kommt vor; das SPKI ist die bessere
+Auskunft, weil es die Kurve mitnennt, statt sie nach Schlüssellänge raten zu
+lassen (zwei 256-Bit-Kurven sind am rohen Punkt nicht zu unterscheiden).
+
+#### Prüfmodus: geht es bei diesem Betrieb überhaupt?
+
+`{"nur_pruefen": true, "qr": "..."}` prüft nur und stempelt nichts. Der Weg,
+mit dem ein Betrieb vor Vertragsschluss herausfindet, ob seine Kasse einen
+brauchbaren QR-Code druckt — Punkt 5 der Marktvalidierung.
+
+**Das ist keine Kür.** Ein echter Bon aus dem Lebensmitteleinzelhandel
+(August 2026, als Testfall festgehalten) ist wohlgeformt, sein öffentlicher
+Schlüssel gültig — der Punkt liegt auf secp384r1, `r` und `s` sind im Bereich —
+und er verifiziert **trotzdem nicht**. 480 Abwandlungen des Aufbaus wurden
+durchprobiert: vier Quellen für den `serialNumber`-Hash, vier Kodierungen des
+`signatureAlgorithm`, drei Zeitformate, beide Versionsnummern, mit und ohne
+`seAuditData`, zwei `certifiedDataType`-OIDs. Keine passt, während derselbe
+Prüfer zwei andere echte TSE-Signaturen zweier anderer Hersteller anstandslos
+bestätigt.
+
+Ob der Grund ein noch unbekanntes Aufbaudetail ist oder ob die `serialNumber`
+dieser TSE sich schlicht nicht aus dem QR errechnen lässt, ist offen.
+
+**Konsequenz:** Die Signaturprüfung ist **nicht bei jedem Betrieb verfügbar**.
+`require_signed_proof` darf deshalb nie Grundannahme werden — es bleibt eine
+Einstellung je Betrieb, standardmäßig aus, und vor dem Einschalten muss der
+Prüfmodus sagen, ob die Kasse dieses Betriebs mitspielt. Wo sie es nicht tut,
+bleibt `require_known_register` die schärfste Hürde.
+
 **Warum die Vergabe gleich in der Funktion passiert:** Sonst müsste die App der
 Datenbank sagen „ich habe prüfen lassen", und genau das darf sie nicht behaupten
 können. `service_issue_stamp` ist deshalb nur für `service_role` freigegeben;
