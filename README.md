@@ -242,6 +242,22 @@ Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
 nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
 es ausliefert.
 
+**Gestaltung.** Die Farbe des Betriebs ist nicht nur Knopffüllung: Aus dem Hex
+werden Farbton und Sättigung gezogen, und das Stylesheet leitet daraus die
+ganze Fläche ab — Kopfband, Papier, Linien, Trennfarben, hell wie dunkel. Die
+Schriftfarbe auf farbigen Flächen wird aus der Leuchtdichte gerechnet (Schwelle
+0,179 nach WCAG), sonst stünde auf einem hellen Gelb weiße Schrift. Stempel
+sitzen leicht gedreht, weil ein echter Stempel nie gerade sitzt; die Drehung
+hängt am Index und wackelt deshalb beim Neuzeichnen nicht. Gutscheine sind
+Abrisse mit Perforationskerben, keine weiteren Karten.
+
+**Schriften** liegen unter `web/app/fonts/` im Projekt, statt von Google geladen
+zu werden. Der Grund ist Datenschutz: Ein `<link>` auf `fonts.googleapis.com`
+überträgt die IP des Kunden an Google; das LG München I hat das 2022 als
+DSGVO-Verstoß gewertet (Az. 3 O 17493/20). Bei einer App, deren Verkaufsargument
+Datensparsamkeit ist, wäre das ein Widerspruch. Beides sind Variable Fonts unter
+der Open Font License, zusammen 48 KB — Einzelheiten in `web/app/fonts/LIESMICH.md`.
+
 **Einrichten:** `config.example.js` nach `config.js` kopieren. Kamera und
 Service Worker brauchen `https` oder `localhost`.
 

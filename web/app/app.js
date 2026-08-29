@@ -26,6 +26,8 @@ let stempel = 0;
 let gutscheine = [];
 let scanLaeuft = false;
 let sammelnLaeuft = false;
+/** Index des gerade gesetzten Stempels - nur der wird animiert. */
+let frischerIndex = -1;
 
 const slug = new URLSearchParams(location.search).get('b')?.trim() || null;
 
@@ -107,23 +109,58 @@ function standLaden() {
 
 // ------------------------------------------------------------------ Anzeige
 
-function markeSetzen(farbe) {
-  const wert = /^#[0-9A-Fa-f]{6}$/.test(farbe ?? '') ? farbe : '#4CAF50';
-  document.documentElement.style.setProperty('--marke', wert);
-  document.documentElement.style.setProperty('--marke-tief', abdunkeln(wert));
-  $('theme-farbe').setAttribute('content', wert);
+/*
+ * Rechnet aus der Farbe des Betriebs die ganze Palette.
+ *
+ * Gesetzt werden nur Farbton, Saettigung und die Marke selbst; alle Flaechen,
+ * Linien und Textfarben leitet das Stylesheet daraus ab. Sonst waere die
+ * Betriebsfarbe wieder nur eine Knopffuellung auf immergleichem Grau.
+ */
+function paletteSetzen(farbe) {
+  const marke = /^#[0-9A-Fa-f]{6}$/.test(farbe ?? '') ? farbe : '#4CAF50';
+  const { h, s } = hexZuHsl(marke);
+
+  // Ein grauer Betrieb darf keine rosa Flaechen bekommen: Unterhalb einer
+  // Restsaettigung wird der Farbton bedeutungslos, dann bleibt es neutral.
+  const sProzent = s < 0.08 ? 6 : Math.min(Math.max(s * 100, 18), 52);
+
+  const wurzel = document.documentElement.style;
+  wurzel.setProperty('--h', Math.round(h));
+  wurzel.setProperty('--s', sProzent.toFixed(1) + '%');
+  wurzel.setProperty('--marke', marke);
+  // Weisse Schrift auf hellem Gelb waere unlesbar. Die Schwelle 0,179 ist
+  // der Punkt, an dem Schwarz besser kontrastiert als Weiss (WCAG).
+  wurzel.setProperty('--marke-text',
+    leuchtkraft(marke) > 0.179 ? `hsl(${Math.round(h)} 45% 11%)` : '#ffffff');
+
+  $('theme-farbe').setAttribute('content', marke);
 }
 
-/** Dunklere Variante fuer Text auf Weiss - reine Rechnung, kein Farbraum. */
-function abdunkeln(hex) {
-  const zahl = (i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.72);
-  return '#' + [1, 3, 5].map((i) => zahl(i).toString(16).padStart(2, '0')).join('');
+function hexZuHsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = (max === r ? (g - b) / d + (g < b ? 6 : 0)
+           : max === g ? (b - r) / d + 2
+                       : (r - g) / d + 4) * 60;
+  return { h, s, l };
+}
+
+/** Relative Leuchtdichte nach WCAG - entscheidet ueber die Schriftfarbe. */
+function leuchtkraft(hex) {
+  const kanal = (i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * kanal(1) + 0.7152 * kanal(3) + 0.0722 * kanal(5);
 }
 
 function allesZeichnen() {
   $('betrieb').textContent = betrieb.name;
   document.title = betrieb.name + ' – TreueBiss';
-  markeSetzen(betrieb.primary_color);
+  paletteSetzen(betrieb.primary_color);
 
   if (betrieb.logo_url) {
     $('logo').src = betrieb.logo_url;
@@ -143,35 +180,53 @@ function allesZeichnen() {
 
 function karteZeichnen() {
   const proKarte = betrieb.stamps_per_card ?? 10;
-  $('stand-zahl').textContent = stempel;
-  $('stand-text').textContent = `von ${proKarte}`;
-  $('punkte').innerHTML = Array.from({ length: proKarte }, (_, i) =>
-    `<div class="punkt${i < stempel ? ' voll' : ''}"></div>`).join('');
+  const rest = Math.max(proKarte - stempel, 0);
+
+  // "Noch drei" treibt an, "7 von 10" ist Buchhaltung. Beides zeigen, aber
+  // in dieser Reihenfolge.
+  $('stand-text').innerHTML = stempel === 0
+    ? 'Noch kein Stempel auf der Karte.'
+    : rest === 1
+      ? 'Nur noch <b>ein</b> Stempel bis zur vollen Karte.'
+      : `Noch <b>${rest}</b> Stempel bis zur vollen Karte.`;
+  $('stand-zahl').textContent = `${stempel} von ${proKarte} gesammelt`;
+
+  $('punkte').innerHTML = Array.from({ length: proKarte }, (_, i) => {
+    // Die Drehung haengt am Index, nicht am Zufall - sonst wackelte die
+    // Karte bei jedem Neuzeichnen.
+    const dreh = (i * 37) % 15 - 7;
+    const klassen = ['punkt'];
+    if (i < stempel) klassen.push('voll');
+    if (i === frischerIndex) klassen.push('frisch');
+    return `<div class="${klassen.join(' ')}" style="--dreh:${dreh}deg"></div>`;
+  }).join('');
+  frischerIndex = -1;
 }
 
 function gutscheineZeichnen() {
   const offen = gutscheine.filter((g) => !g.is_redeemed);
   if (!offen.length) {
     $('gutscheine').innerHTML =
-      '<p class="leer">Noch kein Gutschein. Volle Karte, voller Gutschein.</p>';
+      '<p class="leer-text">Noch keiner da. Volle Karte, voller Gutschein.</p>';
     return;
   }
   $('gutscheine').innerHTML = offen.map((g) => {
-    const abgelaufen = g.expires_at < Date.now();
-    const bis = new Date(g.expires_at).toLocaleDateString('de-DE');
-    // Bewusst nicht die Ueberschrift des Betriebs wiederholen: Die stand
-    // sonst zweimal untereinander ("Gutscheine" ueber "Gutscheine").
-    return `<div class="gutschein${abgelaufen ? ' abgelaufen' : ''}">
-      <b>${abgelaufen ? 'Abgelaufen am ' : 'Gültig bis '}${h(bis)}</b>
-      <small>${abgelaufen ? 'Leider verfallen.' : 'An der Kasse vorzeigen und einlösen.'}</small>
-      ${abgelaufen ? '' : `
+    const verfallen = g.expires_at < Date.now();
+    const bis = new Date(g.expires_at).toLocaleDateString('de-DE',
+      { day: '2-digit', month: 'long', year: 'numeric' });
+    // Ohne Knopf gibt es auch nichts abzureissen: Dann entfallen Naht und
+    // Kerben, sonst sieht ein verfallener Gutschein aus wie ein gueltiger.
+    return `<div class="abriss${verfallen ? ' verfallen ohne-naht' : ''}">
+      <p class="wert">Ein Gutschein</p>
+      <p class="frist">${verfallen ? 'Verfallen am ' : 'Gültig bis '}${h(bis)}</p>
+      ${verfallen ? '' : `
+        <hr class="naht">
         <div id="code-${h(g.id)}" class="verborgen">
-          <input id="code-feld-${h(g.id)}" placeholder="Einlöse-Code"
-                 autocapitalize="off" spellcheck="false">
+          <label for="code-feld-${h(g.id)}">Einlöse-Code</label>
+          <input id="code-feld-${h(g.id)}" autocapitalize="off" spellcheck="false"
+                 placeholder="Die Verkaufskraft tippt ihn ein">
         </div>
-        <div class="knopfreihe">
-          <button class="schmal" data-einloesen="${h(g.id)}">Einlösen</button>
-        </div>`}
+        <button data-einloesen="${h(g.id)}">Einlösen</button>`}
     </div>`;
   }).join('');
 
@@ -184,7 +239,7 @@ function angeboteZeichnen(liste) {
   if (!liste?.length) { $('angebote-bereich').classList.add('verborgen'); return; }
   $('angebote').innerHTML = liste.map((a) => `<div class="angebot">
       <b>${h(a.title)}</b>
-      ${a.description ? `<small>${h(a.description)}</small>` : ''}
+      ${a.description ? `<span>${h(a.description)}</span>` : ''}
     </div>`).join('');
   $('angebote-bereich').classList.remove('verborgen');
 }
@@ -238,6 +293,8 @@ async function stempelHolen(belegRef) {
 
   scannerSchliessen();
   const neu = data?.[0];
+  // Die Zaehlung kommt aus der Funktion und gilt vor dem Kartenreset.
+  frischerIndex = neu?.voucher_id ? -1 : (neu?.stamp_count ?? 1) - 1;
   await datenHolen();
   melden(neu?.voucher_id
     ? 'Karte voll! Dein Gutschein liegt bereit.'

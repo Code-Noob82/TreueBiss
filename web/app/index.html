@@ -10,123 +10,340 @@
 <meta name="theme-color" id="theme-farbe" content="#4CAF50">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preload" href="./fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  /* Selbst ausgeliefert, nicht von Google geladen: siehe fonts/LIESMICH.md.
+     Beides Variable Fonts - eine Datei deckt alle Schnitte ab. */
+  @font-face {
+    font-family: "Familjen Grotesk";
+    src: url("./fonts/familjen-grotesk-latin.woff2") format("woff2");
+    font-weight: 400 700; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Public Sans";
+    src: url("./fonts/public-sans-latin.woff2") format("woff2");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
+
+  /*
+    Die ganze Palette wird zur Laufzeit aus der Farbe des Betriebs gerechnet.
+    app.js setzt nur drei Werte - Farbton, Saettigung und die Marke selbst -,
+    alles Weitere leitet sich hier ab. So traegt jede Baeckerei ihre eigene
+    Flaeche, statt nur einen anders eingefaerbten Knopf zu bekommen.
+  */
   :root {
-    /* Wird zur Laufzeit auf die Farbe des Betriebs gesetzt. */
+    --h: 122;
+    --s: 30%;
     --marke: #4CAF50;
-    --marke-tief: #3d8b40;
-    --grau: #f4f4f5; --text: #18181b; --schwach: #71717a; --rand: #d4d4d8;
-    --rot: #c62828;
+    --marke-text: #ffffff;
+
+    --grund:       hsl(var(--h) calc(var(--s) * 0.9) 13%);
+    --grund-text:  hsl(var(--h) calc(var(--s) * 0.5) 97%);
+    --grund-leise: hsl(var(--h) calc(var(--s) * 0.3) 76%);
+    --papier:      hsl(var(--h) calc(var(--s) * 0.5) 97.5%);
+    --karte:       hsl(var(--h) calc(var(--s) * 0.6) 99.6%);
+    --tinte:       hsl(var(--h) calc(var(--s) * 0.6) 12%);
+    --tinte-leise: hsl(var(--h) calc(var(--s) * 0.25) 42%);
+    --linie:       hsl(var(--h) calc(var(--s) * 0.35) 88%);
+    --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 93%);
+    --leer:        hsl(var(--h) calc(var(--s) * 0.3) 85%);
+
+    --gut:      hsl(var(--h) calc(var(--s) * 0.5) 94%);
+    --gut-text: hsl(var(--h) calc(var(--s) * 0.9) 24%);
+    --warn:     #fdf3e0;
+    --warn-text:#7c5410;
+    --rot:      #fdecea;
+    --rot-text: #9c2d22;
+
+    --hoehe: 0 1px 1px hsl(var(--h) 20% 10% / .04),
+             0 6px 20px -10px hsl(var(--h) 25% 12% / .18);
+
+    --display: "Familjen Grotesk", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --lauf: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --grund:       hsl(var(--h) calc(var(--s) * 0.7) 9%);
+      --grund-text:  hsl(var(--h) calc(var(--s) * 0.3) 95%);
+      --grund-leise: hsl(var(--h) calc(var(--s) * 0.2) 66%);
+      --papier:      hsl(var(--h) calc(var(--s) * 0.4) 11%);
+      --karte:       hsl(var(--h) calc(var(--s) * 0.4) 15%);
+      --tinte:       hsl(var(--h) calc(var(--s) * 0.2) 94%);
+      --tinte-leise: hsl(var(--h) calc(var(--s) * 0.15) 66%);
+      --linie:       hsl(var(--h) calc(var(--s) * 0.3) 26%);
+      --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 21%);
+      --leer:        hsl(var(--h) calc(var(--s) * 0.25) 32%);
+
+      --gut:      hsl(var(--h) calc(var(--s) * 0.5) 20%);
+      --gut-text: hsl(var(--h) calc(var(--s) * 0.5) 84%);
+      --warn:     #35291380; --warn-text: #e8c07a;
+      --rot:      #3a1e1a80; --rot-text: #f0a094;
+      --hoehe:    0 1px 1px #0006, 0 8px 24px -12px #000a;
+    }
+  }
+
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--grau); color: var(--text); line-height: 1.5;
-    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    margin: 0;
+    background: var(--papier);
+    color: var(--tinte);
+    font-family: var(--lauf);
+    font-size: 1rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
   }
-  main { max-width: 480px; margin: 0 auto; }
 
-  header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  header img { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
-  header h1 { font-size: 1.25rem; margin: 0; }
+  /* ---------------------------------------------------------------- Kopf */
+  .kopf {
+    background: var(--grund);
+    color: var(--grund-text);
+    padding: calc(env(safe-area-inset-top) + 22px) 20px 46px;
+    /* Der Bogen unten nimmt die Rundung der Karte auf, die darauf liegt. */
+    border-radius: 0 0 26px 26px;
+  }
+  .kopf-innen {
+    max-width: 460px; margin: 0 auto;
+    display: flex; align-items: center; gap: 13px;
+  }
+  .kopf img {
+    width: 46px; height: 46px; border-radius: 12px; object-fit: cover;
+    background: hsl(var(--h) 10% 100% / .12);
+  }
+  .kopf h1 {
+    font-family: var(--display);
+    font-size: 1.45rem; font-weight: 700; letter-spacing: -.012em;
+    margin: 0; line-height: 1.15; text-wrap: balance;
+  }
+  .kopf p {
+    margin: 1px 0 0; font-size: .78rem; letter-spacing: .11em;
+    text-transform: uppercase; color: var(--grund-leise);
+  }
 
+  main { max-width: 460px; margin: -32px auto 0; padding: 0 20px 40px; }
+
+  /* --------------------------------------------------------------- Karten */
   .karte {
-    background: #fff; border-radius: 16px; padding: 20px;
-    box-shadow: 0 1px 3px rgb(0 0 0 / .08); margin-bottom: 16px;
+    background: var(--karte);
+    border: 1px solid var(--linie-zart);
+    border-radius: 20px;
+    padding: 22px;
+    box-shadow: var(--hoehe);
+    margin-bottom: 16px;
   }
-  h2 { font-size: 1rem; margin: 0 0 14px; }
+  .marke {
+    font-family: var(--display);
+    font-size: .74rem; font-weight: 600;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--tinte-leise);
+    margin: 0 0 14px;
+  }
 
   /* --------------------------------------------------------- Stempelkarte */
-  .stand { display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; }
-  .stand b { font-size: 2rem; line-height: 1; color: var(--marke-tief); }
-  .stand span { color: var(--schwach); font-size: .9rem; }
+  .fortschritt {
+    font-family: var(--display);
+    font-size: 1.42rem; font-weight: 600; line-height: 1.25;
+    letter-spacing: -.011em;
+    margin: 0 0 3px; text-wrap: balance;
+  }
+  .fortschritt b { color: var(--marke); font-weight: 700; }
+  .zaehler {
+    font-size: .82rem; color: var(--tinte-leise);
+    font-variant-numeric: tabular-nums; margin: 0 0 20px;
+  }
 
-  .punkte { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .punkte {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 13px 10px;
+    margin-bottom: 22px;
+    justify-items: center;
+  }
   .punkt {
-    width: 34px; height: 34px; border-radius: 50%;
-    border: 2px solid var(--rand); display: grid; place-items: center;
+    width: 100%; max-width: 46px; aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px dashed var(--leer);
+    display: grid; place-items: center;
   }
-  .punkt.voll { background: var(--marke); border-color: var(--marke); }
+  /*
+    Ein Stempel sitzt nie gerade. Die Drehung kommt aus dem Index, ist also
+    fuer jedes Feld immer dieselbe - sonst wackelte die Karte bei jedem
+    Neuzeichnen.
+  */
+  .punkt.voll {
+    border: 0;
+    background:
+      radial-gradient(circle at 34% 30%, hsl(0 0% 100% / .28), transparent 58%),
+      var(--marke);
+    transform: rotate(var(--dreh, 0deg));
+    box-shadow: inset 0 0 0 1px hsl(var(--h) 40% 20% / .12);
+  }
   .punkt.voll::after {
-    content: ""; width: 12px; height: 12px; border-radius: 50%; background: #fff;
+    content: "";
+    width: 34%; height: 34%; border-radius: 50%;
+    background: var(--marke-text); opacity: .82;
+  }
+  .punkt.frisch { animation: stempeln .42s cubic-bezier(.2, 1.5, .4, 1) both; }
+  @keyframes stempeln {
+    0%   { transform: rotate(var(--dreh, 0deg)) scale(1.75); opacity: 0; }
+    55%  { transform: rotate(var(--dreh, 0deg)) scale(.93); opacity: 1; }
+    100% { transform: rotate(var(--dreh, 0deg)) scale(1); opacity: 1; }
   }
 
+  /* --------------------------------------------------------------- Knöpfe */
   button {
-    width: 100%; padding: 14px; font-size: 1rem; font-weight: 600;
-    border: 0; border-radius: 12px; background: var(--marke); color: #fff;
-    cursor: pointer; font-family: inherit;
+    font-family: var(--display);
+    font-size: 1rem; font-weight: 600; letter-spacing: .005em;
+    width: 100%; padding: 15px 18px;
+    border: 0; border-radius: 14px;
+    background: var(--marke); color: var(--marke-text);
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
   }
-  button:disabled { opacity: .5; cursor: default; }
-  button.sekundaer { background: #fff; color: var(--text); border: 1px solid var(--rand); }
-  button.schmal { width: auto; padding: 9px 14px; font-size: .9rem; }
-  .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; }
-  .knopfreihe button { width: auto; flex: 1 1 auto; }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(1px) scale(.995); }
+  button:disabled { opacity: .45; cursor: default; transform: none; filter: none; }
+  button:focus-visible { outline: 3px solid var(--marke); outline-offset: 3px; }
+  button.still {
+    background: transparent; color: var(--tinte);
+    border: 1px solid var(--linie);
+  }
+  button.klein { width: auto; padding: 11px 18px; font-size: .92rem; }
+  .reihe { display: flex; gap: 9px; }
+  .reihe button { flex: 1 1 0; }
 
+  /* -------------------------------------------------------------- Scanner */
+  label {
+    display: block; font-size: .78rem; font-weight: 600;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--tinte-leise); margin-bottom: 7px;
+  }
   input {
-    width: 100%; padding: 12px; font-size: 1rem; border: 1px solid var(--rand);
-    border-radius: 10px; margin-bottom: 10px; font-family: inherit;
+    width: 100%; padding: 13px 14px; font-size: 1rem;
+    font-family: inherit; color: inherit;
+    background: var(--papier);
+    border: 1px solid var(--linie); border-radius: 12px;
+    margin-bottom: 13px;
   }
-
-  video { width: 100%; border-radius: 12px; background: #000; display: block; margin-bottom: 12px; }
+  input:focus-visible { outline: 2px solid var(--marke); outline-offset: 1px; }
+  video {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border-radius: 14px; background: var(--grund);
+    display: block; margin-bottom: 15px;
+  }
 
   /* ------------------------------------------------------------ Meldungen */
-  .meldung { padding: 14px; border-radius: 12px; margin-bottom: 16px; font-weight: 500; }
-  .meldung.gut { background: #e8f5e9; color: var(--marke-tief); }
-  .meldung.schlecht { background: #ffebee; color: var(--rot); }
-  .meldung code { background: rgb(0 0 0 / .07); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  .meldung {
+    border-radius: 14px; padding: 13px 16px; margin-bottom: 16px;
+    font-size: .93rem; font-weight: 500;
+    background: var(--rot); color: var(--rot-text);
+  }
+  .meldung.gut { background: var(--gut); color: var(--gut-text); }
+  .meldung code, .fuss code {
+    font-family: ui-monospace, Menlo, monospace; font-size: .88em;
+    background: hsl(var(--h) 20% 50% / .14); padding: 1px 5px; border-radius: 5px;
+  }
   .band {
-    background: #fff8e1; color: #8a6011; border-radius: 12px;
-    padding: 10px 14px; margin-bottom: 16px; font-size: .88rem;
+    border-radius: 14px; padding: 11px 16px; margin-bottom: 16px;
+    font-size: .86rem; background: var(--warn); color: var(--warn-text);
   }
 
-  /* ------------------------------------------------------------ Gutscheine */
-  .gutschein {
-    border: 1px solid var(--rand); border-radius: 12px; padding: 14px;
-    margin-bottom: 10px;
+  /* ----------------------------------------------------------- Gutscheine */
+  /*
+    Ein Gutschein ist ein Abriss, keine weitere Karte. Die Kerben links und
+    rechts sitzen auf der Perforation - deshalb liegt die Trennlinie genau
+    auf ihrer Hoehe.
+  */
+  .abriss {
+    position: relative;
+    background: var(--papier);
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    padding: 16px 18px 18px;
+    margin-bottom: 12px;
+    overflow: hidden;
   }
-  .gutschein b { display: block; }
-  .gutschein small { color: var(--schwach); }
-  .gutschein.abgelaufen { opacity: .55; }
-  .gutschein .knopfreihe { margin-top: 10px; }
+  .abriss::before, .abriss::after {
+    content: ""; position: absolute; top: var(--kerbe, 78px);
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--karte);
+    border: 1px solid var(--linie);
+  }
+  .abriss::before { left: -9px; }
+  .abriss::after  { right: -9px; }
+  .abriss .wert {
+    font-family: var(--display); font-weight: 700;
+    font-size: 1.16rem; letter-spacing: -.01em; margin: 0;
+  }
+  .abriss .frist { font-size: .86rem; color: var(--tinte-leise); margin: 2px 0 0; }
+  .abriss .naht {
+    border: 0; border-top: 1px dashed var(--linie);
+    margin: 16px -18px 15px;
+  }
+  .abriss.verfallen { opacity: .5; }
+  .abriss.verfallen .wert { text-decoration: line-through; }
+  /* Ohne Knopf gibt es nichts abzureissen - dann auch keine Kerben. */
+  .abriss.ohne-naht::before, .abriss.ohne-naht::after { display: none; }
+  .abriss label { margin-top: 2px; }
 
-  .angebot { border-top: 1px solid var(--rand); padding-top: 12px; margin-top: 12px; }
-  .angebot:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
-  .angebot b { display: block; }
-  .angebot small { color: var(--schwach); }
+  /* -------------------------------------------------------------- Angebot */
+  .angebot { padding: 13px 0; border-top: 1px solid var(--linie-zart); }
+  .angebot:first-child { padding-top: 0; border-top: 0; }
+  .angebot b { display: block; font-family: var(--display); font-weight: 600; }
+  .angebot span { font-size: .9rem; color: var(--tinte-leise); }
 
-  .leer { color: var(--schwach); font-size: .9rem; margin: 0; }
-  .hinweis { font-size: .8rem; color: var(--schwach); line-height: 1.5; }
+  .leer-text { color: var(--tinte-leise); font-size: .92rem; margin: 0; }
   .verborgen { display: none; }
 
-  footer { margin-top: 24px; }
-  footer a { color: var(--schwach); }
+  .fuss {
+    max-width: 460px; margin: 6px auto 0; padding: 0 20px;
+    font-size: .78rem; line-height: 1.6; color: var(--tinte-leise);
+  }
+  .fuss p { margin: 0 0 7px; }
+  .fuss a { color: var(--tinte-leise); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <img id="logo" class="verborgen" alt="">
-    <h1 id="betrieb">TreueBiss</h1>
-  </header>
 
+<header class="kopf">
+  <div class="kopf-innen">
+    <img id="logo" class="verborgen" alt="">
+    <div>
+      <h1 id="betrieb">TreueBiss</h1>
+      <p id="kopf-zeile">Deine Stempelkarte</p>
+    </div>
+  </div>
+</header>
+
+<main>
   <div id="band"></div>
   <div id="meldung"></div>
 
   <!-- Stempelkarte -->
   <section id="karte-bereich" class="karte verborgen">
-    <h2 id="karte-titel">Treuepunkte</h2>
-    <p class="stand"><b id="stand-zahl">0</b><span id="stand-text">von 10</span></p>
+    <p class="marke" id="karte-titel">Treuepunkte</p>
+    <p class="fortschritt" id="stand-text">Deine Karte ist noch leer.</p>
+    <p class="zaehler" id="stand-zahl">0 von 10</p>
     <div class="punkte" id="punkte"></div>
 
     <div id="scanner" class="verborgen">
       <video id="video" playsinline muted></video>
-      <label for="beleg">Oder die Belegnummer eintippen</label>
-      <input id="beleg" autocapitalize="off" spellcheck="false" placeholder="Nummer vom Kassenbon">
-      <div class="knopfreihe">
+      <label for="beleg">Nummer vom Kassenbon</label>
+      <input id="beleg" autocapitalize="off" spellcheck="false" placeholder="z. B. AMA-2642">
+      <div class="reihe">
         <button id="beleg-senden">Stempel holen</button>
-        <button id="scan-abbrechen" class="sekundaer">Abbrechen</button>
+        <button id="scan-abbrechen" class="still">Abbrechen</button>
       </div>
     </div>
 
@@ -135,21 +352,21 @@
 
   <!-- Gutscheine -->
   <section id="gutscheine-bereich" class="karte verborgen">
-    <h2 id="gutscheine-titel">Gutscheine</h2>
+    <p class="marke" id="gutscheine-titel">Gutscheine</p>
     <div id="gutscheine"></div>
   </section>
 
   <!-- Angebote -->
   <section id="angebote-bereich" class="karte verborgen">
-    <h2 id="angebote-titel">Angebot des Tages</h2>
+    <p class="marke" id="angebote-titel">Angebot des Tages</p>
     <div id="angebote"></div>
   </section>
-
-  <footer>
-    <p class="hinweis" id="fuss"></p>
-    <p id="rechtliches" class="hinweis"></p>
-  </footer>
 </main>
+
+<footer class="fuss">
+  <p id="fuss"></p>
+  <p id="rechtliches"></p>
+</footer>
 
 <script type="module" src="./app.js"></script>
 </body>
