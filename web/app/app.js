@@ -39,6 +39,23 @@ function melden(text, gut = false) {
     : '';
 }
 
+/*
+ * Waehrend eine Anfrage laeuft, muss der Knopf das zeigen. Ohne das steht
+ * der Kunde an der Kasse vor einer Seite, die sich nicht ruehrt, und tippt
+ * ein zweites Mal.
+ */
+function beschaeftigt(knopf, an, text) {
+  if (!knopf) return;
+  if (an) {
+    knopf.dataset.ruhetext ??= knopf.textContent;
+    knopf.textContent = text;
+    knopf.disabled = true;
+  } else {
+    knopf.textContent = knopf.dataset.ruhetext ?? knopf.textContent;
+    knopf.disabled = false;
+  }
+}
+
 function band(text) {
   $('band').innerHTML = text ? `<div class="band">${text}</div>` : '';
 }
@@ -164,7 +181,9 @@ function allesZeichnen() {
 
   if (betrieb.logo_url) {
     $('logo').src = betrieb.logo_url;
-    $('logo').alt = betrieb.name;
+    // Der Name steht direkt daneben in der Ueberschrift; als alt-Text waere
+    // er die zweite Ansage derselben Sache.
+    $('logo').alt = '';
     $('logo').classList.remove('verborgen');
   }
 
@@ -285,10 +304,12 @@ async function stempelHolen(belegRef) {
   sammelnLaeuft = true;
   melden('');
 
+  beschaeftigt($('beleg-senden'), true, 'Einen Moment …');
   const { data, error } = await db.rpc('issue_stamp', {
     p_tenant_id: betrieb.id, p_proof_ref: ref, p_source: 'receipt',
   });
   sammelnLaeuft = false;
+  beschaeftigt($('beleg-senden'), false);
   if (error) { console.error('issue_stamp', error); melden(fehlertext(error)); return; }
 
   scannerSchliessen();
@@ -319,9 +340,12 @@ async function einloesen(gutscheinId) {
   if (betrieb.requires_redeem_code && !code) { melden('Es fehlt der Einlöse-Code.'); return; }
 
   melden('');
+  const knopf = $('gutscheine').querySelector(`[data-einloesen="${gutscheinId}"]`);
+  beschaeftigt(knopf, true, 'Wird eingelöst …');
   const { error } = await db.rpc('redeem_voucher', {
     p_voucher_id: gutscheinId, p_code: code,
   });
+  beschaeftigt(knopf, false);
   if (error) { console.error('redeem_voucher', error); melden(fehlertext(error)); return; }
   await datenHolen();
   melden('Eingelöst. Guten Appetit!', true);
