@@ -4,61 +4,98 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TreueBiss – Kasse</title>
+<meta name="theme-color" content="#4CAF50">
+<link rel="preload" href="../gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../gemeinsam/basis.css">
 <style>
-  :root {
-    --gruen: #4CAF50; --gruen-dunkel: #3d8b40; --rot: #c62828;
-    --grau: #f4f4f5; --text: #18181b; --schwach: #71717a; --rand: #d4d4d8;
+  /*
+    Werkzeug des Personals, nicht Schaufenster des Betriebs: Die Kasse bleibt
+    bei der Vorgabefarbe. Wer zwischen zwei Filialen wechselt, soll dieselbe
+    Oberfläche vorfinden - und an der Kasse hilft ein eingefärbter Rahmen
+    niemandem, Tempo aber sehr.
+  */
+  .kopf {
+    background: var(--grund); color: var(--grund-text);
+    padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s7);
+    border-radius: 0 0 var(--s5) var(--s5);
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--grau); color: var(--text);
-    padding: max(16px, env(safe-area-inset-top)) 16px 16px;
+  .kopf-innen { max-width: 460px; margin: 0 auto; }
+  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
+  .kopf p {
+    margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
+    text-transform: uppercase; color: var(--grund-leise);
   }
-  main { max-width: 460px; margin: 0 auto; }
-  h1 { font-size: 1.25rem; margin: 0 0 4px; }
-  .betrieb { color: var(--schwach); font-size: .9rem; margin: 0 0 20px; }
-  .karte {
-    background: #fff; border-radius: 14px; padding: 20px;
-    box-shadow: 0 1px 3px rgb(0 0 0 / .08); margin-bottom: 16px;
+
+  main { max-width: 460px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
+
+  /*
+    Die Bestätigung ist der eine Moment, auf den es hier ankommt: Die
+    Verkaufskraft schaut im Vorbeigehen hin, mit dem Kunden gegenüber. Nicht
+    eine Zeile Text unter vielen, sondern eine Fläche, die man aus einem
+    Meter Abstand liest.
+  */
+  .bestaetigung {
+    background: var(--gut); color: var(--gut-text);
+    border-radius: var(--s5); padding: var(--s5);
+    margin-bottom: var(--s4); text-align: center;
   }
-  label { display: block; font-size: .85rem; color: var(--schwach); margin-bottom: 6px; }
-  input {
-    width: 100%; padding: 12px; font-size: 1rem; border: 1px solid var(--rand);
-    border-radius: 10px; margin-bottom: 12px; font-family: inherit;
+  .bestaetigung .haken {
+    width: var(--s7); height: var(--s7); margin: 0 auto var(--s3);
+    border-radius: 50%; background: var(--marke); color: var(--marke-text);
+    display: grid; place-items: center; font-size: var(--t-gross);
+    animation: aufgehen 240ms cubic-bezier(.2, .8, .3, 1) both;
   }
-  button {
-    width: 100%; padding: 14px; font-size: 1rem; font-weight: 600;
-    border: 0; border-radius: 10px; background: var(--gruen); color: #fff;
-    cursor: pointer; font-family: inherit;
+  .bestaetigung b {
+    display: block; font-family: var(--display);
+    font-size: var(--t-gross); font-weight: 700; line-height: 1.15;
   }
-  button:disabled { opacity: .5; cursor: default; }
-  button.sekundaer { background: #fff; color: var(--text); border: 1px solid var(--rand); }
-  video { width: 100%; border-radius: 10px; background: #000; display: block; }
-  .meldung { padding: 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 500; }
-  .meldung.gut { background: #e8f5e9; color: var(--gruen-dunkel); }
-  .meldung.schlecht { background: #ffebee; color: var(--rot); }
-  .zahlen { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .zahl { background: #fff; border-radius: 12px; padding: 14px; }
-  .zahl b { display: block; font-size: 1.6rem; }
-  .zahl span { font-size: .8rem; color: var(--schwach); }
-  .hinweis { font-size: .8rem; color: var(--schwach); line-height: 1.5; }
-  .meldung code {
-    background: rgb(0 0 0 / .07); padding: 1px 5px; border-radius: 4px;
-    font-size: .9em;
+  .bestaetigung span { font-size: var(--t-klein); }
+  @keyframes aufgehen {
+    from { transform: scale(.6); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
   }
-  .verborgen { display: none; }
+
+  video {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border-radius: var(--s3); background: var(--grund);
+    display: block; margin-bottom: var(--s4);
+  }
+  .trenner {
+    border: 0; border-top: 1px solid var(--linie-zart);
+    margin: var(--s5) calc(var(--s5) * -1);
+  }
+
+  /* Zahlen sind Nachschlagewerk, nicht Hauptsache - deshalb nebenan. */
+  .zahlen { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
+  .zahl {
+    border: 1px solid var(--linie-zart); border-radius: var(--s3);
+    padding: var(--s3) var(--s4);
+  }
+  .zahl b {
+    display: block; font-family: var(--display); font-weight: 700;
+    font-size: var(--t-display); font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .zahl span { font-size: var(--t-mikro); color: var(--tinte-leise); }
 </style>
 </head>
 <body>
-<main>
-  <h1>TreueBiss – Kasse</h1>
-  <p class="betrieb" id="betrieb"></p>
 
-  <div id="meldung"></div>
+<header class="kopf">
+  <div class="kopf-innen">
+    <h1>Kasse</h1>
+    <p id="betrieb">TreueBiss</p>
+  </div>
+</header>
+
+<main>
+  <div id="bestaetigung" role="status" aria-live="polite"></div>
+  <div id="meldung" role="status" aria-live="polite"></div>
 
   <!-- Anmeldung -->
   <section id="anmeldung" class="karte">
+    <p class="marke">Anmeldung</p>
     <label for="email">E-Mail</label>
     <input id="email" type="email" autocomplete="username" inputmode="email">
     <label for="passwort">Passwort</label>
@@ -68,23 +105,25 @@
 
   <!-- Einlösen -->
   <section id="kasse" class="karte verborgen">
-    <video id="video" playsinline class="verborgen"></video>
+    <p class="marke">Gutschein einlösen</p>
+    <video id="video" playsinline muted class="verborgen"></video>
     <div id="scanner-bereich">
       <button id="scannen" class="verborgen">QR-Code scannen</button>
       <p id="kein-scanner" class="hinweis verborgen"></p>
     </div>
-    <hr style="border:0;border-top:1px solid var(--rand);margin:16px 0">
+    <hr class="trenner">
     <label for="code">Gutschein-Nummer</label>
     <input id="code" placeholder="z. B. 7aa68458-61fc-…" autocapitalize="off" spellcheck="false">
-    <button id="einloesen">Einlösen</button>
+    <button id="einloesen" class="still">Von Hand einlösen</button>
   </section>
 
   <!-- Zahlen -->
-  <section id="zahlen-bereich" class="verborgen">
+  <section id="zahlen-bereich" class="karte neben verborgen">
+    <p class="marke">Zahlen dieses Betriebs</p>
     <div class="zahlen" id="zahlen"></div>
-    <p style="margin-top:16px">
-      <button id="abmelden" class="sekundaer">Abmelden</button>
-    </p>
+    <div class="reihe" style="margin-top: var(--s5)">
+      <button id="abmelden" class="still">Abmelden</button>
+    </div>
   </section>
 </main>
 
@@ -94,14 +133,53 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Aus supabase/config.js - siehe web/kasse/config.example.js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/*
+ * Eigener Speicherschlüssel je Oberfläche.
+ *
+ * Ohne ihn teilen sich alle drei Seiten unter derselben Adresse EINE
+ * Anmeldung: Der Supabase-Client legt sein Token unter `sb-<projekt>-auth-
+ * token` ab, für alle gleich. Die Folgen sind still und übel - eine
+ * Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt
+ * Stempel auf den Kassenzugang, weil dort schon eine Sitzung liegt und gar
+ * keine anonyme Anmeldung mehr stattfindet. Umgekehrt steht die Kasse
+ * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
+ * keinem Betrieb.
+ */
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
+  { auth: { storageKey: 'treuebiss-kasse' } });
 const $ = (id) => document.getElementById(id);
 let scanLaeuft = false;
 
-function melden(text, gut = false) {
-  $('meldung').innerHTML = text
-    ? `<div class="meldung ${gut ? 'gut' : 'schlecht'}">${text}</div>`
-    : '';
+function melden(text) {
+  $('meldung').innerHTML = text ? `<div class="meldung">${text}</div>` : '';
+  if (text) $('bestaetigung').innerHTML = '';
+}
+
+/*
+ * Der Erfolgsfall bekommt eine eigene Flaeche statt einer Textzeile. An der
+ * Kasse schaut die Verkaufskraft im Vorbeigehen hin, mit dem Kunden
+ * gegenueber - eine Zeile unter anderen Zeilen wird dabei uebersehen.
+ */
+function bestaetigen(zeit) {
+  $('meldung').innerHTML = '';
+  $('bestaetigung').innerHTML = `<div class="bestaetigung">
+      <div class="haken" aria-hidden="true">&check;</div>
+      <b>Eingelöst</b>
+      <span>${zeit} Uhr &middot; Guten Appetit!</span>
+    </div>`;
+}
+
+/** Sperrt einen Knopf, solange seine Anfrage laeuft. */
+function beschaeftigt(knopf, an, text) {
+  if (!knopf) return;
+  if (an) {
+    knopf.dataset.ruhetext ??= knopf.textContent;
+    knopf.textContent = text;
+    knopf.disabled = true;
+  } else {
+    knopf.textContent = knopf.dataset.ruhetext ?? knopf.textContent;
+    knopf.disabled = false;
+  }
 }
 
 /**
@@ -159,12 +237,15 @@ async function einloesen(gutscheinId) {
   const id = gutscheinId.trim();
   if (!id) return;
   melden('');
+  beschaeftigt($('einloesen'), true, 'Einen Moment …');
   const { data, error } = await db.rpc('staff_redeem_voucher', { p_voucher_id: id });
+  beschaeftigt($('einloesen'), false);
   if (error) { console.error('staff_redeem_voucher', error); melden(fehlertext(error)); return; }
-  const zeit = new Date(data[0].redeemed_at).toLocaleTimeString('de-DE');
-  melden(`Eingelöst um ${zeit}. Guten Appetit!`, true);
+  const zeit = new Date(data[0].redeemed_at)
+    .toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  bestaetigen(zeit);
   $('code').value = '';
-  await zahlenLaden();  // Meldung nicht ueberschreiben: der Erfolg zaehlt hier.
+  await zahlenLaden();  // Bestaetigung nicht ueberschreiben: der Erfolg zaehlt hier.
 }
 
 /**
@@ -266,10 +347,12 @@ function zeigeAngemeldet(ja) {
 
 $('anmelden').onclick = async () => {
   melden('');
+  beschaeftigt($('anmelden'), true, 'Wird geprüft …');
   const { error } = await db.auth.signInWithPassword({
     email: $('email').value.trim(),
     password: $('passwort').value,
   });
+  beschaeftigt($('anmelden'), false);
   if (error) { console.error('signIn', error); melden(anmeldeFehlertext(error)); return; }
   $('passwort').value = '';
   await starten();
@@ -278,7 +361,8 @@ $('anmelden').onclick = async () => {
 $('abmelden').onclick = async () => {
   await scanBeenden(null);
   await db.auth.signOut();
-  $('betrieb').textContent = '';
+  $('betrieb').textContent = 'TreueBiss';
+  $('bestaetigung').innerHTML = '';
   melden('');
   zeigeAngemeldet(false);
 };

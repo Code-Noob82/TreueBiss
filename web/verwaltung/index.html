@@ -4,83 +4,94 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TreueBiss – Verwaltung</title>
+<link rel="preload" href="../gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../gemeinsam/basis.css">
 <style>
-  :root {
-    --gruen: #4CAF50; --gruen-dunkel: #3d8b40; --rot: #c62828;
-    --grau: #f4f4f5; --text: #18181b; --schwach: #71717a; --rand: #d4d4d8;
+  /*
+    Anders als die Kasse trägt diese Seite die Farbe des Betriebs - und zwar
+    aus einem Grund, nicht als Zierde: Sie zeigt beim Ändern des Farbfelds
+    sofort, was der Kunde später sehen wird, und sie sagt bei mehreren
+    Betrieben auf einen Blick, welcher gerade bearbeitet wird.
+  */
+  .kopf {
+    background: var(--grund); color: var(--grund-text);
+    padding: var(--s5) var(--s5) var(--s7);
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--grau); color: var(--text); padding: 24px 16px 64px;
-    line-height: 1.5;
+  .kopf-innen {
+    max-width: 720px; margin: 0 auto;
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between; gap: var(--s3);
   }
-  main { max-width: 720px; margin: 0 auto; }
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 20px; }
-  h1 { font-size: 1.3rem; margin: 0; }
-  .betrieb { color: var(--schwach); font-size: .9rem; margin: 0; }
-  h2 { font-size: 1rem; margin: 0 0 14px; }
-  .karte {
-    background: #fff; border-radius: 14px; padding: 20px;
-    box-shadow: 0 1px 3px rgb(0 0 0 / .08); margin-bottom: 16px;
+  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
+  .kopf p {
+    margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
+    text-transform: uppercase; color: var(--grund-leise);
   }
-  label { display: block; font-size: .85rem; color: var(--schwach); margin-bottom: 6px; }
-  input, select, textarea {
-    width: 100%; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--rand);
-    border-radius: 10px; margin-bottom: 12px; font-family: inherit; background: #fff;
-    color: inherit;
+  .kopf select {
+    width: auto; min-width: 12rem; margin: 0;
+    background: hsl(var(--h) 10% 100% / .1);
+    border-color: hsl(var(--h) 10% 100% / .25);
+    color: var(--grund-text);
   }
-  textarea { resize: vertical; min-height: 68px; }
-  input[type="color"] { padding: 4px; height: 44px; cursor: pointer; }
-  .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-  @media (max-width: 520px) { .paar { grid-template-columns: 1fr; } }
-  button {
-    padding: 12px 18px; font-size: 1rem; font-weight: 600;
-    border: 0; border-radius: 10px; background: var(--gruen); color: #fff;
-    cursor: pointer; font-family: inherit;
+
+  main { max-width: 720px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
+
+  /* Zahlen sind Nachschlagewerk - flach, nicht schwebend. */
+  .zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--s3); }
+  .zahl {
+    border: 1px solid var(--linie-zart); border-radius: var(--s3);
+    padding: var(--s3) var(--s4);
   }
-  button:disabled { opacity: .5; cursor: default; }
-  button.sekundaer { background: #fff; color: var(--text); border: 1px solid var(--rand); }
-  button.gefahr { background: #fff; color: var(--rot); border: 1px solid var(--rand); }
-  button.schmal { padding: 8px 12px; font-size: .85rem; }
-  .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .meldung { padding: 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 500; }
-  .meldung.gut { background: #e8f5e9; color: var(--gruen-dunkel); }
-  .meldung.schlecht { background: #ffebee; color: var(--rot); }
-  .meldung code, .hinweis code {
-    background: rgb(0 0 0 / .07); padding: 1px 5px; border-radius: 4px; font-size: .9em;
+  .zahl b {
+    display: block; font-family: var(--display); font-weight: 700;
+    font-size: var(--t-display); font-variant-numeric: tabular-nums; line-height: 1.1;
   }
-  .zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
-  .zahl { background: #fff; border-radius: 12px; padding: 14px; }
-  .zahl b { display: block; font-size: 1.6rem; }
-  .zahl span { font-size: .8rem; color: var(--schwach); }
-  .hinweis { font-size: .82rem; color: var(--schwach); margin: -4px 0 14px; }
-  .angebot {
-    border: 1px solid var(--rand); border-radius: 10px; padding: 12px 14px;
-    margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px 12px;
+  .zahl span { font-size: var(--t-mikro); color: var(--tinte-leise); }
+
+  .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s4); }
+  @media (max-width: 560px) { .paar { grid-template-columns: 1fr; } }
+
+  .gruppe { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--linie-zart); }
+  .gruppe:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+
+  /* Eintrag in der Angebotsliste - Text links, Handgriffe rechts. */
+  .eintrag {
+    border: 1px solid var(--linie); border-radius: var(--s3);
+    padding: var(--s3) var(--s4); margin-bottom: var(--s2);
+    display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4);
     align-items: center; justify-content: space-between;
   }
-  .angebot .text { flex: 1 1 260px; min-width: 0; }
-  .angebot b { display: block; }
-  .angebot small { color: var(--schwach); }
-  .leer { color: var(--schwach); font-size: .9rem; margin: 0 0 12px; }
-  .verborgen { display: none; }
-  .stand { font-size: .85rem; color: var(--schwach); margin: 0 0 12px; }
-  .stand.an { color: var(--gruen-dunkel); font-weight: 600; }
+  .eintrag .text { flex: 1 1 16rem; min-width: 0; }
+  .eintrag b { display: block; font-family: var(--display); font-weight: 600; }
+  .eintrag small { color: var(--tinte-leise); }
+  .eintrag .reihe { flex: 0 0 auto; }
+
+  .stand { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
+  .stand.an { color: var(--gut-text); font-weight: 600; }
+  .hinweis { margin: calc(var(--s2) * -1) 0 var(--s4); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>TreueBiss – Verwaltung</h1>
-    <p class="betrieb" id="betrieb"></p>
-  </header>
 
-  <div id="meldung"></div>
+<header class="kopf">
+  <div class="kopf-innen">
+    <div>
+      <h1>Verwaltung</h1>
+      <p id="betrieb">TreueBiss</p>
+    </div>
+    <div id="wahl-bereich" class="verborgen">
+      <select id="wahl" aria-label="Betrieb auswählen"></select>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="meldung" role="status" aria-live="polite"></div>
 
   <!-- Anmeldung -->
   <section id="anmeldung" class="karte">
-    <h2>Anmeldung</h2>
+    <p class="marke">Anmeldung</p>
     <label for="email">E-Mail</label>
     <input id="email" type="email" autocomplete="username" inputmode="email">
     <label for="passwort">Passwort</label>
@@ -90,141 +101,156 @@
 
   <div id="verwaltung" class="verborgen">
 
-    <!-- Betriebswahl, nur bei mehreren -->
-    <section id="wahl-bereich" class="karte verborgen">
-      <label for="wahl">Betrieb</label>
-      <select id="wahl"></select>
-    </section>
-
-    <!-- Zahlen -->
-    <section class="karte">
-      <h2>Zahlen</h2>
+    <section class="karte neben">
+      <p class="marke">Zahlen</p>
       <div class="zahlen" id="zahlen"></div>
     </section>
 
-    <!-- Stammdaten -->
+    <!-- Stammdaten und Kartenregeln werden zusammen gespeichert -->
     <section class="karte">
-      <h2>Stammdaten</h2>
-      <label for="name">Name des Betriebs</label>
-      <input id="name" maxlength="80">
+      <p class="marke">Stammdaten</p>
 
-      <div class="paar">
-        <div>
-          <label for="t-punkte">Bezeichnung für Stempel</label>
-          <input id="t-punkte" maxlength="40">
+      <div class="gruppe">
+        <label for="name">Name des Betriebs</label>
+        <input id="name" maxlength="80">
+
+        <div class="paar">
+          <div>
+            <label for="t-punkte">Bezeichnung für Stempel</label>
+            <input id="t-punkte" maxlength="40">
+          </div>
+          <div>
+            <label for="t-gutscheine">Bezeichnung für Gutscheine</label>
+            <input id="t-gutscheine" maxlength="40">
+          </div>
         </div>
-        <div>
-          <label for="t-gutscheine">Bezeichnung für Gutscheine</label>
-          <input id="t-gutscheine" maxlength="40">
+
+        <label for="t-angebot">Überschrift für das Tagesangebot</label>
+        <input id="t-angebot" maxlength="40">
+
+        <div class="paar">
+          <div>
+            <label for="farbe">Primärfarbe</label>
+            <input id="farbe" type="color">
+          </div>
+          <div>
+            <label for="farbe-text">Farbwert</label>
+            <input id="farbe-text" maxlength="7" autocapitalize="off" spellcheck="false">
+          </div>
         </div>
+        <p class="hinweis">Diese Seite färbt sich sofort mit — so sieht es später beim Kunden aus.</p>
+
+        <label for="logo">Logo-Adresse (optional)</label>
+        <input id="logo" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
       </div>
 
-      <label for="t-angebot">Überschrift für das Tagesangebot</label>
-      <input id="t-angebot" maxlength="40">
-
-      <div class="paar">
-        <div>
-          <label for="farbe">Primärfarbe</label>
-          <input id="farbe" type="color">
+      <div class="gruppe">
+        <p class="marke">Kartenregeln</p>
+        <div class="paar">
+          <div>
+            <label for="stempel">Stempel pro Karte</label>
+            <input id="stempel" type="number" min="1" max="50" inputmode="numeric">
+          </div>
+          <div>
+            <label for="tage">Gültigkeit des Gutscheins in Tagen</label>
+            <input id="tage" type="number" min="1" inputmode="numeric">
+          </div>
         </div>
-        <div>
-          <label for="farbe-text">Farbwert</label>
-          <input id="farbe-text" maxlength="7" autocapitalize="off" spellcheck="false">
-        </div>
+        <p class="hinweis">
+          Die Kartengröße wirkt sofort, auch auf angefangene Karten. Wer die Zahl
+          senkt, beschert Kunden mit voller Karte beim nächsten Einkauf einen
+          Gutschein; wer sie erhöht, verlangt von ihnen mehr Einkäufe als beim
+          Sammelstart angekündigt.
+        </p>
       </div>
 
-      <label for="logo">Logo-Adresse (optional)</label>
-      <input id="logo" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
-
-      <h2 style="margin-top:20px">Kartenregeln</h2>
-      <div class="paar">
-        <div>
-          <label for="stempel">Stempel pro Karte</label>
-          <input id="stempel" type="number" min="1" max="50" inputmode="numeric">
-        </div>
-        <div>
-          <label for="tage">Gültigkeit des Gutscheins in Tagen</label>
-          <input id="tage" type="number" min="1" inputmode="numeric">
-        </div>
-      </div>
-      <p class="hinweis">
-        Die Kartengröße wirkt sofort, auch auf angefangene Karten. Wer die Zahl
-        senkt, beschert Kunden mit voller Karte beim nächsten Einkauf einen
-        Gutschein; wer sie erhöht, verlangt von ihnen mehr Einkäufe als beim
-        Sammelstart angekündigt.
-      </p>
-
-      <div class="knopfreihe">
+      <div class="reihe">
         <button id="speichern">Speichern</button>
-        <button id="zuruecksetzen" class="sekundaer">Änderungen verwerfen</button>
+        <button id="zuruecksetzen" class="still">Änderungen verwerfen</button>
       </div>
     </section>
 
     <!-- Angebote -->
     <section class="karte">
-      <h2>Angebote</h2>
-      <p class="hinweis">Erscheinen in der App auf der Startseite.</p>
+      <p class="marke">Angebote</p>
+      <p class="hinweis">Erscheinen beim Kunden auf der Startseite.</p>
       <div id="angebote"></div>
 
-      <div class="paar">
-        <div>
-          <label for="a-titel">Titel</label>
-          <input id="a-titel" maxlength="80" placeholder="z. B. Dinkel-Kracher">
+      <div class="gruppe">
+        <div class="paar">
+          <div>
+            <label for="a-titel">Titel</label>
+            <input id="a-titel" maxlength="80" placeholder="z. B. Dinkel-Kracher">
+          </div>
+          <div>
+            <label for="a-bild">Bild-Adresse (optional)</label>
+            <input id="a-bild" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
+          </div>
         </div>
-        <div>
-          <label for="a-bild">Bild-Adresse (optional)</label>
-          <input id="a-bild" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
+        <label for="a-text">Beschreibung (optional)</label>
+        <textarea id="a-text" maxlength="240" placeholder="Heute frisch aus dem Ofen, nur 3,50 €!"></textarea>
+        <div class="paar">
+          <div>
+            <label for="a-von">Gültig ab (optional)</label>
+            <input id="a-von" type="date">
+          </div>
+          <div>
+            <label for="a-bis">Gültig bis (optional)</label>
+            <input id="a-bis" type="date">
+          </div>
         </div>
-      </div>
-      <label for="a-text">Beschreibung (optional)</label>
-      <textarea id="a-text" maxlength="240" placeholder="Heute frisch aus dem Ofen, nur 3,50 €!"></textarea>
-      <div class="paar">
-        <div>
-          <label for="a-von">Gültig ab (optional)</label>
-          <input id="a-von" type="date">
+        <div class="reihe">
+          <button id="a-speichern">Angebot anlegen</button>
+          <button id="a-abbrechen" class="still verborgen">Bearbeiten abbrechen</button>
         </div>
-        <div>
-          <label for="a-bis">Gültig bis (optional)</label>
-          <input id="a-bis" type="date">
-        </div>
-      </div>
-      <div class="knopfreihe">
-        <button id="a-speichern">Angebot anlegen</button>
-        <button id="a-abbrechen" class="sekundaer verborgen">Bearbeiten abbrechen</button>
       </div>
     </section>
 
     <!-- Einlöse-Code -->
     <section class="karte">
-      <h2>Einlöse-Code</h2>
+      <p class="marke">Einlöse-Code</p>
       <p class="stand" id="code-stand"></p>
       <p class="hinweis">
         Ohne Code löst der Kunde selbst ein und zeigt die Bestätigung vor; das
         geht schneller. Mit Code muss die Verkaufskraft ihn auf dem Kundengerät
         eingeben. Der Code wird nur als Hash gespeichert und lässt sich hier
-        nicht auslesen – nur neu setzen.
+        nicht auslesen — nur neu setzen.
       </p>
       <label for="code">Neuer Code (mindestens 6 Zeichen)</label>
       <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="knopfreihe">
+      <div class="reihe">
         <button id="code-setzen">Code setzen</button>
         <button id="code-loeschen" class="gefahr">Code entfernen</button>
       </div>
     </section>
 
-    <p class="knopfreihe">
-      <button id="abmelden" class="sekundaer">Abmelden</button>
-    </p>
+    <div class="reihe">
+      <button id="abmelden" class="still">Abmelden</button>
+    </div>
   </div>
 </main>
 
 <script type="module">
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { paletteSetzen } from '../gemeinsam/palette.js';
 
 // Siehe web/verwaltung/config.example.js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/*
+ * Eigener Speicherschlüssel je Oberfläche.
+ *
+ * Ohne ihn teilen sich alle drei Seiten unter derselben Adresse EINE
+ * Anmeldung: Der Supabase-Client legt sein Token unter `sb-<projekt>-auth-
+ * token` ab, für alle gleich. Die Folgen sind still und übel - eine
+ * Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt
+ * Stempel auf den Kassenzugang, weil dort schon eine Sitzung liegt und gar
+ * keine anonyme Anmeldung mehr stattfindet. Umgekehrt steht die Kasse
+ * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
+ * keinem Betrieb.
+ */
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
+  { auth: { storageKey: 'treuebiss-verwaltung' } });
 const $ = (id) => document.getElementById(id);
 
 /** Betriebe, die dieser Zugang verwalten darf. */
@@ -236,9 +262,22 @@ let bearbeitet = null;
 
 function melden(text, gut = false) {
   $('meldung').innerHTML = text
-    ? `<div class="meldung ${gut ? 'gut' : 'schlecht'}">${text}</div>`
+    ? `<div class="meldung${gut ? ' gut' : ''}">${text}</div>`
     : '';
   if (text) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** Sperrt einen Knopf, solange seine Anfrage laeuft. */
+function beschaeftigt(knopf, an, text) {
+  if (!knopf) return;
+  if (an) {
+    knopf.dataset.ruhetext ??= knopf.textContent;
+    knopf.textContent = text;
+    knopf.disabled = true;
+  } else {
+    knopf.textContent = knopf.dataset.ruhetext ?? knopf.textContent;
+    knopf.disabled = false;
+  }
 }
 
 /** Fremder Text gehoert nie ungeprueft ins HTML. */
@@ -339,6 +378,7 @@ function betriebWaehlen(id) {
 }
 
 function formularFuellen() {
+  paletteSetzen(aktiv.primary_color);
   $('name').value = aktiv.name ?? '';
   $('t-punkte').value = aktiv.loyalty_points_title ?? '';
   $('t-gutscheine').value = aktiv.vouchers_title ?? '';
@@ -356,6 +396,11 @@ function farbeSetzen(wert) {
   $('farbe-text').value = wert;
 }
 
+/** Faerbt die Seite mit - die Vorschau ist hier der eigentliche Zweck. */
+function vorschau(wert) {
+  if (/^#[0-9A-Fa-f]{6}$/.test(wert)) paletteSetzen(wert);
+}
+
 function codeStandZeigen() {
   const an = aktiv.requires_redeem_code;
   $('code-stand').textContent = an
@@ -369,7 +414,7 @@ async function zahlenLaden() {
   const { data, error } = await db.rpc('staff_pilot_summary');
   if (error) { $('zahlen').innerHTML = ''; melden(fehlertext(error)); return; }
   const z = (data ?? []).find((r) => r.tenant_id === aktiv.id);
-  if (!z) { $('zahlen').innerHTML = '<p class="leer">Noch keine Zahlen.</p>'; return; }
+  if (!z) { $('zahlen').innerHTML = '<p class="leer-text">Noch keine Zahlen.</p>'; return; }
   $('zahlen').innerHTML = [
     [z.members, 'Teilnehmer'],
     [z.stamps_issued, 'Stempel gesamt'],
@@ -384,7 +429,7 @@ async function angeboteLaden() {
   if (error) { melden(fehlertext(error)); return; }
   const liste = data ?? [];
   if (!liste.length) {
-    $('angebote').innerHTML = '<p class="leer">Noch kein Angebot angelegt.</p>';
+    $('angebote').innerHTML = '<p class="leer-text">Noch kein Angebot angelegt.</p>';
     return;
   }
   $('angebote').innerHTML = liste.map((a) => {
@@ -392,10 +437,10 @@ async function angeboteLaden() {
       ? `${a.valid_from ? datum(a.valid_from) : '…'} – ${a.valid_to ? datum(a.valid_to) : '…'}`
       : '';
     const unten = [a.description, zeitraum].filter(Boolean).map(h).join(' · ');
-    return `<div class="angebot">
+    return `<div class="eintrag">
       <div class="text"><b>${h(a.title)}</b>${unten ? `<small>${unten}</small>` : ''}</div>
-      <div class="knopfreihe">
-        <button class="sekundaer schmal" data-bearbeiten="${h(a.id)}">Bearbeiten</button>
+      <div class="reihe">
+        <button class="still schmal" data-bearbeiten="${h(a.id)}">Bearbeiten</button>
         <button class="gefahr schmal" data-loeschen="${h(a.id)}">Löschen</button>
       </div>
     </div>`;
@@ -450,15 +495,15 @@ function zeigeAngemeldet(ja) {
 
 // -------------------------------------------------------------- Bedienung
 
-$('farbe').oninput = () => { $('farbe-text').value = $('farbe').value; };
+$('farbe').oninput = () => { $('farbe-text').value = $('farbe').value; vorschau($('farbe').value); };
 $('farbe-text').oninput = () => {
   const wert = $('farbe-text').value.trim();
-  if (/^#[0-9A-Fa-f]{6}$/.test(wert)) $('farbe').value = wert.toLowerCase();
+  if (/^#[0-9A-Fa-f]{6}$/.test(wert)) { $('farbe').value = wert.toLowerCase(); vorschau(wert); }
 };
 
 $('speichern').onclick = async () => {
   melden('');
-  $('speichern').disabled = true;
+  beschaeftigt($('speichern'), true, 'Wird gespeichert …');
   const { data, error } = await db.rpc('owner_update_tenant', {
     p_tenant_id: aktiv.id,
     p_name: $('name').value,
@@ -470,7 +515,7 @@ $('speichern').onclick = async () => {
     p_stamps_per_card: Number($('stempel').value),
     p_voucher_validity_days: Number($('tage').value),
   });
-  $('speichern').disabled = false;
+  beschaeftigt($('speichern'), false);
   if (error) { console.error('owner_update_tenant', error); melden(fehlertext(error)); return; }
 
   // Den Stand vom Server uebernehmen, nicht den aus den Feldern: Der Server
@@ -504,11 +549,11 @@ $('a-speichern').onclick = async () => {
     valid_to: bis,
   };
 
-  $('a-speichern').disabled = true;
+  beschaeftigt($('a-speichern'), true, 'Wird gespeichert …');
   const { error } = bearbeitet
     ? await db.from('offers').update(felder).eq('id', bearbeitet)
     : await db.from('offers').insert({ ...felder, tenant_id: aktiv.id });
-  $('a-speichern').disabled = false;
+  beschaeftigt($('a-speichern'), false);
   if (error) { console.error('offers.save', error); melden(fehlertext(error)); return; }
 
   melden(bearbeitet ? 'Angebot geändert.' : 'Angebot angelegt.', true);
@@ -522,9 +567,11 @@ $('code-setzen').onclick = async () => {
   melden('');
   const code = $('code').value.trim();
   if (code.length < 6) { melden('Der Einlöse-Code braucht mindestens 6 Zeichen.'); return; }
+  beschaeftigt($('code-setzen'), true, 'Wird gesetzt …');
   const { error } = await db.rpc('owner_set_redeem_code', {
     p_tenant_id: aktiv.id, p_code: code,
   });
+  beschaeftigt($('code-setzen'), false);
   if (error) { console.error('owner_set_redeem_code', error); melden(fehlertext(error)); return; }
   $('code').value = '';
   aktiv.requires_redeem_code = true;
@@ -546,10 +593,12 @@ $('wahl').onchange = () => { melden(''); betriebWaehlen($('wahl').value); };
 
 $('anmelden').onclick = async () => {
   melden('');
+  beschaeftigt($('anmelden'), true, 'Wird geprüft …');
   const { error } = await db.auth.signInWithPassword({
     email: $('email').value.trim(),
     password: $('passwort').value,
   });
+  beschaeftigt($('anmelden'), false);
   if (error) { console.error('signIn', error); melden(anmeldeFehlertext(error)); return; }
   $('passwort').value = '';
   await starten();
@@ -558,7 +607,8 @@ $('anmelden').onclick = async () => {
 $('abmelden').onclick = async () => {
   await db.auth.signOut();
   betriebe = []; aktiv = null;
-  $('betrieb').textContent = '';
+  $('betrieb').textContent = 'TreueBiss';
+  paletteSetzen('#4CAF50');
   melden('');
   zeigeAngemeldet(false);
 };

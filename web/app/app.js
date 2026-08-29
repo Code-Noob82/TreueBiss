@@ -10,6 +10,7 @@
  * am Tresen oder ein Link auf dem Beleg fuehrt direkt hierher.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { paletteSetzen } from '../gemeinsam/palette.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -126,58 +127,10 @@ function standLaden() {
 
 // ------------------------------------------------------------------ Anzeige
 
-/*
- * Rechnet aus der Farbe des Betriebs die ganze Palette.
- *
- * Gesetzt werden nur Farbton, Saettigung und die Marke selbst; alle Flaechen,
- * Linien und Textfarben leitet das Stylesheet daraus ab. Sonst waere die
- * Betriebsfarbe wieder nur eine Knopffuellung auf immergleichem Grau.
- */
-function paletteSetzen(farbe) {
-  const marke = /^#[0-9A-Fa-f]{6}$/.test(farbe ?? '') ? farbe : '#4CAF50';
-  const { h, s } = hexZuHsl(marke);
-
-  // Ein grauer Betrieb darf keine rosa Flaechen bekommen: Unterhalb einer
-  // Restsaettigung wird der Farbton bedeutungslos, dann bleibt es neutral.
-  const sProzent = s < 0.08 ? 6 : Math.min(Math.max(s * 100, 18), 52);
-
-  const wurzel = document.documentElement.style;
-  wurzel.setProperty('--h', Math.round(h));
-  wurzel.setProperty('--s', sProzent.toFixed(1) + '%');
-  wurzel.setProperty('--marke', marke);
-  // Weisse Schrift auf hellem Gelb waere unlesbar. Die Schwelle 0,179 ist
-  // der Punkt, an dem Schwarz besser kontrastiert als Weiss (WCAG).
-  wurzel.setProperty('--marke-text',
-    leuchtkraft(marke) > 0.179 ? `hsl(${Math.round(h)} 45% 11%)` : '#ffffff');
-
-  $('theme-farbe').setAttribute('content', marke);
-}
-
-function hexZuHsl(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
-  if (max === min) return { h: 0, s: 0, l };
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  const h = (max === r ? (g - b) / d + (g < b ? 6 : 0)
-           : max === g ? (b - r) / d + 2
-                       : (r - g) / d + 4) * 60;
-  return { h, s, l };
-}
-
-/** Relative Leuchtdichte nach WCAG - entscheidet ueber die Schriftfarbe. */
-function leuchtkraft(hex) {
-  const kanal = (i) => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * kanal(1) + 0.7152 * kanal(3) + 0.0722 * kanal(5);
-}
-
 function allesZeichnen() {
   $('betrieb').textContent = betrieb.name;
   document.title = betrieb.name + ' – TreueBiss';
-  paletteSetzen(betrieb.primary_color);
+  $('theme-farbe').setAttribute('content', paletteSetzen(betrieb.primary_color));
 
   if (betrieb.logo_url) {
     $('logo').src = betrieb.logo_url;
@@ -464,6 +417,18 @@ function rechtlichesZeichnen() {
     .join(' · ');
 }
 
+/*
+ * Eigener Speicherschlüssel je Oberfläche.
+ *
+ * Ohne ihn teilen sich alle drei Seiten unter derselben Adresse EINE
+ * Anmeldung: Der Supabase-Client legt sein Token unter `sb-<projekt>-auth-
+ * token` ab, für alle gleich. Die Folgen sind still und übel - eine
+ * Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt
+ * Stempel auf den Kassenzugang, weil dort schon eine Sitzung liegt und gar
+ * keine anonyme Anmeldung mehr stattfindet. Umgekehrt steht die Kasse
+ * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
+ * keinem Betrieb.
+ */
 async function starten() {
   try {
     konfig = await import('./config.js');
@@ -486,7 +451,8 @@ async function starten() {
     return;
   }
 
-  db = createClient(konfig.SUPABASE_URL, konfig.SUPABASE_ANON_KEY);
+  db = createClient(konfig.SUPABASE_URL, konfig.SUPABASE_ANON_KEY,
+    { auth: { storageKey: 'treuebiss-kunde' } });
   $('fuss').textContent = 'Deine Karte liegt in diesem Browser. '
     + 'Ohne Konto lässt sie sich nicht auf ein anderes Gerät mitnehmen.';
 

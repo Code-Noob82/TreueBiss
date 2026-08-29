@@ -1,0 +1,209 @@
+/*
+ * Gemeinsame Grundlage für alle drei Oberflächen: Kunden-App, Kasse,
+ * Verwaltung.
+ *
+ * Warum eine geteilte Datei und nicht drei Kopien: Genau so verfallen
+ * Designsysteme. Sobald derselbe Abstand an drei Stellen steht, driftet er
+ * an zweien davon ab, und niemand merkt es, bis die Seiten nicht mehr
+ * zusammengehören.
+ *
+ * Die Palette hängt an zwei Werten, die JavaScript setzt - Farbton und
+ * Sättigung. Alles Weitere leitet sich hier ab. Die Kunden-App und die
+ * Verwaltung setzen die Farbe des Betriebs; die Kasse bleibt bei der
+ * Vorgabe, weil sie ein Werkzeug des Anbieters ist und nicht das Schaufenster
+ * des Betriebs.
+ */
+
+/* Selbst ausgeliefert, nicht von Google geladen - Begründung in
+   fonts/LIESMICH.md. Beides Variable Fonts: eine Datei je Familie. */
+@font-face {
+  font-family: "Familjen Grotesk";
+  src: url("./fonts/familjen-grotesk-latin.woff2") format("woff2");
+  font-weight: 400 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Public Sans";
+  src: url("./fonts/public-sans-latin.woff2") format("woff2");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+
+:root {
+  --h: 122;
+  --s: 30%;
+  --marke: #4CAF50;
+  --marke-text: hsl(122 30% 97%);
+
+  --grund:       hsl(var(--h) calc(var(--s) * 0.9) 13%);
+  --grund-text:  hsl(var(--h) calc(var(--s) * 0.5) 97%);
+  --grund-leise: hsl(var(--h) calc(var(--s) * 0.3) 76%);
+  --papier:      hsl(var(--h) calc(var(--s) * 0.5) 97.5%);
+  --karte:       hsl(var(--h) calc(var(--s) * 0.6) 99.6%);
+  --tinte:       hsl(var(--h) calc(var(--s) * 0.6) 12%);
+  --tinte-leise: hsl(var(--h) calc(var(--s) * 0.25) 42%);
+  --linie:       hsl(var(--h) calc(var(--s) * 0.35) 88%);
+  --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 93%);
+  --leer:        hsl(var(--h) calc(var(--s) * 0.3) 85%);
+
+  --gut:      hsl(var(--h) calc(var(--s) * 0.5) 94%);
+  --gut-text: hsl(var(--h) calc(var(--s) * 0.9) 24%);
+  --warn:     #fdf3e0; --warn-text: #7c5410;
+  --rot:      #fdecea; --rot-text: #9c2d22;
+
+  --hoehe: 0 1px 1px hsl(var(--h) 20% 10% / .04),
+           0 6px 20px -10px hsl(var(--h) 25% 12% / .18);
+
+  --display: "Familjen Grotesk", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --lauf: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Abstände auf einer 4er-Stufung. Nähe ist Bedeutung: Der Abstand
+     innerhalb einer Gruppe muss sichtbar kleiner sein als der zwischen
+     Gruppen. Ein gegriffener Einzelwert zerlegt das. */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px;
+
+  /* Fünf Schriftgrade. Hierarchie kommt zuerst aus Gewicht und Farbe. */
+  --t-gross:   1.5rem;
+  --t-display: 1.25rem;
+  --t-body:    1rem;
+  --t-klein:   .875rem;
+  --t-mikro:   .75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund:       hsl(var(--h) calc(var(--s) * 0.7) 9%);
+    --grund-text:  hsl(var(--h) calc(var(--s) * 0.3) 95%);
+    --grund-leise: hsl(var(--h) calc(var(--s) * 0.2) 66%);
+    --papier:      hsl(var(--h) calc(var(--s) * 0.4) 11%);
+    --karte:       hsl(var(--h) calc(var(--s) * 0.4) 15%);
+    --tinte:       hsl(var(--h) calc(var(--s) * 0.2) 94%);
+    --tinte-leise: hsl(var(--h) calc(var(--s) * 0.15) 66%);
+    --linie:       hsl(var(--h) calc(var(--s) * 0.3) 26%);
+    --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 21%);
+    --leer:        hsl(var(--h) calc(var(--s) * 0.25) 32%);
+
+    --gut:      hsl(var(--h) calc(var(--s) * 0.5) 20%);
+    --gut-text: hsl(var(--h) calc(var(--s) * 0.5) 84%);
+    --warn:     #35291380; --warn-text: #e8c07a;
+    --rot:      #3a1e1a80; --rot-text: #f0a094;
+    --hoehe:    0 1px 1px #0006, 0 8px 24px -12px #000a;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--tinte);
+  font-family: var(--lauf);
+  font-size: var(--t-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.012em; text-wrap: balance; }
+
+/*
+ * Zwei Höhenlagen, je eine Sprache - nicht Rahmen und Schatten und
+ * Flächenwechsel auf demselben Kasten. Was schwebt, wirft einen Schatten;
+ * was steht, bekommt eine Haarlinie.
+ */
+.karte {
+  background: var(--karte);
+  border: 0;
+  border-radius: var(--s5);
+  padding: var(--s5);
+  box-shadow: var(--hoehe);
+  margin-bottom: var(--s4);
+}
+.karte.neben {
+  box-shadow: none;
+  border: 1px solid var(--linie-zart);
+  padding: var(--s4) var(--s5);
+}
+
+/** Abschnittsmarke über einer Karte. */
+.marke {
+  font-family: var(--display);
+  font-size: var(--t-mikro); font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase;
+  color: var(--tinte-leise);
+  margin: 0 0 var(--s3);
+}
+
+/* ------------------------------------------------------------------ Knöpfe */
+button {
+  font-family: var(--display);
+  font-size: var(--t-body); font-weight: 600; letter-spacing: .005em;
+  width: 100%; padding: var(--s4) var(--s5);
+  border: 0; border-radius: var(--s3);
+  background: var(--marke); color: var(--marke-text);
+  cursor: pointer;
+  /* Nur benannte Eigenschaften - `all` bewegt auch, was niemand bewegen wollte. */
+  transition: filter 140ms ease-out, transform 140ms ease-out;
+}
+button:hover { filter: brightness(1.06); }
+button:active { transform: translateY(1px) scale(.995); }
+button:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
+button:focus-visible { outline: 3px solid var(--marke); outline-offset: 3px; }
+
+button.still {
+  background: transparent; color: var(--tinte);
+  border: 1px solid var(--linie);
+}
+button.gefahr {
+  background: transparent; color: var(--rot-text);
+  border: 1px solid var(--linie);
+}
+button.schmal { width: auto; padding: var(--s3) var(--s4); font-size: var(--t-klein); }
+
+.reihe { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.reihe button { flex: 1 1 auto; }
+
+/* ---------------------------------------------------------------- Formular */
+label {
+  display: block; font-size: var(--t-mikro); font-weight: 600;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: var(--tinte-leise); margin-bottom: var(--s2);
+}
+input, select, textarea {
+  width: 100%; padding: var(--s3) var(--s4); font-size: var(--t-body);
+  font-family: inherit; color: inherit;
+  background: var(--papier);
+  border: 1px solid var(--linie); border-radius: var(--s3);
+  margin-bottom: var(--s3);
+}
+textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--marke); outline-offset: 1px;
+}
+input[type="color"] { padding: var(--s1); height: 46px; cursor: pointer; }
+
+/* --------------------------------------------------------------- Meldungen */
+.meldung {
+  border-radius: var(--s3); padding: var(--s3) var(--s4); margin-bottom: var(--s4);
+  font-size: var(--t-klein); font-weight: 500;
+  background: var(--rot); color: var(--rot-text);
+}
+.meldung.gut { background: var(--gut); color: var(--gut-text); }
+.band {
+  border-radius: var(--s3); padding: var(--s3) var(--s4); margin-bottom: var(--s4);
+  font-size: var(--t-klein); background: var(--warn); color: var(--warn-text);
+}
+.meldung code, .hinweis code, .fuss code {
+  font-family: ui-monospace, Menlo, monospace; font-size: .88em;
+  background: hsl(var(--h) 20% 50% / .14); padding: 1px var(--s1); border-radius: var(--s1);
+}
+
+.hinweis { font-size: var(--t-klein); color: var(--tinte-leise); line-height: 1.55; }
+.leer-text { color: var(--tinte-leise); font-size: var(--t-klein); margin: 0; }
+.verborgen { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

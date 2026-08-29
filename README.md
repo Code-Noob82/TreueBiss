@@ -159,6 +159,12 @@ Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
 öffnet sie im Browser, meldet sich an, scannt den Gutschein-QR des Kunden und
 sieht die Zahlen des eigenen Betriebs.
 
+Anders als die Kundenseite trägt die Kasse **nicht** die Farbe des Betriebs:
+Sie ist Werkzeug des Anbieters, nicht Schaufenster. Wer zwischen zwei Filialen
+wechselt, soll dieselbe Oberfläche vorfinden. Der Erfolgsfall bekommt dafür
+eine eigene Fläche statt einer Textzeile — an der Kasse schaut die
+Verkaufskraft im Vorbeigehen hin, mit dem Kunden gegenüber.
+
 **Einrichten:**
 
 1. `web/kasse/config.example.js` nach `config.js` kopieren und die Werte des
@@ -242,6 +248,20 @@ Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
 nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
 es ausliefert.
 
+**Gemeinsame Grundlage.** Tokens, Schriften, Abstands- und Schriftstufung,
+Knöpfe, Formularfelder und Meldungen liegen einmal in `web/gemeinsam/basis.css`,
+die Palettenrechnung in `web/gemeinsam/palette.js`. Alle drei Oberflächen
+binden dieselben Dateien ein. Drei Kopien derselben Tokens wären der übliche
+Weg, auf dem ein Designsystem verfällt.
+
+**Getrennte Anmeldungen.** Jede Oberfläche bekommt einen eigenen
+`storageKey` (`treuebiss-kunde`, `treuebiss-kasse`, `treuebiss-verwaltung`).
+Ohne das teilen sich alle drei unter derselben Adresse **eine** Anmeldung, weil
+der Supabase-Client sein Token für jeden Client unter demselben Schlüssel
+ablegt. Die Folgen sind still: Eine Verkaufskraft, die auf dem Kassengerät die
+Kundenseite öffnet, sammelt Stempel auf den Kassenzugang — eine anonyme
+Anmeldung findet gar nicht mehr statt, weil schon eine Sitzung da ist.
+
 **Gestaltung.** Die Farbe des Betriebs ist nicht nur Knopffüllung: Aus dem Hex
 werden Farbton und Sättigung gezogen, und das Stylesheet leitet daraus die
 ganze Fläche ab — Kopfband, Papier, Linien, Trennfarben, hell wie dunkel. Die
@@ -251,12 +271,12 @@ sitzen leicht gedreht, weil ein echter Stempel nie gerade sitzt; die Drehung
 hängt am Index und wackelt deshalb beim Neuzeichnen nicht. Gutscheine sind
 Abrisse mit Perforationskerben, keine weiteren Karten.
 
-**Schriften** liegen unter `web/app/fonts/` im Projekt, statt von Google geladen
+**Schriften** liegen unter `web/gemeinsam/fonts/` im Projekt, statt von Google geladen
 zu werden. Der Grund ist Datenschutz: Ein `<link>` auf `fonts.googleapis.com`
 überträgt die IP des Kunden an Google; das LG München I hat das 2022 als
 DSGVO-Verstoß gewertet (Az. 3 O 17493/20). Bei einer App, deren Verkaufsargument
 Datensparsamkeit ist, wäre das ein Widerspruch. Beides sind Variable Fonts unter
-der Open Font License, zusammen 48 KB — Einzelheiten in `web/app/fonts/LIESMICH.md`.
+der Open Font License, zusammen 48 KB — Einzelheiten in `web/gemeinsam/fonts/LIESMICH.md`.
 
 **Einrichten:** `config.example.js` nach `config.js` kopieren. Kamera und
 Service Worker brauchen `https` oder `localhost`.
@@ -305,6 +325,11 @@ Angebote tragen nichts Schützenswertes, dort reichen Policies. Bei `tenants`
 würde eine `update`-Policy die ganze Zeile freigeben — Spaltenrechte gäbe es
 zwar, sie wären aber still: Eine neue Spalte an `tenants` wäre ohne Zutun
 mitfreigegeben. `owner_update_tenant()` schreibt dagegen aus, was änderbar ist.
+
+Die Verwaltung trägt umgekehrt sehr wohl die Farbe des Betriebs — aus einem
+Grund, nicht als Zierde: Sie zeigt beim Ändern des Farbfelds sofort, was der
+Kunde später sieht, und sagt bei mehreren Betrieben auf einen Blick, welcher
+gerade bearbeitet wird.
 
 **Einrichten** wie bei der Kassenseite: `config.example.js` nach `config.js`
 kopieren, Seite über `https` oder `localhost` ausliefern. Eine Kamera braucht

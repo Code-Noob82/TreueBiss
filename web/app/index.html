@@ -11,108 +11,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="preload" href="./fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="./fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../gemeinsam/basis.css">
 <style>
-  /* Selbst ausgeliefert, nicht von Google geladen: siehe fonts/LIESMICH.md.
-     Beides Variable Fonts - eine Datei deckt alle Schnitte ab. */
-  @font-face {
-    font-family: "Familjen Grotesk";
-    src: url("./fonts/familjen-grotesk-latin.woff2") format("woff2");
-    font-weight: 400 700; font-style: normal; font-display: swap;
-  }
-  @font-face {
-    font-family: "Public Sans";
-    src: url("./fonts/public-sans-latin.woff2") format("woff2");
-    font-weight: 100 900; font-style: normal; font-display: swap;
-  }
+  /* Nur, was diese Seite ausmacht. Alles Übrige steht in basis.css. */
+  body { min-height: 100dvh; }
 
-  /*
-    Die ganze Palette wird zur Laufzeit aus der Farbe des Betriebs gerechnet.
-    app.js setzt nur drei Werte - Farbton, Saettigung und die Marke selbst -,
-    alles Weitere leitet sich hier ab. So traegt jede Baeckerei ihre eigene
-    Flaeche, statt nur einen anders eingefaerbten Knopf zu bekommen.
-  */
-  :root {
-    --h: 122;
-    --s: 30%;
-    --marke: #4CAF50;
-    --marke-text: hsl(122 30% 97%);
-
-    --grund:       hsl(var(--h) calc(var(--s) * 0.9) 13%);
-    --grund-text:  hsl(var(--h) calc(var(--s) * 0.5) 97%);
-    --grund-leise: hsl(var(--h) calc(var(--s) * 0.3) 76%);
-    --papier:      hsl(var(--h) calc(var(--s) * 0.5) 97.5%);
-    --karte:       hsl(var(--h) calc(var(--s) * 0.6) 99.6%);
-    --tinte:       hsl(var(--h) calc(var(--s) * 0.6) 12%);
-    --tinte-leise: hsl(var(--h) calc(var(--s) * 0.25) 42%);
-    --linie:       hsl(var(--h) calc(var(--s) * 0.35) 88%);
-    --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 93%);
-    --leer:        hsl(var(--h) calc(var(--s) * 0.3) 85%);
-
-    --gut:      hsl(var(--h) calc(var(--s) * 0.5) 94%);
-    --gut-text: hsl(var(--h) calc(var(--s) * 0.9) 24%);
-    --warn:     #fdf3e0;
-    --warn-text:#7c5410;
-    --rot:      #fdecea;
-    --rot-text: #9c2d22;
-
-    --hoehe: 0 1px 1px hsl(var(--h) 20% 10% / .04),
-             0 6px 20px -10px hsl(var(--h) 25% 12% / .18);
-
-    --display: "Familjen Grotesk", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-    --lauf: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-
-    /* Abstaende auf einer 4er-Stufung. Kein einzelner Wert daneben - sonst
-       verliert Naehe ihre Bedeutung: Der Abstand innerhalb einer Gruppe muss
-       sichtbar kleiner sein als der zwischen Gruppen. */
-    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
-    --s5: 24px; --s6: 32px; --s7: 48px;
-
-    /* Fuenf Schriftgrade, mehr braucht die Seite nicht. Hierarchie kommt
-       zuerst aus Gewicht und Farbe, dann erst aus der Groesse. */
-    --t-gross:   1.5rem;
-    --t-display: 1.25rem;
-    --t-body:    1rem;
-    --t-klein:   .875rem;
-    --t-mikro:   .75rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --grund:       hsl(var(--h) calc(var(--s) * 0.7) 9%);
-      --grund-text:  hsl(var(--h) calc(var(--s) * 0.3) 95%);
-      --grund-leise: hsl(var(--h) calc(var(--s) * 0.2) 66%);
-      --papier:      hsl(var(--h) calc(var(--s) * 0.4) 11%);
-      --karte:       hsl(var(--h) calc(var(--s) * 0.4) 15%);
-      --tinte:       hsl(var(--h) calc(var(--s) * 0.2) 94%);
-      --tinte-leise: hsl(var(--h) calc(var(--s) * 0.15) 66%);
-      --linie:       hsl(var(--h) calc(var(--s) * 0.3) 26%);
-      --linie-zart:  hsl(var(--h) calc(var(--s) * 0.3) 21%);
-      --leer:        hsl(var(--h) calc(var(--s) * 0.25) 32%);
-
-      --gut:      hsl(var(--h) calc(var(--s) * 0.5) 20%);
-      --gut-text: hsl(var(--h) calc(var(--s) * 0.5) 84%);
-      --warn:     #35291380; --warn-text: #e8c07a;
-      --rot:      #3a1e1a80; --rot-text: #f0a094;
-      --hoehe:    0 1px 1px #0006, 0 8px 24px -12px #000a;
-    }
-  }
-
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--papier);
-    color: var(--tinte);
-    font-family: var(--lauf);
-    font-size: 1rem;
-    line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-    min-height: 100dvh;
-  }
-
-  /* ---------------------------------------------------------------- Kopf */
   .kopf {
     background: var(--grund);
     color: var(--grund-text);
@@ -128,45 +33,13 @@
     width: var(--s7); height: var(--s7); border-radius: var(--s3);
     object-fit: cover; background: hsl(var(--h) 10% 100% / .12);
   }
-  .kopf h1 {
-    font-family: var(--display);
-    font-size: var(--t-display); font-weight: 700; letter-spacing: -.012em;
-    margin: 0; line-height: 1.2; text-wrap: balance;
-  }
+  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
   .kopf p {
     margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
     text-transform: uppercase; color: var(--grund-leise);
   }
 
   main { max-width: 460px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
-
-  /*
-    Zwei Hoehenlagen, je eine Sprache - nicht Rahmen und Schatten und
-    Flaechenwechsel auf demselben Kasten. Die Stempelkarte schwebt (Schatten,
-    kein Rahmen), alles Weitere steht (Haarlinie, kein Schatten). Das traegt
-    zugleich die Rangfolge: Zusammengekniffene Augen sollen erkennen, worum
-    es auf dieser Seite geht.
-  */
-  .karte {
-    background: var(--karte);
-    border: 0;
-    border-radius: var(--s5);
-    padding: var(--s5);
-    box-shadow: var(--hoehe);
-    margin-bottom: var(--s4);
-  }
-  .karte.neben {
-    box-shadow: none;
-    border: 1px solid var(--linie-zart);
-    padding: var(--s4) var(--s5);
-  }
-  .marke {
-    font-family: var(--display);
-    font-size: var(--t-mikro); font-weight: 600;
-    letter-spacing: .13em; text-transform: uppercase;
-    color: var(--tinte-leise);
-    margin: 0 0 var(--s3);
-  }
 
   /* --------------------------------------------------------- Stempelkarte */
   .fortschritt {
@@ -182,11 +55,8 @@
   }
 
   .punkte {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: var(--s3);
-    margin-bottom: var(--s5);
-    justify-items: center;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: var(--s3); margin-bottom: var(--s5); justify-items: center;
   }
   .punkt {
     width: 100%; max-width: var(--s7); aspect-ratio: 1;
@@ -196,7 +66,7 @@
   }
   /*
     Ein Stempel sitzt nie gerade. Die Drehung kommt aus dem Index, ist also
-    fuer jedes Feld immer dieselbe - sonst wackelte die Karte bei jedem
+    für jedes Feld immer dieselbe - sonst wackelte die Karte bei jedem
     Neuzeichnen.
   */
   .punkt.voll {
@@ -208,12 +78,11 @@
     box-shadow: inset 0 0 0 1px hsl(var(--h) 40% 20% / .12);
   }
   .punkt.voll::after {
-    content: "";
-    width: 34%; height: 34%; border-radius: 50%;
+    content: ""; width: 34%; height: 34%; border-radius: 50%;
     background: var(--marke-text); opacity: .82;
   }
-  /* 240 ms, ease-out, nur transform und opacity. Der kleine Rueckprall ist
-     kein Zierrat, sondern das Absetzen des Stempels - danach ist Schluss. */
+  /* 240 ms, nur transform und opacity. Der kleine Rückprall ist kein Zierrat,
+     sondern das Absetzen des Stempels - danach ist Schluss. */
   .punkt.frisch { animation: stempeln 240ms cubic-bezier(.2, .8, .3, 1) both; }
   @keyframes stempeln {
     0%   { transform: rotate(var(--dreh, 0deg)) scale(1.5); opacity: 0; }
@@ -221,69 +90,16 @@
     100% { transform: rotate(var(--dreh, 0deg)) scale(1); opacity: 1; }
   }
 
-  /* --------------------------------------------------------------- Knöpfe */
-  button {
-    font-family: var(--display);
-    font-size: var(--t-body); font-weight: 600; letter-spacing: .005em;
-    width: 100%; padding: var(--s4) var(--s5);
-    border: 0; border-radius: var(--s3);
-    background: var(--marke); color: var(--marke-text);
-    cursor: pointer;
-    /* Nur benannte Eigenschaften, keine Layoutwerte. */
-    transition: filter 140ms ease-out, transform 140ms ease-out;
-  }
-  button:hover { filter: brightness(1.06); }
-  button:active { transform: translateY(1px) scale(.995); }
-  button:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
-  button:focus-visible { outline: 3px solid var(--marke); outline-offset: 3px; }
-  button.still {
-    background: transparent; color: var(--tinte);
-    border: 1px solid var(--linie);
-  }
-  .reihe { display: flex; gap: var(--s2); }
-  .reihe button { flex: 1 1 0; }
-
-  /* -------------------------------------------------------------- Scanner */
-  label {
-    display: block; font-size: var(--t-mikro); font-weight: 600;
-    letter-spacing: .07em; text-transform: uppercase;
-    color: var(--tinte-leise); margin-bottom: var(--s2);
-  }
-  input {
-    width: 100%; padding: var(--s3) var(--s4); font-size: var(--t-body);
-    font-family: inherit; color: inherit;
-    background: var(--papier);
-    border: 1px solid var(--linie); border-radius: var(--s3);
-    margin-bottom: var(--s3);
-  }
-  input:focus-visible { outline: 2px solid var(--marke); outline-offset: 1px; }
   video {
     width: 100%; aspect-ratio: 4/3; object-fit: cover;
     border-radius: var(--s3); background: var(--grund);
     display: block; margin-bottom: var(--s4);
   }
 
-  /* ------------------------------------------------------------ Meldungen */
-  .meldung {
-    border-radius: var(--s3); padding: var(--s3) var(--s4); margin-bottom: var(--s4);
-    font-size: var(--t-klein); font-weight: 500;
-    background: var(--rot); color: var(--rot-text);
-  }
-  .meldung.gut { background: var(--gut); color: var(--gut-text); }
-  .meldung code, .fuss code {
-    font-family: ui-monospace, Menlo, monospace; font-size: .88em;
-    background: hsl(var(--h) 20% 50% / .14); padding: 1px var(--s1); border-radius: var(--s1);
-  }
-  .band {
-    border-radius: var(--s3); padding: var(--s3) var(--s4); margin-bottom: var(--s4);
-    font-size: var(--t-klein); background: var(--warn); color: var(--warn-text);
-  }
-
   /* ----------------------------------------------------------- Gutscheine */
   /*
-    Ein Gutschein ist ein Abriss, keine weitere Karte. Die Kerben links und
-    rechts sitzen auf der Perforation - deshalb liegt die Trennlinie genau
-    auf ihrer Hoehe.
+    Ein Gutschein ist ein Abriss, keine weitere Karte. Die Kerben sitzen auf
+    der Perforation - deshalb liegt die Trennlinie genau auf ihrer Höhe.
   */
   .abriss {
     position: relative;
@@ -297,8 +113,7 @@
   .abriss::before, .abriss::after {
     content: ""; position: absolute; top: var(--kerbe, 76px);
     width: var(--s4); height: var(--s4); border-radius: 50%;
-    background: var(--karte);
-    border: 1px solid var(--linie);
+    background: var(--karte); border: 1px solid var(--linie);
   }
   .abriss::before { left: calc(var(--s2) * -1 - 1px); }
   .abriss::after  { right: calc(var(--s2) * -1 - 1px); }
@@ -307,15 +122,12 @@
     font-size: var(--t-display); letter-spacing: -.01em; margin: 0;
   }
   .abriss .frist { font-size: var(--t-klein); color: var(--tinte-leise); margin: var(--s1) 0 0; }
-  .abriss .naht {
-    border: 0; border-top: 1px dashed var(--linie);
-    margin: var(--s4) calc(var(--s4) * -1);
-  }
+  .abriss .naht { border: 0; border-top: 1px dashed var(--linie); margin: var(--s4) calc(var(--s4) * -1); }
+  .abriss label { margin-top: var(--s1); }
   .abriss.verfallen { opacity: .5; }
   .abriss.verfallen .wert { text-decoration: line-through; }
-  /* Ohne Knopf gibt es nichts abzureissen - dann auch keine Kerben. */
+  /* Ohne Knopf gibt es nichts abzureißen - dann auch keine Kerben. */
   .abriss.ohne-naht::before, .abriss.ohne-naht::after { display: none; }
-  .abriss label { margin-top: var(--s1); }
 
   /* -------------------------------------------------------------- Angebot */
   .angebot { padding: var(--s3) 0; border-top: 1px solid var(--linie-zart); }
@@ -323,22 +135,12 @@
   .angebot b { display: block; font-family: var(--display); font-weight: 600; }
   .angebot span { font-size: var(--t-klein); color: var(--tinte-leise); }
 
-  .leer-text { color: var(--tinte-leise); font-size: var(--t-klein); margin: 0; }
-  .verborgen { display: none; }
-
   .fuss {
     max-width: 460px; margin: var(--s2) auto 0; padding: 0 var(--s5);
     font-size: var(--t-mikro); line-height: 1.6; color: var(--tinte-leise);
   }
   .fuss p { margin: 0 0 var(--s2); }
   .fuss a { color: var(--tinte-leise); }
-
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-      animation-duration: .01ms !important; animation-iteration-count: 1 !important;
-      transition-duration: .01ms !important;
-    }
-  }
 </style>
 </head>
 <body>

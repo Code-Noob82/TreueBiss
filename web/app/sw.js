@@ -10,7 +10,7 @@
  * bestehende Installationen den alten Stand, bis der Speicher von selbst
  * ablaeuft - der klassische "beim Kunden ist es noch die alte Fassung".
  */
-const VERSION = 'treuebiss-app-v4';
+const VERSION = 'treuebiss-app-v6';
 
 const HUELLE = [
   './',
@@ -20,8 +20,10 @@ const HUELLE = [
   './icon.svg',
   './icon-192.png',
   './icon-512.png',
-  './fonts/familjen-grotesk-latin.woff2',
-  './fonts/public-sans-latin.woff2',
+  '../gemeinsam/basis.css',
+  '../gemeinsam/palette.js',
+  '../gemeinsam/fonts/familjen-grotesk-latin.woff2',
+  '../gemeinsam/fonts/public-sans-latin.woff2',
 ];
 
 self.addEventListener('install', (e) => {
