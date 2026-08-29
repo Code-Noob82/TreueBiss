@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TreueBiss – Kasse</title>
+<style>
+  :root {
+    --gruen: #4CAF50; --gruen-dunkel: #3d8b40; --rot: #c62828;
+    --grau: #f4f4f5; --text: #18181b; --schwach: #71717a; --rand: #d4d4d8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--grau); color: var(--text);
+    padding: max(16px, env(safe-area-inset-top)) 16px 16px;
+  }
+  main { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  .betrieb { color: var(--schwach); font-size: .9rem; margin: 0 0 20px; }
+  .karte {
+    background: #fff; border-radius: 14px; padding: 20px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / .08); margin-bottom: 16px;
+  }
+  label { display: block; font-size: .85rem; color: var(--schwach); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 12px; font-size: 1rem; border: 1px solid var(--rand);
+    border-radius: 10px; margin-bottom: 12px; font-family: inherit;
+  }
+  button {
+    width: 100%; padding: 14px; font-size: 1rem; font-weight: 600;
+    border: 0; border-radius: 10px; background: var(--gruen); color: #fff;
+    cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.sekundaer { background: #fff; color: var(--text); border: 1px solid var(--rand); }
+  video { width: 100%; border-radius: 10px; background: #000; display: block; }
+  .meldung { padding: 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 500; }
+  .meldung.gut { background: #e8f5e9; color: var(--gruen-dunkel); }
+  .meldung.schlecht { background: #ffebee; color: var(--rot); }
+  .zahlen { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .zahl { background: #fff; border-radius: 12px; padding: 14px; }
+  .zahl b { display: block; font-size: 1.6rem; }
+  .zahl span { font-size: .8rem; color: var(--schwach); }
+  .hinweis { font-size: .8rem; color: var(--schwach); line-height: 1.5; }
+  .meldung code {
+    background: rgb(0 0 0 / .07); padding: 1px 5px; border-radius: 4px;
+    font-size: .9em;
+  }
+  .verborgen { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TreueBiss – Kasse</h1>
+  <p class="betrieb" id="betrieb"></p>
+
+  <div id="meldung"></div>
+
+  <!-- Anmeldung -->
+  <section id="anmeldung" class="karte">
+    <label for="email">E-Mail</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email">
+    <label for="passwort">Passwort</label>
+    <input id="passwort" type="password" autocomplete="current-password">
+    <button id="anmelden">Anmelden</button>
+  </section>
+
+  <!-- Einlösen -->
+  <section id="kasse" class="karte verborgen">
+    <video id="video" playsinline class="verborgen"></video>
+    <div id="scanner-bereich">
+      <button id="scannen" class="verborgen">QR-Code scannen</button>
+      <p id="kein-scanner" class="hinweis verborgen"></p>
+    </div>
+    <hr style="border:0;border-top:1px solid var(--rand);margin:16px 0">
+    <label for="code">Gutschein-Nummer</label>
+    <input id="code" placeholder="z. B. 7aa68458-61fc-…" autocapitalize="off" spellcheck="false">
+    <button id="einloesen">Einlösen</button>
+  </section>
+
+  <!-- Zahlen -->
+  <section id="zahlen-bereich" class="verborgen">
+    <div class="zahlen" id="zahlen"></div>
+    <p style="margin-top:16px">
+      <button id="abmelden" class="sekundaer">Abmelden</button>
+    </p>
+  </section>
+</main>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Aus supabase/config.js - siehe web/kasse/config.example.js
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+let scanLaeuft = false;
+
+function melden(text, gut = false) {
+  $('meldung').innerHTML = text
+    ? `<div class="meldung ${gut ? 'gut' : 'schlecht'}">${text}</div>`
+    : '';
+}
+
+/**
+ * Erreichte die Anfrage den Server ueberhaupt? Ein Netzwerkfehler hat keinen
+ * HTTP-Status - die Unterscheidung ist wichtig, weil sonst ein Verbindungs-
+ * abbruch wie ein Tippfehler aussieht und an der Kasse jemand dreimal das
+ * Passwort neu eingibt.
+ */
+function istNetzfehler(fehler) {
+  if (/fetch|network|Failed to send/i.test(fehler?.message ?? '')) return true;
+  if (fehler?.name?.includes('Retryable')) return true;
+  // Vorsichtig sein: Ein PostgrestError traegt den SQLSTATE in `code`, ein
+  // AuthError einen HTTP-Status in `status`. Fehlt beides, kam die Anfrage
+  // nicht an. Wer nur auf `status` prueft, haelt jeden Datenbankfehler
+  // faelschlich fuer einen Verbindungsabbruch.
+  return !fehler?.code && !fehler?.status;
+}
+
+/** Uebersetzt die Fehlercodes der Datenbankfunktionen in Klartext. */
+function fehlertext(fehler) {
+  if (istNetzfehler(fehler)) return 'Keine Verbindung zum Server.';
+  const t = (fehler?.message ?? '') + (fehler?.details ?? '');
+  if (t.includes('not staff')) return 'Dieser Zugang gehört nicht zu diesem Betrieb.';
+  if (t.includes('already redeemed')) return 'Dieser Gutschein wurde bereits eingelöst.';
+  if (t.includes('expired')) return 'Dieser Gutschein ist abgelaufen.';
+  if (t.includes('not found')) return 'Diesen Gutschein gibt es nicht.';
+  return 'Es hat nicht geklappt. Bitte noch einmal versuchen.';
+}
+
+/** Fehler bei der Anmeldung, nach Ursache getrennt. */
+function anmeldeFehlertext(fehler) {
+  if (istNetzfehler(fehler)) {
+    return 'Keine Verbindung zum Server. Prüfe die Internetverbindung '
+         + 'und die Adresse in <code>config.js</code>.';
+  }
+  const t = fehler?.message ?? '';
+  if (/not confirmed/i.test(t)) {
+    return 'Dieser Zugang ist noch nicht bestätigt. Im Supabase-Dashboard '
+         + 'unter Authentication → Users „Auto Confirm User“ setzen.';
+  }
+  if (/invalid login/i.test(t)) return 'E-Mail oder Passwort stimmt nicht.';
+  return 'Anmeldung fehlgeschlagen: ' + t;
+}
+
+/**
+ * Nicht ausgefuellte Konfiguration frueh erkennen. Sonst schlaegt jede
+ * Anmeldung fehl und sieht aus, als stimme das Passwort nicht.
+ */
+function konfigurationFehlt() {
+  return !SUPABASE_URL || SUPABASE_URL.includes('DEIN-PROJEKT')
+      || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('DEIN_ANON_KEY');
+}
+
+async function einloesen(gutscheinId) {
+  const id = gutscheinId.trim();
+  if (!id) return;
+  melden('');
+  const { data, error } = await db.rpc('staff_redeem_voucher', { p_voucher_id: id });
+  if (error) { console.error('staff_redeem_voucher', error); melden(fehlertext(error)); return; }
+  const zeit = new Date(data[0].redeemed_at).toLocaleTimeString('de-DE');
+  melden(`Eingelöst um ${zeit}. Guten Appetit!`, true);
+  $('code').value = '';
+  await zahlenLaden();  // Meldung nicht ueberschreiben: der Erfolg zaehlt hier.
+}
+
+/**
+ * Laedt die Zahlen des Betriebs.
+ *
+ * Gibt zurueck, was schiefging - ein Fehler der Datenbankfunktion darf nicht
+ * genauso aussehen wie "kein Betrieb zugeordnet", sonst sucht man an der
+ * falschen Stelle.
+ *
+ * @returns {'ok'|'kein-betrieb'|{fehler: string}}
+ */
+async function zahlenLaden() {
+  const { data, error } = await db.rpc('staff_pilot_summary');
+  if (error) {
+    if (istNetzfehler(error)) return { fehler: 'Keine Verbindung zum Server.' };
+    if (/does not exist|schema cache/i.test(error.message ?? '')) {
+      return { fehler: 'Die Kassenfunktionen fehlen in der Datenbank. '
+                     + 'Wurde <code>supabase/schema.sql</code> eingespielt?' };
+    }
+    return { fehler: 'Die Zahlen konnten nicht geladen werden: ' + error.message };
+  }
+  if (!data?.length) return 'kein-betrieb';
+  const z = data[0];
+  $('betrieb').textContent = z.tenant;
+  $('zahlen').innerHTML = [
+    [z.members, 'Teilnehmer'],
+    [z.stamps_issued, 'Stempel gesamt'],
+    [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
+    [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
+  ].map(([wert, was]) => `<div class="zahl"><b>${wert}</b><span>${was}</span></div>`).join('');
+  return 'ok';
+}
+
+/**
+ * Scannen ueber die BarcodeDetector-API. Sie fehlt in Safari und Firefox,
+ * und die Kamera braucht https oder localhost - aus einer lokal geoeffneten
+ * Datei geht sie nicht. Deshalb ist die manuelle Eingabe gleichwertig und
+ * nicht nur Notloesung.
+ */
+async function scannerVorbereiten() {
+  const gehtNicht = (grund) => {
+    $('kein-scanner').textContent = grund + ' Gib die Nummer unten ein.';
+    $('kein-scanner').classList.remove('verborgen');
+  };
+  if (!('BarcodeDetector' in window)) {
+    return gehtNicht('Dieser Browser kann keine QR-Codes lesen.');
+  }
+  if (!window.isSecureContext) {
+    return gehtNicht('Die Kamera braucht eine https-Adresse.');
+  }
+  $('scannen').classList.remove('verborgen');
+  $('scannen').onclick = starteScan;
+}
+
+async function starteScan() {
+  if (scanLaeuft) return;
+  const video = $('video');
+  try {
+    video.srcObject = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    await video.play();
+  } catch {
+    melden('Kein Zugriff auf die Kamera.');
+    return;
+  }
+  video.classList.remove('verborgen');
+  $('scannen').textContent = 'Scan läuft …';
+  $('scannen').disabled = true;
+  scanLaeuft = true;
+
+  const detector = new BarcodeDetector({ formats: ['qr_code'] });
+  const suchen = async () => {
+    if (!scanLaeuft) return;
+    try {
+      const treffer = await detector.detect(video);
+      if (treffer.length) { await scanBeenden(treffer[0].rawValue); return; }
+    } catch { /* einzelne Frames duerfen fehlschlagen */ }
+    requestAnimationFrame(suchen);
+  };
+  requestAnimationFrame(suchen);
+}
+
+async function scanBeenden(wert) {
+  scanLaeuft = false;
+  const video = $('video');
+  video.srcObject?.getTracks().forEach((t) => t.stop());
+  video.classList.add('verborgen');
+  $('scannen').textContent = 'QR-Code scannen';
+  $('scannen').disabled = false;
+  if (wert) await einloesen(wert);
+}
+
+function zeigeAngemeldet(ja) {
+  $('anmeldung').classList.toggle('verborgen', ja);
+  $('kasse').classList.toggle('verborgen', !ja);
+  $('zahlen-bereich').classList.toggle('verborgen', !ja);
+}
+
+$('anmelden').onclick = async () => {
+  melden('');
+  const { error } = await db.auth.signInWithPassword({
+    email: $('email').value.trim(),
+    password: $('passwort').value,
+  });
+  if (error) { console.error('signIn', error); melden(anmeldeFehlertext(error)); return; }
+  $('passwort').value = '';
+  await starten();
+};
+
+$('abmelden').onclick = async () => {
+  await scanBeenden(null);
+  await db.auth.signOut();
+  $('betrieb').textContent = '';
+  melden('');
+  zeigeAngemeldet(false);
+};
+
+$('einloesen').onclick = () => einloesen($('code').value);
+$('code').onkeydown = (e) => { if (e.key === 'Enter') einloesen($('code').value); };
+
+async function starten() {
+  if (konfigurationFehlt()) {
+    melden('<code>web/kasse/config.js</code> ist nicht ausgefüllt. '
+         + 'Trage dort URL und Anon-Key deines Supabase-Projekts ein.');
+    $('anmeldung').classList.add('verborgen');
+    return;
+  }
+  const { data } = await db.auth.getSession();
+  if (!data.session) { zeigeAngemeldet(false); return; }
+  zeigeAngemeldet(true);
+  const stand = await zahlenLaden();
+  await scannerVorbereiten();
+
+  if (stand === 'kein-betrieb') {
+    melden('Dieser Zugang ist keinem Betrieb zugeordnet. Fehlt der Eintrag '
+         + 'in <code>tenant_staff</code>?');
+  } else if (typeof stand === 'object') {
+    melden(stand.fehler);
+  }
+}
+
+starten();
+</script>
+</body>
+</html>
