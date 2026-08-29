@@ -133,7 +133,40 @@ statt einen Stempel zu vergeben, der später zurückgenommen werden müsste.
 
 Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
 
-### 1. Auswertung für den Piloten
+### 1. Kassenseite für den Betrieb
+
+`web/kasse/index.html` — eine einzelne Seite ohne Build-Schritt. Das Personal
+öffnet sie im Browser, meldet sich an, scannt den Gutschein-QR des Kunden und
+sieht die Zahlen des eigenen Betriebs.
+
+**Einrichten:**
+
+1. `web/kasse/config.example.js` nach `config.js` kopieren und die Werte des
+   Supabase-Projekts eintragen.
+2. Im Supabase-Dashboard unter *Authentication → Users* einen Zugang für den
+   Betrieb anlegen.
+3. Den Zugang dem Betrieb zuordnen:
+   ```sql
+   insert into public.tenant_staff (user_id, tenant_id)
+   values ('<user-id>', '<tenant-id>');
+   ```
+4. Die Seite über `https` oder `localhost` ausliefern. **Die Kamera funktioniert
+   nicht aus einer lokal geöffneten Datei** (`file://` ist kein sicherer
+   Kontext). Zum Ausprobieren genügt:
+   ```bash
+   cd web/kasse && python3 -m http.server 8777
+   ```
+
+Die QR-Erkennung nutzt die `BarcodeDetector`-API — vorhanden in Chrome und auf
+Android, nicht in Safari und Firefox. Die Eingabe der Gutschein-Nummer per Hand
+ist deshalb gleichwertig ausgelegt und nicht nur Notlösung.
+
+Das Personal löst über `staff_redeem_voucher()` ein. Die reguläre
+`redeem_voucher()` prüft auf Besitz des Gutscheins — das Personal ist aber
+nicht der Besitzer. Hier ersetzt die Beschäftigung beim Betrieb diesen
+Nachweis, und damit auch den Einlöse-Code: Wer scannt, ist der Betrieb.
+
+### 2. Auswertung für den Piloten
 
 Vier Views in `supabase/schema.sql` liefern die Zahlen, an denen sich
 entscheidet, ob das Programm trägt:
@@ -166,7 +199,7 @@ weist sie getrennt aus. Und Nutzer aus der Zeit vor den Mitgliedschaften haben
 Gutscheine, aber keinen Eintrag in `memberships`; `members` zählt sie deshalb
 nicht mit.
 
-### 2. Mandantenfähigkeit
+### 3. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -180,13 +213,13 @@ Schemaänderung mehr, nur noch die Oberfläche dafür.
 Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
 App - hier dockt später ein Admin-Backend an.
 
-### 3. Architektur: Hexagonal + MVVM
+### 4. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 4. Abstraktion der Datenquelle: Repository Pattern
+### 5. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 

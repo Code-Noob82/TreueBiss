@@ -1,6 +1,18 @@
 -- TreueBiss - Datenbankschema (Supabase / Postgres)
 --
--- Reihenfolge beachten: tenants zuerst, danach alles was darauf verweist.
+-- ACHTUNG Reihenfolge: Das Skript laeuft von oben nach unten. Jede Anweisung
+-- darf nur auf Objekte verweisen, die weiter oben stehen. Der Aufbau ist:
+--
+--   1. Tabellen (tenants zuerst, danach alles was darauf verweist)
+--   2. Spalten fuer bestehende Installationen nachziehen
+--   3. Row Level Security und Policies
+--   4. Funktionen fuer Vergabe und Einloesen
+--   5. Beispieldaten
+--   6. Views fuer die Auswertung
+--   7. Funktionen, die auf Views aufbauen
+--
+-- Eine an der falschen Stelle eingefuegte Anweisung faellt auf einer frischen
+-- Datenbank sofort um - `supabase/test/run.sh` deckt genau das ab.
 -- Pflege von tenants und offers laeuft ueber den Service-Role-Key oder das
 -- Supabase-Studio, nicht aus der App. Genau hier dockt spaeter ein Admin-
 -- Backend an, ohne dass der Rest angefasst werden muss.
@@ -66,6 +78,35 @@ create table if not exists public.memberships (
     joined_at timestamptz not null default now(),
     primary key (user_id, tenant_id)
 );
+
+-- ==================================================== Personal des Betriebs
+
+-- Wer fuer einen Betrieb an der Kasse arbeitet. Getrennt von memberships:
+-- Das sind Kunden, die dort sammeln - hier geht es um Beschaeftigte.
+-- Angelegt wird ueber das Supabase-Dashboard oder den Service-Role-Key,
+-- nicht aus der Anwendung.
+create table if not exists public.tenant_staff (
+    user_id   uuid not null references auth.users(id) on delete cascade,
+    tenant_id uuid not null references public.tenants(id) on delete cascade,
+    created_at timestamptz not null default now(),
+    primary key (user_id, tenant_id)
+);
+
+alter table public.tenant_staff enable row level security;
+
+drop policy if exists tenant_staff_select_own on public.tenant_staff;
+-- Personal sieht nur die eigene Zuordnung; angelegt wird sie nicht hier.
+create policy tenant_staff_select_own on public.tenant_staff
+    for select to authenticated using (auth.uid() = user_id);
+
+-- Arbeitet der Aufrufer fuer diesen Betrieb?
+create or replace function public.is_staff_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid() and s.tenant_id = target_tenant
+    );
+$$;
 
 -- ============================================ Einloesen (serverseitig)
 
@@ -148,6 +189,70 @@ $$;
 
 revoke all on function public.redeem_voucher(uuid, text) from public;
 grant execute on function public.redeem_voucher(uuid, text) to authenticated;
+
+-- ================================================ Kassenseite des Betriebs
+
+/*
+ * Loest einen Gutschein ein - aufgerufen vom Personal, nicht vom Kunden.
+ *
+ * redeem_voucher() prueft user_id = auth.uid(); das Personal ist aber nicht
+ * der Besitzer des Gutscheins. Hier ersetzt die Beschaeftigung des Aufrufers
+ * beim Betrieb diesen Nachweis - und damit auch den Einloese-Code: Wer
+ * scannt, ist der Betrieb.
+ *
+ * Fehlercodes:
+ *   42501  Aufrufer arbeitet nicht fuer diesen Betrieb
+ *   22023  Gutschein unbekannt, bereits eingeloest oder abgelaufen
+ */
+create or replace function public.staff_redeem_voucher(p_voucher_id uuid)
+returns table (
+    voucher_id  uuid,
+    redeemed_at timestamptz,
+    customer    uuid
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_staff    uuid := auth.uid();
+    v_tenant   uuid;
+    v_owner    uuid;
+    v_redeemed boolean;
+    v_expires  int8;
+    v_now      timestamptz := now();
+begin
+    if v_staff is null then
+        raise exception 'not authenticated' using errcode = '28000';
+    end if;
+
+    select tenant_id, user_id, is_redeemed, expires_at
+      into v_tenant, v_owner, v_redeemed, v_expires
+      from public.vouchers where id = p_voucher_id;
+
+    if not found then
+        raise exception 'voucher not found' using errcode = '22023';
+    end if;
+    if not public.is_staff_of(v_tenant) then
+        raise exception 'not staff of this tenant' using errcode = '42501';
+    end if;
+    if v_redeemed then
+        raise exception 'voucher already redeemed' using errcode = '22023';
+    end if;
+    if v_expires < (extract(epoch from v_now) * 1000)::int8 then
+        raise exception 'voucher expired' using errcode = '22023';
+    end if;
+
+    update public.vouchers
+       set is_redeemed = true, redeemed_at = v_now
+     where id = p_voucher_id;
+
+    return query select p_voucher_id, v_now, v_owner;
+end;
+$$;
+
+revoke all on function public.staff_redeem_voucher(uuid) from public;
+grant execute on function public.staff_redeem_voucher(uuid) to authenticated;
 
 -- ==================================================== Beispiel-Betrieb (Demo)
 -- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
@@ -510,3 +615,23 @@ revoke all on public.pilot_daily_signups     from anon, authenticated;
 revoke all on public.pilot_daily_stamps      from anon, authenticated;
 revoke all on public.pilot_daily_redemptions from anon, authenticated;
 revoke all on public.pilot_summary           from anon, authenticated;
+
+/*
+ * Die Pilot-Zahlen des eigenen Betriebs.
+ *
+ * pilot_summary selbst bleibt gesperrt - sie enthaelt alle Betriebe. Diese
+ * Funktion gibt nur die Zeilen zurueck, fuer die der Aufrufer arbeitet.
+ */
+create or replace function public.staff_pilot_summary()
+returns setof public.pilot_summary
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select * from public.pilot_summary
+     where public.is_staff_of(tenant_id);
+$$;
+
+revoke all on function public.staff_pilot_summary() from public;
+grant execute on function public.staff_pilot_summary() to authenticated;
