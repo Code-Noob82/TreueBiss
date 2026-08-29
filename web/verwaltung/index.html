@@ -28,6 +28,7 @@
     margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
     text-transform: uppercase; color: var(--grund-leise);
   }
+  .kopf-rechts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
   .kopf select {
     width: auto; min-width: 12rem; margin: 0;
     background: hsl(var(--h) 10% 100% / .1);
@@ -80,8 +81,14 @@
       <h1>Verwaltung</h1>
       <p id="betrieb">TreueBiss</p>
     </div>
-    <div id="wahl-bereich" class="verborgen">
-      <select id="wahl" aria-label="Betrieb auswählen"></select>
+    <div class="kopf-rechts">
+      <nav id="wechsel" class="wechsel verborgen" aria-label="Bereich wechseln">
+        <a href="../kasse/">Kasse</a>
+        <a href="./" aria-current="page">Verwaltung</a>
+      </nav>
+      <div id="wahl-bereich" class="verborgen">
+        <select id="wahl" aria-label="Betrieb auswählen"></select>
+      </div>
     </div>
   </div>
 </header>
@@ -238,19 +245,23 @@ import { paletteSetzen } from '../gemeinsam/palette.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 /*
- * Eigener Speicherschlüssel je Oberfläche.
+ * Speicherschlüssel: Die Grenze verläuft zwischen Kunde und Betrieb, nicht
+ * zwischen den einzelnen Seiten.
  *
- * Ohne ihn teilen sich alle drei Seiten unter derselben Adresse EINE
- * Anmeldung: Der Supabase-Client legt sein Token unter `sb-<projekt>-auth-
- * token` ab, für alle gleich. Die Folgen sind still und übel - eine
- * Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt
- * Stempel auf den Kassenzugang, weil dort schon eine Sitzung liegt und gar
- * keine anonyme Anmeldung mehr stattfindet. Umgekehrt steht die Kasse
- * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
- * keinem Betrieb.
+ * Ohne eigenen Schlüssel teilen sich alle Seiten unter derselben Adresse EINE
+ * Anmeldung, weil der Supabase-Client sein Token immer unter
+ * `sb-<projekt>-auth-token` ablegt. Zwischen Kundenseite und Betriebsseiten
+ * wäre das übel: Eine Verkaufskraft, die auf dem Kassengerät die Kundenseite
+ * öffnet, sammelt Stempel auf den Kassenzugang, weil schon eine Sitzung da
+ * ist und gar keine anonyme Anmeldung mehr stattfindet.
+ *
+ * Kasse und Verwaltung dagegen sind derselbe Mensch mit demselben Login. Sie
+ * teilen sich `treuebiss-betrieb`, damit der Umschalter im Kopf nicht auf ein
+ * Anmeldeformular führt. Was der Zugang darf, entscheidet ohnehin der Server:
+ * `is_owner_of` in den Funktionen, nicht die Seite.
  */
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
-  { auth: { storageKey: 'treuebiss-verwaltung' } });
+  { auth: { storageKey: 'treuebiss-betrieb' } });
 const $ = (id) => document.getElementById(id);
 
 /** Betriebe, die dieser Zugang verwalten darf. */
@@ -607,6 +618,7 @@ $('anmelden').onclick = async () => {
 $('abmelden').onclick = async () => {
   await db.auth.signOut();
   betriebe = []; aktiv = null;
+  $('wechsel').classList.add('verborgen');
   $('betrieb').textContent = 'TreueBiss';
   paletteSetzen('#4CAF50');
   melden('');
@@ -641,6 +653,9 @@ async function starten() {
   if (typeof stand === 'object') { zeigeAngemeldet(false); melden(stand.fehler); return; }
 
   zeigeAngemeldet(true);
+  // Jeder Inhaber ist zugleich Personal: is_staff_of filtert nicht nach
+  // Rolle. Der Weg zur Kasse steht hier also immer offen.
+  $('wechsel').classList.remove('verborgen');
   if (betriebe.length > 1) {
     $('wahl-bereich').classList.remove('verborgen');
     $('wahl').innerHTML = betriebe

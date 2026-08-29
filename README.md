@@ -254,13 +254,23 @@ die Palettenrechnung in `web/gemeinsam/palette.js`. Alle drei Oberflächen
 binden dieselben Dateien ein. Drei Kopien derselben Tokens wären der übliche
 Weg, auf dem ein Designsystem verfällt.
 
-**Getrennte Anmeldungen.** Jede Oberfläche bekommt einen eigenen
-`storageKey` (`treuebiss-kunde`, `treuebiss-kasse`, `treuebiss-verwaltung`).
-Ohne das teilen sich alle drei unter derselben Adresse **eine** Anmeldung, weil
-der Supabase-Client sein Token für jeden Client unter demselben Schlüssel
-ablegt. Die Folgen sind still: Eine Verkaufskraft, die auf dem Kassengerät die
-Kundenseite öffnet, sammelt Stempel auf den Kassenzugang — eine anonyme
-Anmeldung findet gar nicht mehr statt, weil schon eine Sitzung da ist.
+**Getrennte Anmeldungen — die Grenze verläuft zwischen Kunde und Betrieb.**
+Der Supabase-Client legt sein Token immer unter `sb-<projekt>-auth-token` ab;
+ohne eigenen `storageKey` teilen sich also alle Seiten unter derselben Adresse
+**eine** Anmeldung. Zwischen Kundenseite und Betriebsseiten wäre das übel: Eine
+Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt Stempel
+auf den Kassenzugang — eine anonyme Anmeldung findet gar nicht mehr statt, weil
+schon eine Sitzung da ist.
+
+Die Kundenseite bekommt deshalb `treuebiss-kunde`. Kasse und Verwaltung teilen
+sich dagegen `treuebiss-betrieb`: Das ist derselbe Mensch mit demselben Login,
+und was er darf, entscheidet der Server über `is_owner_of`, nicht die Seite.
+Deshalb führt der Umschalter im Kopfband nicht auf ein Anmeldeformular.
+
+**Umschalter zwischen Kasse und Verwaltung.** Er erscheint in der Kasse nur,
+wenn der Zugang in `tenant_staff` die Rolle `owner` trägt — ein Weg, der ins
+Leere führt, ist schlechter als kein Weg. In der Verwaltung steht er immer, weil
+jeder Inhaber zugleich Personal ist (`is_staff_of` filtert nicht nach Rolle).
 
 **Gestaltung.** Die Farbe des Betriebs ist nicht nur Knopffüllung: Aus dem Hex
 werden Farbton und Sättigung gezogen, und das Stylesheet leitet daraus die

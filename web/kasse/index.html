@@ -20,7 +20,11 @@
     padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s7);
     border-radius: 0 0 var(--s5) var(--s5);
   }
-  .kopf-innen { max-width: 460px; margin: 0 auto; }
+  .kopf-innen {
+    max-width: 460px; margin: 0 auto;
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    justify-content: space-between; gap: var(--s3);
+  }
   .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
   .kopf p {
     margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
@@ -84,8 +88,14 @@
 
 <header class="kopf">
   <div class="kopf-innen">
-    <h1>Kasse</h1>
-    <p id="betrieb">TreueBiss</p>
+    <div>
+      <h1>Kasse</h1>
+      <p id="betrieb">TreueBiss</p>
+    </div>
+    <nav id="wechsel" class="wechsel verborgen" aria-label="Bereich wechseln">
+      <a href="./" aria-current="page">Kasse</a>
+      <a href="../verwaltung/">Verwaltung</a>
+    </nav>
   </div>
 </header>
 
@@ -134,19 +144,23 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
 /*
- * Eigener Speicherschlüssel je Oberfläche.
+ * Speicherschlüssel: Die Grenze verläuft zwischen Kunde und Betrieb, nicht
+ * zwischen den einzelnen Seiten.
  *
- * Ohne ihn teilen sich alle drei Seiten unter derselben Adresse EINE
- * Anmeldung: Der Supabase-Client legt sein Token unter `sb-<projekt>-auth-
- * token` ab, für alle gleich. Die Folgen sind still und übel - eine
- * Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt
- * Stempel auf den Kassenzugang, weil dort schon eine Sitzung liegt und gar
- * keine anonyme Anmeldung mehr stattfindet. Umgekehrt steht die Kasse
- * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
- * keinem Betrieb.
+ * Ohne eigenen Schlüssel teilen sich alle Seiten unter derselben Adresse EINE
+ * Anmeldung, weil der Supabase-Client sein Token immer unter
+ * `sb-<projekt>-auth-token` ablegt. Zwischen Kundenseite und Betriebsseiten
+ * wäre das übel: Eine Verkaufskraft, die auf dem Kassengerät die Kundenseite
+ * öffnet, sammelt Stempel auf den Kassenzugang, weil schon eine Sitzung da
+ * ist und gar keine anonyme Anmeldung mehr stattfindet.
+ *
+ * Kasse und Verwaltung dagegen sind derselbe Mensch mit demselben Login. Sie
+ * teilen sich `treuebiss-betrieb`, damit der Umschalter im Kopf nicht auf ein
+ * Anmeldeformular führt. Was der Zugang darf, entscheidet ohnehin der Server:
+ * `is_owner_of` in den Funktionen, nicht die Seite.
  */
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
-  { auth: { storageKey: 'treuebiss-kasse' } });
+  { auth: { storageKey: 'treuebiss-betrieb' } });
 const $ = (id) => document.getElementById(id);
 let scanLaeuft = false;
 
@@ -339,10 +353,23 @@ async function scanBeenden(wert) {
   if (wert) await einloesen(wert);
 }
 
+/*
+ * Zeigt den Umschalter nur, wenn dieser Zugang die Verwaltung auch betreten
+ * darf. Wer nur an der Kasse steht, bekaeme dort sonst eine Absage - ein
+ * Weg, der ins Leere fuehrt, ist schlechter als kein Weg.
+ */
+async function wechselPruefen() {
+  const { data, error } = await db.from('tenant_staff').select('role');
+  if (error) { console.error('tenant_staff', error); return; }
+  const darf = (data ?? []).some((r) => r.role === 'owner');
+  $('wechsel').classList.toggle('verborgen', !darf);
+}
+
 function zeigeAngemeldet(ja) {
   $('anmeldung').classList.toggle('verborgen', ja);
   $('kasse').classList.toggle('verborgen', !ja);
   $('zahlen-bereich').classList.toggle('verborgen', !ja);
+  if (!ja) $('wechsel').classList.add('verborgen');
 }
 
 $('anmelden').onclick = async () => {
@@ -381,6 +408,7 @@ async function starten() {
   if (!data.session) { zeigeAngemeldet(false); return; }
   zeigeAngemeldet(true);
   const stand = await zahlenLaden();
+  await wechselPruefen();
   await scannerVorbereiten();
 
   if (stand === 'kein-betrieb') {

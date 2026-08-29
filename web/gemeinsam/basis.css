@@ -207,3 +207,27 @@ input[type="color"] { padding: var(--s1); height: 46px; cursor: pointer; }
     transition-duration: .01ms !important;
   }
 }
+
+/*
+ * Umschalter zwischen den beiden Betriebsseiten.
+ *
+ * Sitzt im Kopfband, wo auf beiden Seiten Platz dafür ist. Er erscheint nur,
+ * wenn der Zugang das Ziel auch betreten darf - ein Schalter, der auf ein
+ * Anmeldeformular führt, ist schlechter als keiner.
+ */
+.wechsel {
+  display: inline-flex; gap: var(--s1); padding: var(--s1);
+  border-radius: 999px; background: hsl(var(--h) 10% 100% / .12);
+}
+.wechsel a {
+  padding: var(--s2) var(--s4); border-radius: 999px;
+  font-family: var(--display); font-size: var(--t-mikro); font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; line-height: 1;
+  color: var(--grund-leise); text-decoration: none;
+  transition: color 140ms ease-out, background-color 140ms ease-out;
+}
+.wechsel a:hover { color: var(--grund-text); }
+.wechsel a[aria-current="page"] {
+  background: hsl(var(--h) 10% 100% / .18); color: var(--grund-text);
+}
+.wechsel a:focus-visible { outline: 2px solid var(--grund-text); outline-offset: 2px; }
