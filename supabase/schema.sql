@@ -92,7 +92,11 @@ alter table public.tenants
     -- fehlt, muss das an bleiben - sonst faellt der Demo-Betrieb um. Wer
     -- produktiv scannt, schaltet es aus, sonst ist die ganze Pruefung
     -- umgehbar, indem man irgendeine Zeichenkette schickt.
-    add column if not exists allow_opaque_proofs boolean not null default true;
+    add column if not exists allow_opaque_proofs boolean not null default true,
+    -- Verlangt eine geprüfte ECDSA-Signatur. Nur einschaltbar, wo die Edge
+    -- Function `beleg-pruefen` ausgerollt ist - sonst kommt kein Stempel
+    -- mehr durch.
+    add column if not exists require_signed_proof boolean not null default false;
 
 -- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
 -- steht; auf einer frischen Datenbank passiert nichts.
@@ -528,7 +532,10 @@ create table if not exists public.stamp_proofs (
 -- ein abgelehnter oder strittiger Stempel spaeter nicht nachvollziehen.
 alter table public.stamp_proofs
     add column if not exists register_serial text,
-    add column if not exists amount_cents    int;
+    add column if not exists amount_cents    int,
+    -- Wurde die ECDSA-Signatur des Belegs geprüft? Nur die Edge Function
+    -- kann das setzen.
+    add column if not exists signature_verified boolean not null default false;
 
 alter table public.stamp_proofs enable row level security;
 -- Nur lesen; geschrieben wird ausschliesslich in issue_stamp().
@@ -620,10 +627,12 @@ revoke all on function public.parse_receipt_qr(text) from public;
  *
  * Wirft bei bereits verwendetem Nachweis (unique_violation, SQLSTATE 23505).
  */
-create or replace function public.issue_stamp(
+create or replace function public.issue_stamp_intern(
+    p_user_id   uuid,
     p_tenant_id uuid,
     p_proof_ref text,
-    p_source    text default 'receipt'
+    p_source    text,
+    p_signiert  boolean
 )
 returns table (
     stamp_id           uuid,
@@ -636,7 +645,7 @@ security definer
 set search_path = public
 as $$
 declare
-    v_user      uuid := auth.uid();
+    v_user      uuid := p_user_id;
     v_stamp_id  uuid := gen_random_uuid();
     v_count     int;
     v_tenant    public.tenants%rowtype;
@@ -650,7 +659,12 @@ begin
     if v_user is null then
         raise exception 'not authenticated' using errcode = '28000';
     end if;
-    if not public.is_member_of(p_tenant_id) then
+    -- Nicht is_member_of: Die Funktion fragt auth.uid(), und beim Aufruf aus
+    -- der Edge Function heraus steht der Nutzer als Parameter da.
+    if not exists (
+        select 1 from public.memberships m
+         where m.user_id = p_user_id and m.tenant_id = p_tenant_id
+    ) then
         raise exception 'not a member of this tenant' using errcode = '42501';
     end if;
     if p_proof_ref is null or length(trim(p_proof_ref)) = 0 then
@@ -673,6 +687,13 @@ begin
     select * into v_beleg from public.parse_receipt_qr(p_proof_ref);
 
     if found then
+        -- Verlangt der Betrieb eine geprüfte Signatur, kommt der Beleg nur
+        -- über die Edge Function herein. Die Datenbank kann ECDSA nicht
+        -- selbst prüfen; sie kann aber verlangen, dass es jemand getan hat.
+        if v_tenant.require_signed_proof and not p_signiert then
+            raise exception 'signature check required' using errcode = '42501';
+        end if;
+
         if v_tenant.require_known_register and not exists (
             select 1 from public.tenant_registers r
              where r.tenant_id = p_tenant_id and r.serial = v_beleg.register_serial
@@ -701,7 +722,7 @@ begin
         -- Kein Beleg-QR. Solange der Betrieb das erlaubt, zaehlt der freie
         -- Nachweis weiter - sonst waere die Pruefung ohnehin umgehbar,
         -- indem man irgendeine Zeichenkette schickt.
-        if not v_tenant.allow_opaque_proofs then
+        if not v_tenant.allow_opaque_proofs or v_tenant.require_signed_proof then
             raise exception 'receipt qr required' using errcode = '22023';
         end if;
         v_ref := trim(p_proof_ref);
@@ -718,10 +739,12 @@ begin
 
     -- Schlaegt bei einem schon verwendeten Beleg mit unique_violation fehl.
     insert into public.stamp_proofs (
-        tenant_id, user_id, proof_ref, source, register_serial, amount_cents
+        tenant_id, user_id, proof_ref, source, register_serial, amount_cents,
+        signature_verified
     ) values (
         p_tenant_id, v_user, v_ref, p_source,
-        v_beleg.register_serial, v_beleg.amount_cents
+        v_beleg.register_serial, v_beleg.amount_cents,
+        coalesce(p_signiert, false)
     );
 
     insert into public.stamps (id, created_at, user_id, tenant_id)
@@ -751,8 +774,82 @@ begin
 end;
 $$;
 
+revoke all on function public.issue_stamp_intern(uuid, uuid, text, text, boolean) from public;
+
+/*
+ * Der gewoehnliche Weg: Die App ruft das mit ihrer eigenen Anmeldung auf.
+ * Eine geprüfte Signatur kann sie dabei nicht behaupten - das entscheidet
+ * nicht der Aufrufer.
+ */
+create or replace function public.issue_stamp(
+    p_tenant_id uuid,
+    p_proof_ref text,
+    p_source    text default 'receipt'
+)
+returns table (
+    stamp_id           uuid,
+    stamp_count        int,
+    voucher_id         uuid,
+    voucher_expires_at int8
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if auth.uid() is null then
+        raise exception 'not authenticated' using errcode = '28000';
+    end if;
+    return query select * from public.issue_stamp_intern(
+        auth.uid(), p_tenant_id, p_proof_ref, p_source, false);
+end;
+$$;
+
 revoke all on function public.issue_stamp(uuid, text, text) from public;
 grant execute on function public.issue_stamp(uuid, text, text) to authenticated;
+
+/*
+ * Der Weg ueber die Edge Function, die die ECDSA-Signatur des Belegs geprueft
+ * hat. Nur fuer service_role - haette die App dieses Recht, koennte sie sich
+ * die Pruefung selbst bescheinigen und der ganze Aufwand waere umsonst.
+ *
+ * Der Nutzer steht als Parameter da, weil die Funktion mit dem Service-Key
+ * arbeitet und auth.uid() dort leer ist. Sie prueft die Mitgliedschaft
+ * genauso wie der gewoehnliche Weg.
+ */
+create or replace function public.service_issue_stamp(
+    p_user_id   uuid,
+    p_tenant_id uuid,
+    p_proof_ref text,
+    p_source    text default 'receipt'
+)
+returns table (
+    stamp_id           uuid,
+    stamp_count        int,
+    voucher_id         uuid,
+    voucher_expires_at int8
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if p_user_id is null then
+        raise exception 'user required' using errcode = '22023';
+    end if;
+    return query select * from public.issue_stamp_intern(
+        p_user_id, p_tenant_id, p_proof_ref, p_source, true);
+end;
+$$;
+
+revoke all on function public.service_issue_stamp(uuid, uuid, text, text) from public;
+do $$
+begin
+    if exists (select 1 from pg_roles where rolname = 'service_role') then
+        execute 'grant execute on function public.service_issue_stamp(uuid, uuid, text, text) to service_role';
+    end if;
+end
+$$;
 
 -- Beispiel-Angebot fuer den Demo-Betrieb.
 insert into public.offers (tenant_id, title, description)
@@ -1027,13 +1124,18 @@ grant execute on function public.owner_update_tenant(
  * und Kartenregel, das andere Missbrauchsschutz. Wer die Farbe aendert,
  * soll nicht aus Versehen das Zeitfenster verstellen.
  */
+-- Die Signaturpflicht ist spaeter dazugekommen. Ohne dieses drop staende
+-- die alte sechsstellige Fassung daneben, und der Aufruf waere mehrdeutig.
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean);
+
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
     p_max_age_minutes int,
     p_min_cents       int,
     p_daily_limit     int,
     p_require_known   boolean,
-    p_allow_opaque    boolean
+    p_allow_opaque    boolean,
+    p_require_signed  boolean default false
 )
 returns setof public.tenants
 language plpgsql
@@ -1067,15 +1169,16 @@ begin
            proof_min_cents        = p_min_cents,
            daily_stamp_limit      = p_daily_limit,
            require_known_register = coalesce(p_require_known, false),
-           allow_opaque_proofs    = coalesce(p_allow_opaque, true)
+           allow_opaque_proofs    = coalesce(p_allow_opaque, true),
+           require_signed_proof   = coalesce(p_require_signed, false)
      where id = p_tenant_id;
 
     return query select * from public.tenants where id = p_tenant_id;
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean) from public;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean) from public;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*

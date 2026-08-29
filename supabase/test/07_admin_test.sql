@@ -293,6 +293,13 @@ begin
     select require_known_register into v_ok from public.tenants where id = v_tenant;
     call test.check(v_ok, 'Mit eingetragener Kasse lässt sich die Pflicht einschalten');
 
+    perform public.owner_update_proof_rules(v_tenant, 60, 0, 3, true, true, true);
+    select require_signed_proof into v_ok from public.tenants where id = v_tenant;
+    call test.check(v_ok, 'Der Inhaber schaltet die Signaturpflicht ein');
+    perform public.owner_update_proof_rules(v_tenant, 60, 0, 3, true, true, false);
+    select require_signed_proof into v_ok from public.tenants where id = v_tenant;
+    call test.check(not v_ok, 'Und wieder aus');
+
     call auth.become(v_kasse);
     set local role authenticated;
     begin
