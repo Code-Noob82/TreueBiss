@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dominikbaki.treuebiss.R
 import com.dominikbaki.treuebiss.core.domain.models.InvalidRedeemCodeException
+import com.dominikbaki.treuebiss.core.domain.models.RedeemNotConfiguredException
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.models.VoucherNotRedeemableException
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
@@ -81,6 +82,9 @@ class VoucherViewModel @Inject constructor(
             } catch (e: VoucherNotRedeemableException) {
                 Log.w("VoucherViewModel", "Voucher not redeemable", e)
                 _events.emit(VoucherEvent.Failed(R.string.voucher_error_not_redeemable))
+            } catch (e: RedeemNotConfiguredException) {
+                Log.e("VoucherViewModel", "Tenant requires a code but has none", e)
+                _events.emit(VoucherEvent.Failed(R.string.voucher_error_not_configured))
             } catch (e: Exception) {
                 Log.e("VoucherViewModel", "Redeeming failed", e)
                 _events.emit(VoucherEvent.Failed(R.string.voucher_error_offline))

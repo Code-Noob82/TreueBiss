@@ -39,3 +39,10 @@ class InvalidRedeemCodeException(message: String) : Exception(message)
 
 /** Der Gutschein ist bereits eingelöst, abgelaufen oder unbekannt. */
 class VoucherNotRedeemableException(message: String) : Exception(message)
+
+/**
+ * Der Betrieb verlangt einen Einlöse-Code, hat aber keinen hinterlegt.
+ * Ein Fehler in der Einrichtung, nicht beim Kunden - und ausdrücklich kein
+ * Verbindungsproblem, als das er sonst gemeldet würde.
+ */
+class RedeemNotConfiguredException(message: String) : Exception(message)

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TreueBiss</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="theme-color" id="theme-farbe" content="#4CAF50">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preload" href="../gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../gemeinsam/basis.css">
+<style>
+  /* Nur, was diese Seite ausmacht. Alles Übrige steht in basis.css. */
+  body { min-height: 100dvh; }
+
+  .kopf {
+    background: var(--grund);
+    color: var(--grund-text);
+    padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s7);
+    /* Der Bogen unten nimmt die Rundung der Karte auf, die darauf liegt. */
+    border-radius: 0 0 var(--s5) var(--s5);
+  }
+  .kopf-innen {
+    max-width: 460px; margin: 0 auto;
+    display: flex; align-items: center; gap: var(--s3);
+  }
+  .kopf img {
+    width: var(--s7); height: var(--s7); border-radius: var(--s3);
+    object-fit: cover; background: hsl(var(--h) 10% 100% / .12);
+  }
+  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
+  .kopf p {
+    margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
+    text-transform: uppercase; color: var(--grund-leise);
+  }
+
+  main { max-width: 460px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
+
+  /* --------------------------------------------------------- Stempelkarte */
+  .fortschritt {
+    font-family: var(--display);
+    font-size: var(--t-gross); font-weight: 600; line-height: 1.2;
+    letter-spacing: -.014em;
+    margin: 0 0 var(--s1); text-wrap: balance;
+  }
+  .fortschritt b { color: var(--marke); font-weight: 700; }
+  .zaehler {
+    font-size: var(--t-klein); color: var(--tinte-leise);
+    font-variant-numeric: tabular-nums; margin: 0 0 var(--s5);
+  }
+
+  .punkte {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: var(--s3); margin-bottom: var(--s5); justify-items: center;
+  }
+  .punkt {
+    width: 100%; max-width: var(--s7); aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px dashed var(--leer);
+    display: grid; place-items: center;
+  }
+  /*
+    Ein Stempel sitzt nie gerade. Die Drehung kommt aus dem Index, ist also
+    für jedes Feld immer dieselbe - sonst wackelte die Karte bei jedem
+    Neuzeichnen.
+  */
+  .punkt.voll {
+    border: 0;
+    background:
+      radial-gradient(circle at 34% 30%, hsl(0 0% 100% / .28), transparent 58%),
+      var(--marke);
+    transform: rotate(var(--dreh, 0deg));
+    box-shadow: inset 0 0 0 1px hsl(var(--h) 40% 20% / .12);
+  }
+  .punkt.voll::after {
+    content: ""; width: 34%; height: 34%; border-radius: 50%;
+    background: var(--marke-text); opacity: .82;
+  }
+  /* 240 ms, nur transform und opacity. Der kleine Rückprall ist kein Zierrat,
+     sondern das Absetzen des Stempels - danach ist Schluss. */
+  .punkt.frisch { animation: stempeln 240ms cubic-bezier(.2, .8, .3, 1) both; }
+  @keyframes stempeln {
+    0%   { transform: rotate(var(--dreh, 0deg)) scale(1.5); opacity: 0; }
+    60%  { transform: rotate(var(--dreh, 0deg)) scale(.96); opacity: 1; }
+    100% { transform: rotate(var(--dreh, 0deg)) scale(1); opacity: 1; }
+  }
+
+  video {
+    width: 100%; aspect-ratio: 4/3; object-fit: cover;
+    border-radius: var(--s3); background: var(--grund);
+    display: block; margin-bottom: var(--s4);
+  }
+
+  /* ----------------------------------------------------------- Gutscheine */
+  /*
+    Ein Gutschein ist ein Abriss, keine weitere Karte. Die Kerben sitzen auf
+    der Perforation - deshalb liegt die Trennlinie genau auf ihrer Höhe.
+  */
+  .abriss {
+    position: relative;
+    background: var(--papier);
+    border: 1px solid var(--linie);
+    border-radius: var(--s3);
+    padding: var(--s4);
+    margin-bottom: var(--s3);
+    overflow: hidden;
+  }
+  .abriss::before, .abriss::after {
+    content: ""; position: absolute; top: var(--kerbe, 76px);
+    width: var(--s4); height: var(--s4); border-radius: 50%;
+    background: var(--karte); border: 1px solid var(--linie);
+  }
+  .abriss::before { left: calc(var(--s2) * -1 - 1px); }
+  .abriss::after  { right: calc(var(--s2) * -1 - 1px); }
+  .abriss .wert {
+    font-family: var(--display); font-weight: 700;
+    font-size: var(--t-display); letter-spacing: -.01em; margin: 0;
+  }
+  .abriss .frist { font-size: var(--t-klein); color: var(--tinte-leise); margin: var(--s1) 0 0; }
+  .abriss .naht { border: 0; border-top: 1px dashed var(--linie); margin: var(--s4) calc(var(--s4) * -1); }
+  .abriss label { margin-top: var(--s1); }
+  .abriss.verfallen { opacity: .5; }
+  .abriss.verfallen .wert { text-decoration: line-through; }
+  /* Ohne Knopf gibt es nichts abzureißen - dann auch keine Kerben. */
+  .abriss.ohne-naht::before, .abriss.ohne-naht::after { display: none; }
+
+  /* -------------------------------------------------------------- Angebot */
+  .angebot { padding: var(--s3) 0; border-top: 1px solid var(--linie-zart); }
+  .angebot:first-child { padding-top: 0; border-top: 0; }
+  .angebot b { display: block; font-family: var(--display); font-weight: 600; }
+  .angebot span { font-size: var(--t-klein); color: var(--tinte-leise); }
+
+  .fuss {
+    max-width: 460px; margin: var(--s2) auto 0; padding: 0 var(--s5);
+    font-size: var(--t-mikro); line-height: 1.6; color: var(--tinte-leise);
+  }
+  .fuss p { margin: 0 0 var(--s2); }
+  .fuss a { color: var(--tinte-leise); }
+</style>
+</head>
+<body>
+
+<header class="kopf">
+  <div class="kopf-innen">
+    <img id="logo" class="verborgen" alt="">
+    <div>
+      <h1 id="betrieb">TreueBiss</h1>
+      <p id="kopf-zeile">Deine Stempelkarte</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="band" role="status" aria-live="polite"></div>
+  <div id="meldung" role="status" aria-live="polite"></div>
+
+  <!-- Stempelkarte -->
+  <section id="karte-bereich" class="karte verborgen">
+    <p class="marke" id="karte-titel">Treuepunkte</p>
+    <p class="fortschritt" id="stand-text">Deine Karte ist noch leer.</p>
+    <p class="zaehler" id="stand-zahl">0 von 10</p>
+    <!-- Der Stand steht als Text darueber; zehn leere Kreise sagen
+         einem Screenreader nichts. -->
+    <div class="punkte" id="punkte" aria-hidden="true"></div>
+
+    <div id="scanner" class="verborgen">
+      <video id="video" playsinline muted></video>
+      <label for="beleg">Nummer vom Kassenbon</label>
+      <input id="beleg" autocapitalize="off" spellcheck="false" placeholder="z. B. AMA-2642">
+      <div class="reihe">
+        <button id="beleg-senden">Stempel holen</button>
+        <button id="scan-abbrechen" class="still">Abbrechen</button>
+      </div>
+    </div>
+
+    <button id="sammeln">Stempel sammeln</button>
+  </section>
+
+  <!-- Gutscheine -->
+  <section id="gutscheine-bereich" class="karte neben verborgen">
+    <p class="marke" id="gutscheine-titel">Gutscheine</p>
+    <div id="gutscheine"></div>
+  </section>
+
+  <!-- Angebote -->
+  <section id="angebote-bereich" class="karte neben verborgen">
+    <p class="marke" id="angebote-titel">Angebot des Tages</p>
+    <div id="angebote"></div>
+  </section>
+</main>
+
+<footer class="fuss">
+  <p id="fuss"></p>
+  <p id="rechtliches"></p>
+</footer>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

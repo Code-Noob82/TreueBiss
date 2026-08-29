@@ -47,7 +47,14 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 - [x] **Mandantenfähigkeit:** Betriebe liegen als `tenants` im Backend. Ein Build
   ist über `TENANT_ID` einem Betrieb zugeordnet; Name, Bezeichnungen, Primärfarbe
   und die Kartenregeln (Stempel pro Karte, Gültigkeitsdauer) kommen von dort.
-- [x] **Angebote:** Werden im Backend gepflegt und auf dem HomeScreen angezeigt.
+- [x] **Angebote:** Werden vom Betrieb selbst gepflegt und auf dem HomeScreen
+  angezeigt.
+- [x] **Web-App für Kunden:** `web/app/` als Progressive Web App — sammeln und
+  einlösen im Browser, ohne Installation, auf iPhone wie Android. Der Betrieb
+  steht als Slug in der Adresse.
+- [x] **Verwaltung durch den Betrieb:** Eigene Seite unter `web/verwaltung/`
+  für Stammdaten, Kartenregeln, Angebote und Einlöse-Code. Zwei Rollen in
+  `tenant_staff`: `staff` bedient die Kasse, `owner` verwaltet zusätzlich.
 - [x] **Corporate Branding:** Zur Laufzeit aus dem Betrieb, mit neutralem
   Platzhalter solange keine Serverdaten vorliegen.
 - [x] **Einstellungen:** Erscheinungsbild (System/Hell/Dunkel, dauerhaft
@@ -95,7 +102,11 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 2. `SUPABASE_URL` und `SUPABASE_ANON_KEY` aus den Projekt-Einstellungen bei Supabase eintragen.
 3. Anonyme Anmeldungen im Supabase-Projekt aktivieren.
 4. `supabase/schema.sql` im SQL-Editor des Projekts ausführen. Das legt Tabellen,
-   RLS-Policies und einen Demo-Betrieb an.
+   RLS-Policies und einen Demo-Betrieb an. Der Demo-Betrieb kommt **ohne
+   Einlöse-Code**: Ein Code, der im Repository steht, ist keiner. Wer einen
+   will, trägt ihn einmal von Hand in `tenant_secrets` ein — das Skript zeigt
+   den Befehl im Kommentar über den Beispieldaten. Ein bereits gesetzter Code
+   zieht beim Einspielen automatisch mit um.
 5. `TENANT_ID` in `local.properties` auf den gewünschten Betrieb setzen. Ohne
    Eintrag wird der Demo-Betrieb aus dem Schema verwendet.
 
@@ -148,6 +159,12 @@ Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
 öffnet sie im Browser, meldet sich an, scannt den Gutschein-QR des Kunden und
 sieht die Zahlen des eigenen Betriebs.
 
+Anders als die Kundenseite trägt die Kasse **nicht** die Farbe des Betriebs:
+Sie ist Werkzeug des Anbieters, nicht Schaufenster. Wer zwischen zwei Filialen
+wechselt, soll dieselbe Oberfläche vorfinden. Der Erfolgsfall bekommt dafür
+eine eigene Fläche statt einer Textzeile — an der Kasse schaut die
+Verkaufskraft im Vorbeigehen hin, mit dem Kunden gegenüber.
+
 **Einrichten:**
 
 1. `web/kasse/config.example.js` nach `config.js` kopieren und die Werte des
@@ -159,6 +176,8 @@ sieht die Zahlen des eigenen Betriebs.
    insert into public.tenant_staff (user_id, tenant_id)
    values ('<user-id>', '<tenant-id>');
    ```
+   Ohne Rollenangabe entsteht ein Kassenzugang. Wer auch verwalten soll,
+   braucht `role = 'owner'` — siehe [Verwaltung](#3-verwaltung-durch-den-betrieb).
 4. Die Seite über `https` oder `localhost` ausliefern. **Die Kamera funktioniert
    nicht aus einer lokal geöffneten Datei** (`file://` ist kein sicherer
    Kontext). Zum Ausprobieren genügt:
@@ -175,7 +194,162 @@ Das Personal löst über `staff_redeem_voucher()` ein. Die reguläre
 nicht der Besitzer. Hier ersetzt die Beschäftigung beim Betrieb diesen
 Nachweis, und damit auch den Einlöse-Code: Wer scannt, ist der Betrieb.
 
-### 2. Auswertung für den Piloten
+Der Einlöse-Code ist deshalb nur für Betriebe da, die `requires_redeem_code`
+einschalten — und er wird nirgends mitgeliefert. Verlangt ein Betrieb einen
+Code, ohne einen hinterlegt zu haben, lehnt `redeem_voucher()` ausdrücklich ab,
+statt stillschweigend durchzulassen. Die App meldet das als Einrichtungsfehler
+und nicht, wie früher, als fehlende Verbindung.
+
+Der Hash liegt in einer eigenen Tabelle `tenant_secrets`, nicht als Spalte an
+`tenants`. Der Grund ist die Lese-Policy: Sie gilt für die ganze Zeile. Solange
+der Hash an `tenants` hing, konnte ihn jeder angemeldete App-Nutzer über
+PostgREST mitlesen, und ein bcrypt-Hash über einen kurzen Code ist offline in
+Sekunden geknackt — der Code hätte also genau den nicht aufgehalten, gegen den
+er gerichtet ist. `tenant_secrets` hat RLS an und **keine einzige Policy**; nur
+die `security definer`-Funktionen kommen heran.
+
+### 2. Web-App für Kunden (PWA)
+
+`web/app/` — dieselbe Stempelkarte im Browser, ohne Installation, auf iPhone
+wie auf Android. Der Betrieb steht in der Adresse:
+
+```
+https://…/app/?b=baeckerei-mustermann
+```
+
+Ein QR-Aufsteller am Tresen oder ein Link auf dem Beleg führt direkt dorthin.
+Kein Store, kein Build je Betrieb, kein eigenes Entwicklerkonto.
+
+**Warum neben der Android-App.** Ein Drittel der mobilen Nutzung in Deutschland
+läuft über iOS, und der Wettbewerb liefert die Karte überwiegend ganz ohne
+Installation aus. Dazu kommt ein Betriebsrisiko des Build-pro-Mandant-Modells:
+Google Play empfiehlt White-Label-Anbietern ein eigenes Entwicklerkonto je
+Kunde, weil ein Regelverstoß sonst alle Apps eines Kontos mitreißen kann.
+
+**Was sie kann:** Betrieb per Slug laden samt Branding, Bezeichnungen und
+Angeboten; anonym anmelden; Stempel über den Beleg-QR sammeln; Gutscheine
+einlösen — mit Code, wenn der Betrieb einen verlangt.
+
+**QR-Erkennung** nutzt `BarcodeDetector`, wo es sie gibt, und fällt sonst auf
+`jsQR` zurück. Der Rückfall ist kein Beiwerk: Safari hat `BarcodeDetector`
+nicht, und Safari ist der Grund für diese Seite. Die Eingabe der Belegnummer
+von Hand bleibt gleichwertig.
+
+**Offline** zeigt die Seite den letzten bekannten Stand aus `localStorage` und
+sagt es über ein Band. Gesammelt und eingelöst wird ausschließlich auf dem
+Server — offline gibt es beides nicht, und die Seite tut auch nicht so.
+Der Service Worker hält nur die Hülle vor; beim Ändern der Dateien muss
+`VERSION` in `web/app/sw.js` hoch, sonst behalten bestehende Installationen
+den alten Stand.
+
+**Grenze der White-Label-Idee:** Das Manifest ist statisch, die installierte
+App heißt deshalb „TreueBiss" und nicht wie der Betrieb. Farbe, Logo und
+Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
+nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
+es ausliefert.
+
+**Gemeinsame Grundlage.** Tokens, Schriften, Abstands- und Schriftstufung,
+Knöpfe, Formularfelder und Meldungen liegen einmal in `web/gemeinsam/basis.css`,
+die Palettenrechnung in `web/gemeinsam/palette.js`. Alle drei Oberflächen
+binden dieselben Dateien ein. Drei Kopien derselben Tokens wären der übliche
+Weg, auf dem ein Designsystem verfällt.
+
+**Getrennte Anmeldungen — die Grenze verläuft zwischen Kunde und Betrieb.**
+Der Supabase-Client legt sein Token immer unter `sb-<projekt>-auth-token` ab;
+ohne eigenen `storageKey` teilen sich also alle Seiten unter derselben Adresse
+**eine** Anmeldung. Zwischen Kundenseite und Betriebsseiten wäre das übel: Eine
+Verkaufskraft, die auf dem Kassengerät die Kundenseite öffnet, sammelt Stempel
+auf den Kassenzugang — eine anonyme Anmeldung findet gar nicht mehr statt, weil
+schon eine Sitzung da ist.
+
+Die Kundenseite bekommt deshalb `treuebiss-kunde`. Kasse und Verwaltung teilen
+sich dagegen `treuebiss-betrieb`: Das ist derselbe Mensch mit demselben Login,
+und was er darf, entscheidet der Server über `is_owner_of`, nicht die Seite.
+Deshalb führt der Umschalter im Kopfband nicht auf ein Anmeldeformular.
+
+**Umschalter zwischen Kasse und Verwaltung.** Er erscheint in der Kasse nur,
+wenn der Zugang in `tenant_staff` die Rolle `owner` trägt — ein Weg, der ins
+Leere führt, ist schlechter als kein Weg. In der Verwaltung steht er immer, weil
+jeder Inhaber zugleich Personal ist (`is_staff_of` filtert nicht nach Rolle).
+
+**Gestaltung.** Die Farbe des Betriebs ist nicht nur Knopffüllung: Aus dem Hex
+werden Farbton und Sättigung gezogen, und das Stylesheet leitet daraus die
+ganze Fläche ab — Kopfband, Papier, Linien, Trennfarben, hell wie dunkel. Die
+Schriftfarbe auf farbigen Flächen wird aus der Leuchtdichte gerechnet (Schwelle
+0,179 nach WCAG), sonst stünde auf einem hellen Gelb weiße Schrift. Stempel
+sitzen leicht gedreht, weil ein echter Stempel nie gerade sitzt; die Drehung
+hängt am Index und wackelt deshalb beim Neuzeichnen nicht. Gutscheine sind
+Abrisse mit Perforationskerben, keine weiteren Karten.
+
+**Schriften** liegen unter `web/gemeinsam/fonts/` im Projekt, statt von Google geladen
+zu werden. Der Grund ist Datenschutz: Ein `<link>` auf `fonts.googleapis.com`
+überträgt die IP des Kunden an Google; das LG München I hat das 2022 als
+DSGVO-Verstoß gewertet (Az. 3 O 17493/20). Bei einer App, deren Verkaufsargument
+Datensparsamkeit ist, wäre das ein Widerspruch. Beides sind Variable Fonts unter
+der Open Font License, zusammen 48 KB — Einzelheiten in `web/gemeinsam/fonts/LIESMICH.md`.
+
+**Einrichten:** `config.example.js` nach `config.js` kopieren. Kamera und
+Service Worker brauchen `https` oder `localhost`.
+
+```bash
+python3 -m http.server 8765 --directory web
+```
+
+### 3. Verwaltung durch den Betrieb
+
+`web/verwaltung/index.html` — dieselbe Machart wie die Kassenseite: eine
+einzelne Seite, kein Build-Schritt. Hier pflegt der Betrieb selbst, was vorher
+nur der Anbieter per SQL ändern konnte.
+
+- **Stammdaten:** Name, die drei Bezeichnungen in der App, Primärfarbe, Logo.
+- **Kartenregeln:** Stempel pro Karte, Gültigkeit des Gutscheins.
+- **Angebote:** anlegen, ändern, löschen — samt Zeitraum.
+- **Einlöse-Code:** setzen oder entfernen, mindestens sechs Zeichen.
+- **Zahlen:** dieselbe Auswertung wie auf der Kassenseite.
+
+**Warum überhaupt.** Ohne Dashboard ist jede Farbänderung eine Anbieterleistung.
+Das skaliert bei rund 25.000 Kleinstbetrieben nicht und macht jedes
+Preisgespräch unmöglich. Im geprüften Wettbewerbsumfeld gibt es keinen Anbieter
+ohne Dashboard, auch nicht im kostenlosen Tarif.
+
+**Zwei Rollen** in `tenant_staff`:
+
+| Rolle | Darf |
+|---|---|
+| `staff` (Vorgabe) | Gutscheine einlösen, Zahlen sehen |
+| `owner` | zusätzlich Stammdaten, Kartenregeln, Angebote, Einlöse-Code |
+
+Einen bestehenden Zugang zur Betriebsleitung machen:
+
+```sql
+update public.tenant_staff set role = 'owner'
+ where user_id = '<user-id>' and tenant_id = '<tenant-id>';
+```
+
+**Was der Betrieb ausdrücklich nicht selbst kann:** `is_active`, `slug` und die
+Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
+Betrieb, der sich selbst abschaltet, ist ein Supportfall.
+
+**Warum Stammdaten über eine Funktion laufen und Angebote über Policies.**
+Angebote tragen nichts Schützenswertes, dort reichen Policies. Bei `tenants`
+würde eine `update`-Policy die ganze Zeile freigeben — Spaltenrechte gäbe es
+zwar, sie wären aber still: Eine neue Spalte an `tenants` wäre ohne Zutun
+mitfreigegeben. `owner_update_tenant()` schreibt dagegen aus, was änderbar ist.
+
+Die Verwaltung trägt umgekehrt sehr wohl die Farbe des Betriebs — aus einem
+Grund, nicht als Zierde: Sie zeigt beim Ändern des Farbfelds sofort, was der
+Kunde später sieht, und sagt bei mehreren Betrieben auf einen Blick, welcher
+gerade bearbeitet wird.
+
+**Einrichten** wie bei der Kassenseite: `config.example.js` nach `config.js`
+kopieren, Seite über `https` oder `localhost` ausliefern. Eine Kamera braucht
+diese Seite nicht.
+
+```bash
+python3 -m http.server 8765 --directory web
+```
+
+### 4. Auswertung für den Piloten
 
 Vier Views in `supabase/schema.sql` liefern die Zahlen, an denen sich
 entscheidet, ob das Programm trägt:
@@ -208,7 +382,7 @@ weist sie getrennt aus. Und Nutzer aus der Zeit vor den Mitgliedschaften haben
 Gutscheine, aber keinen Eintrag in `memberships`; `members` zählt sie deshalb
 nicht mit.
 
-### 3. Mandantenfähigkeit
+### 5. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -219,16 +393,17 @@ Das Schema ist damit bereits auf mehrere Betriebe ausgelegt. Der Wechsel auf ein
 App mit Beitritt per Code (mehrere Betriebe gleichzeitig) braucht keine
 Schemaänderung mehr, nur noch die Oberfläche dafür.
 
-Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
-App - hier dockt später ein Admin-Backend an.
+Pflege von `tenants` und `offers` läuft nicht aus der Kunden-App, sondern über
+die Verwaltungsseite (siehe oben). `is_active` und `slug` bleiben beim Anbieter
+und brauchen weiterhin den Service-Role-Key.
 
-### 4. Architektur: Hexagonal + MVVM
+### 6. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 5. Abstraktion der Datenquelle: Repository Pattern
+### 7. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 
@@ -261,8 +436,11 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 ## Ausblick
 
 - [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
-- [ ] **Admin-Panel:** Oberfläche, über die Betriebe Angebote und Branding selbst
-      pflegen. Datenseitig ist alles vorhanden, es fehlt die Bedienoberfläche.
+- [ ] **Personalverwaltung im Dashboard:** Zugänge anlegen und Rollen vergeben
+      kann bisher nur der Anbieter, weil dafür der Service-Role-Key nötig ist.
+- [ ] **Kassen-Seriennummern registrieren:** Voraussetzung dafür, dass
+      `issue_stamp` einen Beleg gegen die Kassen des Betriebs prüfen kann. Die
+      Nummer steht im Beleg-QR; die Prüfung dagegen gibt es noch nicht.
 - [ ] **Beleg-Scanner:** ML Kit Barcode Scanning, um den QR-Code auf dem Kassenbon
       einzulesen. Die serverseitige Vergabe dahinter steht bereits; es fehlt der
       Scanner und das Auslesen der TSE-Transaktionsnummer.

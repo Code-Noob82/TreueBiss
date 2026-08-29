@@ -23,6 +23,8 @@ interface VoucherRepository {
      * @throws InvalidRedeemCodeException bei falschem Code.
      * @throws VoucherNotRedeemableException wenn der Gutschein bereits
      *   eingelöst, abgelaufen oder unbekannt ist.
+     * @throws RedeemNotConfiguredException wenn der Betrieb einen Code
+     *   verlangt, aber keinen hinterlegt hat.
      */
     suspend fun redeemVoucher(voucherId: String, code: String? = null)
 

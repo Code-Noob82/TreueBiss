@@ -4,7 +4,7 @@
 -- darf nur auf Objekte verweisen, die weiter oben stehen. Der Aufbau ist:
 --
 --   1. Tabellen (tenants zuerst, danach alles was darauf verweist)
---   2. Spalten fuer bestehende Installationen nachziehen
+--   2. Bestehende Installationen nachziehen (Spalten, Umzuege)
 --   3. Row Level Security und Policies
 --   4. Funktionen fuer Vergabe und Einloesen
 --   5. Beispieldaten
@@ -38,9 +38,6 @@ create table if not exists public.tenants (
     stamps_per_card       int  not null default 10 check (stamps_per_card between 1 and 50),
     voucher_validity_days int  not null default 90 check (voucher_validity_days > 0),
     is_active             boolean not null default true,
-    -- bcrypt-Hash des Einloese-Codes, den das Personal an der Kasse eingibt.
-    -- Der Code selbst wird nie gespeichert.
-    redeem_code_hash      text,
     -- Wenn true, muss beim Einloesen der Code eingegeben werden. Standard ist
     -- false: Der Kunde loest selbst ein, die App zeigt eine zeitgebundene
     -- Bestaetigung, auf die das Personal nur kurz schaut. Betriebe, die es
@@ -49,12 +46,52 @@ create table if not exists public.tenants (
     created_at            timestamptz not null default now()
 );
 
+-- ------------------------------------------------- Geheimnisse des Betriebs
+-- Getrennt von tenants, und zwar aus einem konkreten Grund: Die Lese-Policy
+-- auf tenants gilt fuer die ganze Zeile. Solange der Hash dort lag, konnte
+-- ihn jeder angemeldete App-Nutzer mitlesen - ein bcrypt-Hash ueber einen
+-- kurzen Code ist offline in Sekunden geknackt. Der Code haette also genau
+-- den nicht aufgehalten, gegen den er gerichtet ist.
+--
+-- Auf diese Tabelle kommt niemand: RLS an, keine einzige Policy. Nur die
+-- security-definer-Funktionen unten lesen sie.
+create table if not exists public.tenant_secrets (
+    tenant_id        uuid primary key references public.tenants(id) on delete cascade,
+    -- bcrypt-Hash des Einloese-Codes. Der Code selbst wird nie gespeichert.
+    redeem_code_hash text not null,
+    updated_at       timestamptz not null default now()
+);
+
 -- Bestehende Projekte nachziehen: Das `create table if not exists` oben
 -- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
 -- Spalte. Muss vor allem stehen, was sie verwendet.
-alter table public.tenants add column if not exists redeem_code_hash text;
 alter table public.tenants
     add column if not exists requires_redeem_code boolean not null default false;
+
+-- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
+-- steht; auf einer frischen Datenbank passiert nichts.
+do $$
+begin
+    if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name   = 'tenants'
+           and column_name  = 'redeem_code_hash'
+    ) then
+        insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+        select id, redeem_code_hash
+          from public.tenants
+         where redeem_code_hash is not null
+           -- "1234" stand frueher im Repository und wurde von einer aelteren
+           -- Fassung dieses Skripts jedem Betrieb ohne Code verpasst. Der
+           -- zieht nicht mit um, er verschwindet.
+           and extensions.crypt('1234', redeem_code_hash) <> redeem_code_hash
+        on conflict (tenant_id) do nothing;
+
+        alter table public.tenants drop column redeem_code_hash;
+    end if;
+end
+$$;
 
 -- ---------------------------------------------------------------- Angebote
 create table if not exists public.offers (
@@ -163,9 +200,11 @@ begin
         raise exception 'voucher expired' using errcode = '22023';
     end if;
 
-    select redeem_code_hash, requires_redeem_code
-      into v_hash, v_requires
+    select requires_redeem_code into v_requires
       from public.tenants where id = v_tenant and is_active;
+
+    select redeem_code_hash into v_hash
+      from public.tenant_secrets where tenant_id = v_tenant;
 
     -- Der Code ist nur Pflicht, wenn der Betrieb ihn verlangt. Sonst loest
     -- der Kunde selbst ein; das Personal prueft die Bestaetigung per Blick,
@@ -256,27 +295,36 @@ grant execute on function public.staff_redeem_voucher(uuid) to authenticated;
 
 -- ==================================================== Beispiel-Betrieb (Demo)
 -- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
--- Der Einloese-Code des Demo-Betriebs ist "1234". Vor einem Pilotbetrieb
--- unbedingt aendern:
---   update public.tenants
---      set redeem_code_hash = extensions.crypt('DEIN_CODE', extensions.gen_salt('bf'))
---    where id = '...';
+--
+-- Bewusst OHNE Einloese-Code: Ein Code, der im Repository steht, ist keiner.
+-- Er bleibt null, und das ist ungefaehrlich, weil requires_redeem_code auf
+-- false steht - der Kunde loest dann selbst ein, das Personal prueft die
+-- Bestaetigung per Blick oder scannt den QR an der Kasse.
+--
+-- Wer einen Code will, setzt ihn einmal von Hand und schaltet ihn scharf:
+--   insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+--   values ('...', extensions.crypt('DEIN_CODE', extensions.gen_salt('bf')))
+--       on conflict (tenant_id)
+--       do update set redeem_code_hash = excluded.redeem_code_hash,
+--                     updated_at       = now();
+--   update public.tenants set requires_redeem_code = true where id = '...';
+-- Ohne Hash lehnt redeem_voucher mit Code-Pflicht ausdruecklich ab, statt
+-- stillschweigend durchzulassen.
 insert into public.tenants (
-    id, slug, name, daily_special_title, primary_color, redeem_code_hash
+    id, slug, name, daily_special_title, primary_color
 ) values (
     '00000000-0000-4000-8000-000000000001',
     'baeckerei-mustermann',
     'Bäckerei Mustermann',
     'Schmankerl des Tages',
-    '#4CAF50',
-    extensions.crypt('1234', extensions.gen_salt('bf'))
+    '#4CAF50'
 ) on conflict (id) do nothing;
 
--- Bestehende Betriebe ohne Code bekommen den Demo-Code, damit das Einloesen
--- nach dem Upgrade nicht stumm blockiert.
-update public.tenants
-   set redeem_code_hash = extensions.crypt('1234', extensions.gen_salt('bf'))
- where redeem_code_hash is null;
+-- Sicherheitsnetz fuer den Fall, dass "1234" ueber einen anderen Weg in
+-- tenant_secrets gelandet ist als ueber den Umzug oben. Nur Hashes, die
+-- genau darauf passen; ein selbst gesetzter Code bleibt unangetastet.
+delete from public.tenant_secrets
+ where extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
 
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (
@@ -345,7 +393,11 @@ create index if not exists stamps_user_tenant_idx on public.stamps (user_id, ten
 create index if not exists vouchers_user_tenant_idx on public.vouchers (user_id, tenant_id);
 
 -- ======================================================== Row Level Security
-alter table public.tenants     enable row level security;
+alter table public.tenants        enable row level security;
+-- Bewusst ohne Policy: Wer keine Policy hat, sieht keine Zeile. Der revoke
+-- kommt oben drauf, weil Supabase neuen Tabellen Rechte mitgibt.
+alter table public.tenant_secrets enable row level security;
+revoke all on public.tenant_secrets from anon, authenticated;
 alter table public.offers      enable row level security;
 alter table public.memberships enable row level security;
 alter table public.stamps      enable row level security;
@@ -635,3 +687,201 @@ $$;
 
 revoke all on function public.staff_pilot_summary() from public;
 grant execute on function public.staff_pilot_summary() to authenticated;
+
+-- ============================================ Verwaltung durch den Betrieb
+-- Bis hierher pflegt der Anbieter jeden Betrieb von Hand per SQL. Das
+-- skaliert nicht und laesst sich nicht verkaufen: Jede Farbaenderung waere
+-- eine Anbieterleistung. Ab hier macht der Betrieb es selbst.
+--
+-- Zwei Rollen im Personal:
+--   staff - Kasse: Gutscheine einloesen, Zahlen sehen.
+--   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
+--
+-- Was der Betrieb ausdruecklich NICHT selbst kann, bleibt beim Anbieter:
+-- is_active, slug und die Zuordnung von Personal. Ein Betrieb, der sich
+-- selbst abschaltet oder seinen Bezeichner aendert, ist ein Supportfall -
+-- der Build der App haengt an beidem.
+alter table public.tenant_staff
+    add column if not exists role text not null default 'staff';
+
+-- `add constraint if not exists` gibt es nicht; auf einem schon
+-- eingerichteten Projekt liefe das Skript sonst beim zweiten Lauf auf.
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'tenant_staff_role_check'
+    ) then
+        alter table public.tenant_staff
+            add constraint tenant_staff_role_check check (role in ('staff', 'owner'));
+    end if;
+end
+$$;
+
+-- Darf der Aufrufer diesen Betrieb verwalten?
+create or replace function public.is_owner_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid()
+          and s.tenant_id = target_tenant
+          and s.role = 'owner'
+    );
+$$;
+
+-- ------------------------------------------------------------- Angebote
+-- Angebote tragen nichts Schuetzenswertes, deshalb reichen hier Policies;
+-- fuer tenants braucht es weiter unten eine Funktion, weil dort einzelne
+-- Spalten tabu bleiben muessen.
+drop policy if exists offers_owner_insert on public.offers;
+drop policy if exists offers_owner_update on public.offers;
+drop policy if exists offers_owner_delete on public.offers;
+
+create policy offers_owner_insert on public.offers
+    for insert to authenticated
+    with check (public.is_owner_of(tenant_id));
+
+-- Das `with check` steht hier ausgeschrieben, obwohl Postgres ohne es
+-- denselben Ausdruck verwendet: Es haelt fest, dass auch die neue Zeile
+-- geprueft wird - ein Angebot laesst sich also nicht in einen fremden
+-- Betrieb umhaengen.
+create policy offers_owner_update on public.offers
+    for update to authenticated
+    using (public.is_owner_of(tenant_id))
+    with check (public.is_owner_of(tenant_id));
+
+create policy offers_owner_delete on public.offers
+    for delete to authenticated
+    using (public.is_owner_of(tenant_id));
+
+-- ----------------------------------------------------------- Stammdaten
+/*
+ * Aendert die Angaben, die der Betrieb selbst verantwortet.
+ *
+ * Bewusst eine Funktion statt einer update-Policy: PostgREST wuerde sonst
+ * die ganze Zeile freigeben. Spaltenrechte gaebe es zwar, sie waeren aber
+ * still - eine neue Spalte an tenants waere ohne Zutun mitfreigegeben.
+ * Hier steht ausbuchstabiert, was aenderbar ist.
+ */
+create or replace function public.owner_update_tenant(
+    p_tenant_id             uuid,
+    p_name                  text,
+    p_loyalty_points_title  text,
+    p_vouchers_title        text,
+    p_daily_special_title   text,
+    p_primary_color         text,
+    p_logo_url              text,
+    p_stamps_per_card       int,
+    p_voucher_validity_days int
+)
+returns setof public.tenants
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if auth.uid() is null then
+        raise exception 'not authenticated' using errcode = '28000';
+    end if;
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+
+    -- Die drei Bezeichnungen stehen in der App als Ueberschriften. Leer
+    -- waeren sie dort ein Loch, deshalb hier abgelehnt statt stumm auf
+    -- den Vorgabewert zurueckgesetzt.
+    if coalesce(length(trim(p_name)), 0) = 0
+       or coalesce(length(trim(p_loyalty_points_title)), 0) = 0
+       or coalesce(length(trim(p_vouchers_title)), 0) = 0
+       or coalesce(length(trim(p_daily_special_title)), 0) = 0 then
+        raise exception 'name and titles required' using errcode = '22023';
+    end if;
+    if p_primary_color is not null and p_primary_color !~ '^#[0-9A-Fa-f]{6}$' then
+        raise exception 'invalid primary color' using errcode = '22023';
+    end if;
+    if p_stamps_per_card is null or p_stamps_per_card < 1 or p_stamps_per_card > 50 then
+        raise exception 'stamps per card out of range' using errcode = '22023';
+    end if;
+    if p_voucher_validity_days is null or p_voucher_validity_days < 1 then
+        raise exception 'validity days out of range' using errcode = '22023';
+    end if;
+
+    update public.tenants
+       set name                  = trim(p_name),
+           loyalty_points_title  = trim(p_loyalty_points_title),
+           vouchers_title        = trim(p_vouchers_title),
+           daily_special_title   = trim(p_daily_special_title),
+           primary_color         = p_primary_color,
+           logo_url              = nullif(trim(coalesce(p_logo_url, '')), ''),
+           stamps_per_card       = p_stamps_per_card,
+           voucher_validity_days = p_voucher_validity_days
+     where id = p_tenant_id;
+
+    return query select * from public.tenants where id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_update_tenant(
+    uuid, text, text, text, text, text, text, int, int) from public;
+grant execute on function public.owner_update_tenant(
+    uuid, text, text, text, text, text, text, int, int) to authenticated;
+
+-- -------------------------------------------------------- Einloese-Code
+/*
+ * Setzt den Einloese-Code. Muss eine Funktion sein: tenant_secrets hat
+ * keine Policy und ist von aussen unerreichbar - genau das ist der Sinn.
+ */
+create or replace function public.owner_set_redeem_code(
+    p_tenant_id uuid,
+    p_code      text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+    -- Untergrenze mit Absicht: Ein vierstelliger Code ist der Fall, den wir
+    -- gerade erst aus dem Schema entfernt haben. Er haelt den Kunden nicht
+    -- auf, der zu Hause selbst einloesen will.
+    if p_code is null or length(trim(p_code)) < 6 then
+        raise exception 'redeem code too short' using errcode = '22023';
+    end if;
+
+    insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+    values (p_tenant_id, crypt(trim(p_code), gen_salt('bf')))
+        on conflict (tenant_id) do update
+        set redeem_code_hash = excluded.redeem_code_hash,
+            updated_at       = now();
+
+    update public.tenants set requires_redeem_code = true where id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_set_redeem_code(uuid, text) from public;
+grant execute on function public.owner_set_redeem_code(uuid, text) to authenticated;
+
+/*
+ * Nimmt den Code wieder zurueck. Beides in einem Schritt: Ein Betrieb, der
+ * requires_redeem_code stehen liesse und den Hash loeschte, koennte gar
+ * nicht mehr einloesen.
+ */
+create or replace function public.owner_clear_redeem_code(p_tenant_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+    update public.tenants set requires_redeem_code = false where id = p_tenant_id;
+    delete from public.tenant_secrets where tenant_id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_clear_redeem_code(uuid) from public;
+grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;

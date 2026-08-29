@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="TreueBiss">
+  <!-- Vollflaechiger Grund: so bleibt das Icon auch maskiert ohne Rand. -->
+  <rect width="512" height="512" fill="#4CAF50"/>
+  <!-- Karte und Stempel sitzen in der sicheren Zone (mittlere 80 %). -->
+  <rect x="118" y="158" width="276" height="196" rx="26" fill="#ffffff"/>
+  <g fill="#4CAF50">
+    <circle cx="170" cy="222" r="21"/>
+    <circle cx="228" cy="222" r="21"/>
+    <circle cx="286" cy="222" r="21"/>
+  </g>
+  <g fill="none" stroke="#4CAF50" stroke-width="9" opacity="0.45">
+    <circle cx="344" cy="222" r="17"/>
+    <circle cx="170" cy="290" r="17"/>
+    <circle cx="228" cy="290" r="17"/>
+    <circle cx="286" cy="290" r="17"/>
+    <circle cx="344" cy="290" r="17"/>
+  </g>
+</svg>

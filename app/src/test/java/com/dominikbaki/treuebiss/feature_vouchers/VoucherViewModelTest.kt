@@ -3,6 +3,7 @@ package com.dominikbaki.treuebiss.feature_vouchers
 import app.cash.turbine.test
 import com.dominikbaki.treuebiss.MainDispatcherRule
 import com.dominikbaki.treuebiss.R
+import com.dominikbaki.treuebiss.core.domain.models.RedeemNotConfiguredException
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.fakes.FakeTenantRepository
 import com.dominikbaki.treuebiss.fakes.FakeVoucherRepository
@@ -46,7 +47,7 @@ class VoucherViewModelTest {
     @Test
     fun `mit richtigem Code wird eingeloest`() = runTest(mainDispatcherRule.dispatcher) {
         viewModel.events.test {
-            viewModel.onRedeemConfirmed(voucher.id, "1234")
+            viewModel.onRedeemConfirmed(voucher.id, "pruef-4711")
             advanceUntilIdle()
 
             assertTrue(awaitItem() is VoucherEvent.Redeemed)
@@ -73,12 +74,34 @@ class VoucherViewModelTest {
     }
 
     @Test
+    fun `fehlt dem Betrieb der Code, wird das nicht als Verbindungsfehler gemeldet`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            // Regression: Der Fall fiel frueher in den Sammel-catch und kam
+            // beim Kunden als "keine Verbindung" an. Falsch adressiert - es
+            // ist ein Einrichtungsfehler des Betriebs.
+            repository.redeemError = RedeemNotConfiguredException("kein Code hinterlegt")
+
+            viewModel.events.test {
+                viewModel.onRedeemConfirmed(voucher.id, "pruef-4711")
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event is VoucherEvent.Failed)
+                assertEquals(
+                    R.string.voucher_error_not_configured,
+                    (event as VoucherEvent.Failed).messageRes
+                )
+            }
+            assertTrue(repository.redeemed.isEmpty())
+        }
+
+    @Test
     fun `ohne Verbindung bleibt der Gutschein erhalten`() =
         runTest(mainDispatcherRule.dispatcher) {
             repository.redeemError = IllegalStateException("offline")
 
             viewModel.events.test {
-                viewModel.onRedeemConfirmed(voucher.id, "1234")
+                viewModel.onRedeemConfirmed(voucher.id, "pruef-4711")
                 advanceUntilIdle()
 
                 val event = awaitItem()
@@ -94,8 +117,8 @@ class VoucherViewModelTest {
     @Test
     fun `ein zweiter Versuch waehrend der Verarbeitung wird ignoriert`() =
         runTest(mainDispatcherRule.dispatcher) {
-            viewModel.onRedeemConfirmed(voucher.id, "1234")
-            viewModel.onRedeemConfirmed(voucher.id, "1234")
+            viewModel.onRedeemConfirmed(voucher.id, "pruef-4711")
+            viewModel.onRedeemConfirmed(voucher.id, "pruef-4711")
             advanceUntilIdle()
 
             assertEquals(1, repository.redeemed.size)
