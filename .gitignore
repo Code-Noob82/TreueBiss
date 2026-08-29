@@ -19,3 +19,6 @@ local.properties
 # gehoeren nicht ins Repository.
 *_rows.csv
 *_rows.sql
+
+# Konfiguration der Kassenseite - pro Installation, nicht im Quelltext.
+web/kasse/config.js
