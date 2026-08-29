@@ -68,6 +68,32 @@ create table if not exists public.tenant_secrets (
 alter table public.tenants
     add column if not exists requires_redeem_code boolean not null default false;
 
+-- Regeln fuer die Pruefung des Kaufnachweises. Die Vorgaben sind bewusst
+-- milde: Ein bestehendes Projekt darf durch das Einspielen nicht ploetzlich
+-- Stempel ablehnen. Scharf stellt der Betrieb selbst in der Verwaltung.
+alter table public.tenants
+    -- Wie alt der Beleg hoechstens sein darf. Der entscheidende Wert gegen
+    -- eingesammelte Bons: Was im Laden liegen bleibt, ist meist Stunden alt.
+    add column if not exists proof_max_age_minutes int not null default 120
+        check (proof_max_age_minutes between 1 and 43200),
+    -- Mindestbetrag in Cent. 0 heisst: jeder Betrag zaehlt.
+    add column if not exists proof_min_cents int not null default 0
+        check (proof_min_cents >= 0),
+    -- Hoechstzahl Stempel je Kunde und Tag. Die Vorgabe ist bewusst hoch:
+    -- Sie ist ein Fangnetz gegen Massenmissbrauch, nicht das eigentliche
+    -- Mittel - das sind Zeitfenster und Kassenliste. Ein echter Kunde kommt
+    -- nie in die Naehe; ein bestehendes Projekt faellt nicht um. Wer scharf
+    -- stellen will, setzt in der Verwaltung 2 oder 3.
+    add column if not exists daily_stamp_limit int not null default 25
+        check (daily_stamp_limit between 1 and 100),
+    -- Nur Belege von Kassen, die der Betrieb eingetragen hat.
+    add column if not exists require_known_register boolean not null default false,
+    -- Duerfen auch Nachweise ohne Beleg-QR zaehlen? Solange der Scanner
+    -- fehlt, muss das an bleiben - sonst faellt der Demo-Betrieb um. Wer
+    -- produktiv scannt, schaltet es aus, sonst ist die ganze Pruefung
+    -- umgehbar, indem man irgendeine Zeichenkette schickt.
+    add column if not exists allow_opaque_proofs boolean not null default true;
+
 -- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
 -- steht; auf einer frischen Datenbank passiert nichts.
 do $$
@@ -135,6 +161,25 @@ drop policy if exists tenant_staff_select_own on public.tenant_staff;
 -- Personal sieht nur die eigene Zuordnung; angelegt wird sie nicht hier.
 create policy tenant_staff_select_own on public.tenant_staff
     for select to authenticated using (auth.uid() = user_id);
+
+-- ==================================================== Kassen des Betriebs
+-- Die Seriennummer steht im Beleg-QR und ist nicht geheim - sie steht auf
+-- jedem Bon. Schuetzenswert ist sie trotzdem nicht wert, breit gestreut zu
+-- werden: Kunden brauchen sie nicht, das Personal schon.
+create table if not exists public.tenant_registers (
+    tenant_id  uuid not null references public.tenants(id) on delete cascade,
+    -- Client-Id der Kasse, wie sie im QR-Code steht (z. B. "AMA-2642").
+    serial     text not null,
+    label      text,
+    created_at timestamptz not null default now(),
+    primary key (tenant_id, serial)
+);
+
+alter table public.tenant_registers enable row level security;
+
+drop policy if exists tenant_registers_read on public.tenant_registers;
+drop policy if exists tenant_registers_owner_insert on public.tenant_registers;
+drop policy if exists tenant_registers_owner_delete on public.tenant_registers;
 
 -- Arbeitet der Aufrufer fuer diesen Betrieb?
 create or replace function public.is_staff_of(target_tenant uuid)
@@ -479,11 +524,91 @@ create table if not exists public.stamp_proofs (
     unique (tenant_id, proof_ref)
 );
 
+-- Was aus dem Beleg-QR gelesen wurde. Ohne diese beiden Spalten laesst sich
+-- ein abgelehnter oder strittiger Stempel spaeter nicht nachvollziehen.
+alter table public.stamp_proofs
+    add column if not exists register_serial text,
+    add column if not exists amount_cents    int;
+
 alter table public.stamp_proofs enable row level security;
 -- Nur lesen; geschrieben wird ausschliesslich in issue_stamp().
 drop policy if exists stamp_proofs_select_own on public.stamp_proofs;
 create policy stamp_proofs_select_own on public.stamp_proofs
     for select to authenticated using (auth.uid() = user_id);
+
+/*
+ * Zerlegt den QR-Code eines deutschen Kassenbelegs (DSFinV-K, Anhang I).
+ *
+ * Aufbau, zwoelf mit Semikolon verkettete Felder:
+ *   V0;<kasse>;<processType>;<processData>;<transaktion>;<zaehler>;
+ *   <start-zeit>;<log-time>;<sig-alg>;<log-time-format>;<signatur>;<key>
+ *
+ * Gibt KEINE Zeile zurueck, wenn der Text kein solcher QR-Code ist - der
+ * Aufrufer unterscheidet daran den Beleg vom freien Nachweis. Alles, was
+ * unklar ist, gilt als kein Beleg: Lieber einen echten Bon ablehnen als
+ * eine erfundene Zeichenkette durchwinken.
+ *
+ * NICHT geprueft wird die ECDSA-Signatur - dafuer fehlt Postgres die
+ * Kryptografie (pgcrypto kann kein ECDSA verifizieren). Gegen das Einsammeln
+ * fremder Bons, den tatsaechlichen Missbrauchsfall, helfen Zeitfenster,
+ * Mindestbetrag, Tageslimit und die Kassenliste. Gegen einen selbst
+ * gebauten QR-Code hilft nur die Signatur; das braucht eine Edge Function.
+ */
+create or replace function public.parse_receipt_qr(p_qr text)
+returns table (
+    register_serial text,
+    transaction_no  text,
+    signature_ctr   text,
+    log_time        timestamptz,
+    amount_cents    int,
+    payment         text
+)
+language plpgsql
+stable
+as $$
+declare
+    f      text[];
+    daten  text[];
+    betrag text;
+    roh    text;
+begin
+    if p_qr is null then return; end if;
+    f := string_to_array(p_qr, ';');
+    if coalesce(array_length(f, 1), 0) < 12 then return; end if;
+    if trim(f[1]) <> 'V0' then return; end if;
+    if trim(f[3]) not like 'Kassenbeleg%' then return; end if;
+
+    register_serial := trim(f[2]);
+    transaction_no  := trim(f[5]);
+    signature_ctr   := trim(f[6]);
+    if register_serial = '' or transaction_no = '' then return; end if;
+
+    -- processData: Beleg^<Umsaetze je Steuersatz>^<Betrag>:<Zahlart>
+    daten := string_to_array(f[4], '^');
+    if coalesce(array_length(daten, 1), 0) < 3 then return; end if;
+    betrag  := trim(split_part(daten[3], ':', 1));
+    payment := nullif(trim(split_part(daten[3], ':', 2)), '');
+    if betrag !~ '^[0-9]+([.,][0-9]{1,2})?$' then return; end if;
+    amount_cents := round(replace(betrag, ',', '.')::numeric * 100);
+
+    -- log-time: je nach Feld 10 Unix-Sekunden oder ISO-8601.
+    roh := trim(f[8]);
+    begin
+        if roh ~ '^[0-9]+$' then
+            log_time := to_timestamp(roh::bigint);
+        else
+            log_time := roh::timestamptz;
+        end if;
+    exception when others then
+        return;
+    end;
+    if log_time is null then return; end if;
+
+    return next;
+end;
+$$;
+
+revoke all on function public.parse_receipt_qr(text) from public;
 
 /*
  * Vergibt einen Stempel gegen einen Kaufnachweis.
@@ -518,6 +643,9 @@ declare
     v_voucher   uuid := null;
     v_expires   int8 := null;
     v_now       timestamptz := now();
+    v_beleg     record;
+    v_ref       text;
+    v_heute     int;
 begin
     if v_user is null then
         raise exception 'not authenticated' using errcode = '28000';
@@ -534,9 +662,67 @@ begin
         raise exception 'unknown or inactive tenant' using errcode = '22023';
     end if;
 
+    /*
+     * Beleg-QR oder freier Nachweis?
+     *
+     * Die Einmaligkeitspruefung allein schuetzt nur gegen denselben Beleg
+     * zweimal. Sie schuetzt nicht gegen das Einsammeln fremder Bons - und
+     * genau die liegen in einer Baeckerei herum, weil die Kundschaft sie
+     * ueberwiegend nicht mitnimmt. Dagegen stehen die Regeln unten.
+     */
+    select * into v_beleg from public.parse_receipt_qr(p_proof_ref);
+
+    if found then
+        if v_tenant.require_known_register and not exists (
+            select 1 from public.tenant_registers r
+             where r.tenant_id = p_tenant_id and r.serial = v_beleg.register_serial
+        ) then
+            raise exception 'unknown register' using errcode = '42501';
+        end if;
+
+        -- Das schaerfste Mittel gegen liegengebliebene Bons: Was im Laden
+        -- eingesammelt wird, ist in aller Regel Stunden alt.
+        if v_beleg.log_time < v_now - make_interval(mins => v_tenant.proof_max_age_minutes) then
+            raise exception 'receipt too old' using errcode = '22023';
+        end if;
+        -- Kassenuhren gehen vor; mehr als eine Viertelstunde ist keine Drift.
+        if v_beleg.log_time > v_now + interval '15 minutes' then
+            raise exception 'receipt from the future' using errcode = '22023';
+        end if;
+        if v_beleg.amount_cents < v_tenant.proof_min_cents then
+            raise exception 'amount below minimum' using errcode = '22023';
+        end if;
+
+        -- Kanonischer Schluessel statt der rohen Zeichenkette: Sonst zaehlt
+        -- derselbe Bon erneut, sobald ein Leerzeichen anders steht.
+        v_ref := v_beleg.register_serial || ':' || v_beleg.transaction_no
+                 || ':' || v_beleg.signature_ctr;
+    else
+        -- Kein Beleg-QR. Solange der Betrieb das erlaubt, zaehlt der freie
+        -- Nachweis weiter - sonst waere die Pruefung ohnehin umgehbar,
+        -- indem man irgendeine Zeichenkette schickt.
+        if not v_tenant.allow_opaque_proofs then
+            raise exception 'receipt qr required' using errcode = '22023';
+        end if;
+        v_ref := trim(p_proof_ref);
+    end if;
+
+    select count(*) into v_heute
+      from public.stamp_proofs
+     where tenant_id = p_tenant_id and user_id = v_user
+       and (created_at at time zone 'Europe/Berlin')::date
+           = (v_now at time zone 'Europe/Berlin')::date;
+    if v_heute >= v_tenant.daily_stamp_limit then
+        raise exception 'daily limit reached' using errcode = '22023';
+    end if;
+
     -- Schlaegt bei einem schon verwendeten Beleg mit unique_violation fehl.
-    insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
-    values (p_tenant_id, v_user, trim(p_proof_ref), p_source);
+    insert into public.stamp_proofs (
+        tenant_id, user_id, proof_ref, source, register_serial, amount_cents
+    ) values (
+        p_tenant_id, v_user, v_ref, p_source,
+        v_beleg.register_serial, v_beleg.amount_cents
+    );
 
     insert into public.stamps (id, created_at, user_id, tenant_id)
     values (v_stamp_id, v_now, v_user, p_tenant_id);
@@ -753,6 +939,14 @@ create policy offers_owner_delete on public.offers
     for delete to authenticated
     using (public.is_owner_of(tenant_id));
 
+-- ------------------------------------------------------------- Kassen
+create policy tenant_registers_read on public.tenant_registers
+    for select to authenticated using (public.is_staff_of(tenant_id));
+create policy tenant_registers_owner_insert on public.tenant_registers
+    for insert to authenticated with check (public.is_owner_of(tenant_id));
+create policy tenant_registers_owner_delete on public.tenant_registers
+    for delete to authenticated using (public.is_owner_of(tenant_id));
+
 -- ----------------------------------------------------------- Stammdaten
 /*
  * Aendert die Angaben, die der Betrieb selbst verantwortet.
@@ -824,6 +1018,64 @@ revoke all on function public.owner_update_tenant(
     uuid, text, text, text, text, text, text, int, int) from public;
 grant execute on function public.owner_update_tenant(
     uuid, text, text, text, text, text, text, int, int) to authenticated;
+
+-- ------------------------------------------------------ Belegpruefung
+/*
+ * Aendert die Regeln, nach denen ein Kaufnachweis geprueft wird.
+ *
+ * Bewusst getrennt von owner_update_tenant: Das eine ist Erscheinungsbild
+ * und Kartenregel, das andere Missbrauchsschutz. Wer die Farbe aendert,
+ * soll nicht aus Versehen das Zeitfenster verstellen.
+ */
+create or replace function public.owner_update_proof_rules(
+    p_tenant_id       uuid,
+    p_max_age_minutes int,
+    p_min_cents       int,
+    p_daily_limit     int,
+    p_require_known   boolean,
+    p_allow_opaque    boolean
+)
+returns setof public.tenants
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+    if p_max_age_minutes is null or p_max_age_minutes < 1 or p_max_age_minutes > 43200 then
+        raise exception 'max age out of range' using errcode = '22023';
+    end if;
+    if p_min_cents is null or p_min_cents < 0 then
+        raise exception 'min amount out of range' using errcode = '22023';
+    end if;
+    if p_daily_limit is null or p_daily_limit < 1 or p_daily_limit > 100 then
+        raise exception 'daily limit out of range' using errcode = '22023';
+    end if;
+
+    -- Nur Belege zulassen, ohne eine einzige Kasse eingetragen zu haben,
+    -- waere das sichere Abschalten der Stempelvergabe.
+    if p_require_known and not exists (
+        select 1 from public.tenant_registers r where r.tenant_id = p_tenant_id
+    ) then
+        raise exception 'no register configured' using errcode = '22023';
+    end if;
+
+    update public.tenants
+       set proof_max_age_minutes  = p_max_age_minutes,
+           proof_min_cents        = p_min_cents,
+           daily_stamp_limit      = p_daily_limit,
+           require_known_register = coalesce(p_require_known, false),
+           allow_opaque_proofs    = coalesce(p_allow_opaque, true)
+     where id = p_tenant_id;
+
+    return query select * from public.tenants where id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean) from public;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*
