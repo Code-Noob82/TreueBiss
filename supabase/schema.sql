@@ -4,7 +4,7 @@
 -- darf nur auf Objekte verweisen, die weiter oben stehen. Der Aufbau ist:
 --
 --   1. Tabellen (tenants zuerst, danach alles was darauf verweist)
---   2. Spalten fuer bestehende Installationen nachziehen
+--   2. Bestehende Installationen nachziehen (Spalten, Umzuege)
 --   3. Row Level Security und Policies
 --   4. Funktionen fuer Vergabe und Einloesen
 --   5. Beispieldaten
@@ -38,9 +38,6 @@ create table if not exists public.tenants (
     stamps_per_card       int  not null default 10 check (stamps_per_card between 1 and 50),
     voucher_validity_days int  not null default 90 check (voucher_validity_days > 0),
     is_active             boolean not null default true,
-    -- bcrypt-Hash des Einloese-Codes, den das Personal an der Kasse eingibt.
-    -- Der Code selbst wird nie gespeichert.
-    redeem_code_hash      text,
     -- Wenn true, muss beim Einloesen der Code eingegeben werden. Standard ist
     -- false: Der Kunde loest selbst ein, die App zeigt eine zeitgebundene
     -- Bestaetigung, auf die das Personal nur kurz schaut. Betriebe, die es
@@ -49,12 +46,52 @@ create table if not exists public.tenants (
     created_at            timestamptz not null default now()
 );
 
+-- ------------------------------------------------- Geheimnisse des Betriebs
+-- Getrennt von tenants, und zwar aus einem konkreten Grund: Die Lese-Policy
+-- auf tenants gilt fuer die ganze Zeile. Solange der Hash dort lag, konnte
+-- ihn jeder angemeldete App-Nutzer mitlesen - ein bcrypt-Hash ueber einen
+-- kurzen Code ist offline in Sekunden geknackt. Der Code haette also genau
+-- den nicht aufgehalten, gegen den er gerichtet ist.
+--
+-- Auf diese Tabelle kommt niemand: RLS an, keine einzige Policy. Nur die
+-- security-definer-Funktionen unten lesen sie.
+create table if not exists public.tenant_secrets (
+    tenant_id        uuid primary key references public.tenants(id) on delete cascade,
+    -- bcrypt-Hash des Einloese-Codes. Der Code selbst wird nie gespeichert.
+    redeem_code_hash text not null,
+    updated_at       timestamptz not null default now()
+);
+
 -- Bestehende Projekte nachziehen: Das `create table if not exists` oben
 -- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
 -- Spalte. Muss vor allem stehen, was sie verwendet.
-alter table public.tenants add column if not exists redeem_code_hash text;
 alter table public.tenants
     add column if not exists requires_redeem_code boolean not null default false;
+
+-- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
+-- steht; auf einer frischen Datenbank passiert nichts.
+do $$
+begin
+    if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name   = 'tenants'
+           and column_name  = 'redeem_code_hash'
+    ) then
+        insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+        select id, redeem_code_hash
+          from public.tenants
+         where redeem_code_hash is not null
+           -- "1234" stand frueher im Repository und wurde von einer aelteren
+           -- Fassung dieses Skripts jedem Betrieb ohne Code verpasst. Der
+           -- zieht nicht mit um, er verschwindet.
+           and extensions.crypt('1234', redeem_code_hash) <> redeem_code_hash
+        on conflict (tenant_id) do nothing;
+
+        alter table public.tenants drop column redeem_code_hash;
+    end if;
+end
+$$;
 
 -- ---------------------------------------------------------------- Angebote
 create table if not exists public.offers (
@@ -163,9 +200,11 @@ begin
         raise exception 'voucher expired' using errcode = '22023';
     end if;
 
-    select redeem_code_hash, requires_redeem_code
-      into v_hash, v_requires
+    select requires_redeem_code into v_requires
       from public.tenants where id = v_tenant and is_active;
+
+    select redeem_code_hash into v_hash
+      from public.tenant_secrets where tenant_id = v_tenant;
 
     -- Der Code ist nur Pflicht, wenn der Betrieb ihn verlangt. Sonst loest
     -- der Kunde selbst ein; das Personal prueft die Bestaetigung per Blick,
@@ -263,10 +302,12 @@ grant execute on function public.staff_redeem_voucher(uuid) to authenticated;
 -- Bestaetigung per Blick oder scannt den QR an der Kasse.
 --
 -- Wer einen Code will, setzt ihn einmal von Hand und schaltet ihn scharf:
---   update public.tenants
---      set redeem_code_hash     = extensions.crypt('DEIN_CODE', extensions.gen_salt('bf')),
---          requires_redeem_code = true
---    where id = '...';
+--   insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+--   values ('...', extensions.crypt('DEIN_CODE', extensions.gen_salt('bf')))
+--       on conflict (tenant_id)
+--       do update set redeem_code_hash = excluded.redeem_code_hash,
+--                     updated_at       = now();
+--   update public.tenants set requires_redeem_code = true where id = '...';
 -- Ohne Hash lehnt redeem_voucher mit Code-Pflicht ausdruecklich ab, statt
 -- stillschweigend durchzulassen.
 insert into public.tenants (
@@ -279,14 +320,11 @@ insert into public.tenants (
     '#4CAF50'
 ) on conflict (id) do nothing;
 
--- Fruehere Fassungen dieses Skripts haben jedem Betrieb ohne Code den
--- oeffentlich bekannten Demo-Code "1234" verpasst - auch echten. Hier
--- wieder einsammeln: Nur Hashes, die genau auf "1234" passen, werden
--- geleert. Ein selbst gesetzter Code bleibt unangetastet.
-update public.tenants
-   set redeem_code_hash = null
- where redeem_code_hash is not null
-   and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
+-- Sicherheitsnetz fuer den Fall, dass "1234" ueber einen anderen Weg in
+-- tenant_secrets gelandet ist als ueber den Umzug oben. Nur Hashes, die
+-- genau darauf passen; ein selbst gesetzter Code bleibt unangetastet.
+delete from public.tenant_secrets
+ where extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
 
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (
@@ -355,7 +393,11 @@ create index if not exists stamps_user_tenant_idx on public.stamps (user_id, ten
 create index if not exists vouchers_user_tenant_idx on public.vouchers (user_id, tenant_id);
 
 -- ======================================================== Row Level Security
-alter table public.tenants     enable row level security;
+alter table public.tenants        enable row level security;
+-- Bewusst ohne Policy: Wer keine Policy hat, sieht keine Zeile. Der revoke
+-- kommt oben drauf, weil Supabase neuen Tabellen Rechte mitgibt.
+alter table public.tenant_secrets enable row level security;
+revoke all on public.tenant_secrets from anon, authenticated;
 alter table public.offers      enable row level security;
 alter table public.memberships enable row level security;
 alter table public.stamps      enable row level security;

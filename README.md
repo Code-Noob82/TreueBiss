@@ -97,8 +97,9 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 4. `supabase/schema.sql` im SQL-Editor des Projekts ausführen. Das legt Tabellen,
    RLS-Policies und einen Demo-Betrieb an. Der Demo-Betrieb kommt **ohne
    Einlöse-Code**: Ein Code, der im Repository steht, ist keiner. Wer einen
-   will, setzt ihn einmal von Hand — das Skript zeigt den Befehl im Kommentar
-   über den Beispieldaten.
+   will, trägt ihn einmal von Hand in `tenant_secrets` ein — das Skript zeigt
+   den Befehl im Kommentar über den Beispieldaten. Ein bereits gesetzter Code
+   zieht beim Einspielen automatisch mit um.
 5. `TENANT_ID` in `local.properties` auf den gewünschten Betrieb setzen. Ohne
    Eintrag wird der Demo-Betrieb aus dem Schema verwendet.
 
@@ -179,11 +180,18 @@ nicht der Besitzer. Hier ersetzt die Beschäftigung beim Betrieb diesen
 Nachweis, und damit auch den Einlöse-Code: Wer scannt, ist der Betrieb.
 
 Der Einlöse-Code ist deshalb nur für Betriebe da, die `requires_redeem_code`
-einschalten — und er wird nirgends mitgeliefert. `redeem_code_hash` ist
-standardmäßig leer; verlangt ein Betrieb einen Code, ohne einen hinterlegt zu
-haben, lehnt `redeem_voucher()` ausdrücklich ab, statt stillschweigend
-durchzulassen. Die App meldet das als Einrichtungsfehler und nicht, wie früher,
-als fehlende Verbindung.
+einschalten — und er wird nirgends mitgeliefert. Verlangt ein Betrieb einen
+Code, ohne einen hinterlegt zu haben, lehnt `redeem_voucher()` ausdrücklich ab,
+statt stillschweigend durchzulassen. Die App meldet das als Einrichtungsfehler
+und nicht, wie früher, als fehlende Verbindung.
+
+Der Hash liegt in einer eigenen Tabelle `tenant_secrets`, nicht als Spalte an
+`tenants`. Der Grund ist die Lese-Policy: Sie gilt für die ganze Zeile. Solange
+der Hash an `tenants` hing, konnte ihn jeder angemeldete App-Nutzer über
+PostgREST mitlesen, und ein bcrypt-Hash über einen kurzen Code ist offline in
+Sekunden geknackt — der Code hätte also genau den nicht aufgehalten, gegen den
+er gerichtet ist. `tenant_secrets` hat RLS an und **keine einzige Policy**; nur
+die `security definer`-Funktionen kommen heran.
 
 ### 2. Auswertung für den Piloten
 

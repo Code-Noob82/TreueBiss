@@ -60,6 +60,13 @@ run_scenario() {
             grep -E "ERROR" "$tmp/prev.log" | head -3
             return 1
         fi
+        # Ein selbst gesetzter Einloese-Code, wie ihn ein Pilotbetrieb haette.
+        # Er muss den Umzug nach tenant_secrets ueberleben - anders als das
+        # mitgelieferte "1234", das dabei verschwindet.
+        "${psql[@]}" -c "update public.tenants
+                            set redeem_code_hash = extensions.crypt(
+                                    'umzug-4711', extensions.gen_salt('bf'))
+                          where id = '00000000-0000-4000-8000-000000000001';" >/dev/null
     fi
 
     # Zweimal einspielen: Das Skript muss wiederholbar sein. NOTICEs ueber
@@ -74,6 +81,22 @@ run_scenario() {
         fi
     done
     echo "Schema eingespielt (zweimal, ohne Fehler)."
+
+    if [ "$legacy" = "previous" ]; then
+        # Der Umzug darf den Code nicht unterwegs verlieren. Ohne diese
+        # Pruefung faellt ein stiller Verlust erst dem Betrieb auf.
+        local ueberlebt
+        ueberlebt="$("${psql[@]}" -tAc "
+            select count(*) from public.tenant_secrets
+             where tenant_id = '00000000-0000-4000-8000-000000000001'
+               and extensions.crypt('umzug-4711', redeem_code_hash) = redeem_code_hash;")"
+        if [ "$ueberlebt" = "1" ]; then
+            echo "OK    Ein selbst gesetzter Einloese-Code ueberlebt den Umzug"
+        else
+            echo "FEHLGESCHLAGEN: Der selbst gesetzte Einloese-Code ging beim Umzug verloren"
+            FAILED=1
+        fi
+    fi
 
     local files=()
     case "$legacy" in

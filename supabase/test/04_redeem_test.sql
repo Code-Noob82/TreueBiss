@@ -22,17 +22,53 @@ begin
 end;
 $$;
 
--- ============================ Kein Betrieb traegt den alten Demo-Code
--- Frueher hat schema.sql jedem Betrieb ohne Code das oeffentlich bekannte
--- "1234" verpasst. Der Waechter faellt, sobald das zurueckkommt.
+-- ============================ Der Einloese-Code liegt sicher
 do $$
 declare v_treffer int;
 begin
+    -- Frueher hat schema.sql jedem Betrieb ohne Code das oeffentlich
+    -- bekannte "1234" verpasst. Der Waechter faellt, sobald das zurueckkommt.
     select count(*) into v_treffer
-      from public.tenants
-     where redeem_code_hash is not null
-       and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
+      from public.tenant_secrets
+     where extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
     call test.check(v_treffer = 0, 'Kein Betrieb traegt den Demo-Code "1234"');
+
+    -- Der Hash darf nicht mehr an tenants haengen: Die Lese-Policy dort gilt
+    -- fuer die ganze Zeile, jeder App-Nutzer haette ihn mitgelesen.
+    select count(*) into v_treffer
+      from information_schema.columns
+     where table_schema = 'public' and table_name = 'tenants'
+       and column_name = 'redeem_code_hash';
+    call test.check(v_treffer = 0, 'tenants traegt keinen Code-Hash mehr');
+end
+$$;
+
+-- ============================ Der Client kommt an die Geheimnisse nicht heran
+do $$
+declare
+    v_user uuid;
+    v_zeilen int;
+begin
+    insert into auth.users default values returning id into v_user;
+    insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+    values ('00000000-0000-4000-8000-000000000001',
+            extensions.crypt('geheim-4711', extensions.gen_salt('bf')))
+        on conflict (tenant_id) do update set redeem_code_hash = excluded.redeem_code_hash;
+
+    call auth.become(v_user);
+    set local role authenticated;
+    begin
+        select count(*) into v_zeilen from public.tenant_secrets;
+    exception when insufficient_privilege then
+        -- Noch besser als null Zeilen: Der revoke greift schon vor der
+        -- Policy. Beides ist ein Bestehen, die Meldung darf sich aendern.
+        v_zeilen := 0;
+    end;
+    reset role;
+    call test.check(v_zeilen = 0, 'Ein App-Nutzer sieht keinen Code-Hash');
+
+    delete from public.tenant_secrets
+     where tenant_id = '00000000-0000-4000-8000-000000000001';
 end
 $$;
 
@@ -121,10 +157,10 @@ begin
     -- Den Code hier selbst setzen: Ein Test, der einen Code aus den
     -- Beispieldaten braucht, haelt genau den Fehler am Leben, den er
     -- pruefen soll.
-    update public.tenants
-       set requires_redeem_code = true,
-           redeem_code_hash     = extensions.crypt('pruef-4711', extensions.gen_salt('bf'))
-     where id = v_tenant;
+    update public.tenants set requires_redeem_code = true where id = v_tenant;
+    insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+    values (v_tenant, extensions.crypt('pruef-4711', extensions.gen_salt('bf')))
+        on conflict (tenant_id) do update set redeem_code_hash = excluded.redeem_code_hash;
 
     insert into auth.users default values returning id into v_bob;
     insert into public.memberships (user_id, tenant_id) values (v_bob, v_tenant);
@@ -156,10 +192,8 @@ begin
     select is_redeemed into v_ok from public.vouchers where id = v_voucher;
     call test.check(v_ok, 'Mit richtigem Code wird eingelöst');
 
-    update public.tenants
-       set requires_redeem_code = false,
-           redeem_code_hash     = null
-     where id = v_tenant;
+    update public.tenants set requires_redeem_code = false where id = v_tenant;
+    delete from public.tenant_secrets where tenant_id = v_tenant;
     raise notice '--- Einlöse-Tests (mit Code) bestanden ---';
 end
 $$;
