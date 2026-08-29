@@ -95,7 +95,10 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 2. `SUPABASE_URL` und `SUPABASE_ANON_KEY` aus den Projekt-Einstellungen bei Supabase eintragen.
 3. Anonyme Anmeldungen im Supabase-Projekt aktivieren.
 4. `supabase/schema.sql` im SQL-Editor des Projekts ausführen. Das legt Tabellen,
-   RLS-Policies und einen Demo-Betrieb an.
+   RLS-Policies und einen Demo-Betrieb an. Der Demo-Betrieb kommt **ohne
+   Einlöse-Code**: Ein Code, der im Repository steht, ist keiner. Wer einen
+   will, setzt ihn einmal von Hand — das Skript zeigt den Befehl im Kommentar
+   über den Beispieldaten.
 5. `TENANT_ID` in `local.properties` auf den gewünschten Betrieb setzen. Ohne
    Eintrag wird der Demo-Betrieb aus dem Schema verwendet.
 
@@ -174,6 +177,13 @@ Das Personal löst über `staff_redeem_voucher()` ein. Die reguläre
 `redeem_voucher()` prüft auf Besitz des Gutscheins — das Personal ist aber
 nicht der Besitzer. Hier ersetzt die Beschäftigung beim Betrieb diesen
 Nachweis, und damit auch den Einlöse-Code: Wer scannt, ist der Betrieb.
+
+Der Einlöse-Code ist deshalb nur für Betriebe da, die `requires_redeem_code`
+einschalten — und er wird nirgends mitgeliefert. `redeem_code_hash` ist
+standardmäßig leer; verlangt ein Betrieb einen Code, ohne einen hinterlegt zu
+haben, lehnt `redeem_voucher()` ausdrücklich ab, statt stillschweigend
+durchzulassen. Die App meldet das als Einrichtungsfehler und nicht, wie früher,
+als fehlende Verbindung.
 
 ### 2. Auswertung für den Piloten
 

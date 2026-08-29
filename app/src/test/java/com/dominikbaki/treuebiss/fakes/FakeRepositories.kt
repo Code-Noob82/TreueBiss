@@ -168,8 +168,11 @@ class FakeVoucherRepository(
 
     override fun observeOpenVouchers(): Flow<List<Voucher>> = vouchers.asStateFlow()
 
-    /** Der Code, den der "Server" akzeptiert. */
-    var expectedCode: String = "1234"
+    /**
+     * Der Code, den der "Server" akzeptiert. Bewusst kein Code, der irgendwo
+     * ausgeliefert wird - "1234" stand frueher in schema.sql.
+     */
+    var expectedCode: String = "pruef-4711"
 
     /** Wird von [redeemVoucher] geworfen, wenn gesetzt. */
     var redeemError: Exception? = null

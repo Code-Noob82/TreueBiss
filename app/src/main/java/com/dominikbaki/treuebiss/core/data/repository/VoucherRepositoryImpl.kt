@@ -3,6 +3,7 @@ package com.dominikbaki.treuebiss.core.data.repository
 import android.util.Log
 import com.dominikbaki.treuebiss.core.data.remote.datasource.SupabaseDataSource
 import com.dominikbaki.treuebiss.core.domain.models.InvalidRedeemCodeException
+import com.dominikbaki.treuebiss.core.domain.models.RedeemNotConfiguredException
 import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.models.VoucherNotRedeemableException
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
@@ -87,6 +88,11 @@ class VoucherRepositoryImpl @Inject constructor(
 private fun Exception.toRedeemFailure(voucherId: String): Exception {
     val text = (message ?: "") + (cause?.message ?: "")
     return when {
+        // Vor dem falschen Code pruefen: Beide Faelle drehen sich um den
+        // Code, aber nur einer ist die Schuld des Kunden.
+        text.contains("no redeem code configured") ->
+            RedeemNotConfiguredException("Betrieb verlangt einen Code, hat aber keinen: $voucherId")
+
         text.contains("invalid redeem code") || text.contains("42501") ->
             InvalidRedeemCodeException("Falscher Einlöse-Code für $voucherId")
 

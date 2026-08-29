@@ -256,27 +256,37 @@ grant execute on function public.staff_redeem_voucher(uuid) to authenticated;
 
 -- ==================================================== Beispiel-Betrieb (Demo)
 -- Die UUID muss mit TENANT_ID in local.properties uebereinstimmen.
--- Der Einloese-Code des Demo-Betriebs ist "1234". Vor einem Pilotbetrieb
--- unbedingt aendern:
+--
+-- Bewusst OHNE Einloese-Code: Ein Code, der im Repository steht, ist keiner.
+-- Er bleibt null, und das ist ungefaehrlich, weil requires_redeem_code auf
+-- false steht - der Kunde loest dann selbst ein, das Personal prueft die
+-- Bestaetigung per Blick oder scannt den QR an der Kasse.
+--
+-- Wer einen Code will, setzt ihn einmal von Hand und schaltet ihn scharf:
 --   update public.tenants
---      set redeem_code_hash = extensions.crypt('DEIN_CODE', extensions.gen_salt('bf'))
+--      set redeem_code_hash     = extensions.crypt('DEIN_CODE', extensions.gen_salt('bf')),
+--          requires_redeem_code = true
 --    where id = '...';
+-- Ohne Hash lehnt redeem_voucher mit Code-Pflicht ausdruecklich ab, statt
+-- stillschweigend durchzulassen.
 insert into public.tenants (
-    id, slug, name, daily_special_title, primary_color, redeem_code_hash
+    id, slug, name, daily_special_title, primary_color
 ) values (
     '00000000-0000-4000-8000-000000000001',
     'baeckerei-mustermann',
     'Bäckerei Mustermann',
     'Schmankerl des Tages',
-    '#4CAF50',
-    extensions.crypt('1234', extensions.gen_salt('bf'))
+    '#4CAF50'
 ) on conflict (id) do nothing;
 
--- Bestehende Betriebe ohne Code bekommen den Demo-Code, damit das Einloesen
--- nach dem Upgrade nicht stumm blockiert.
+-- Fruehere Fassungen dieses Skripts haben jedem Betrieb ohne Code den
+-- oeffentlich bekannten Demo-Code "1234" verpasst - auch echten. Hier
+-- wieder einsammeln: Nur Hashes, die genau auf "1234" passen, werden
+-- geleert. Ein selbst gesetzter Code bleibt unangetastet.
 update public.tenants
-   set redeem_code_hash = extensions.crypt('1234', extensions.gen_salt('bf'))
- where redeem_code_hash is null;
+   set redeem_code_hash = null
+ where redeem_code_hash is not null
+   and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
 
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (

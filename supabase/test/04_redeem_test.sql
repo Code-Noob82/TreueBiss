@@ -22,6 +22,20 @@ begin
 end;
 $$;
 
+-- ============================ Kein Betrieb traegt den alten Demo-Code
+-- Frueher hat schema.sql jedem Betrieb ohne Code das oeffentlich bekannte
+-- "1234" verpasst. Der Waechter faellt, sobald das zurueckkommt.
+do $$
+declare v_treffer int;
+begin
+    select count(*) into v_treffer
+      from public.tenants
+     where redeem_code_hash is not null
+       and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
+    call test.check(v_treffer = 0, 'Kein Betrieb traegt den Demo-Code "1234"');
+end
+$$;
+
 -- ============================ Standard: ohne Code einlösbar
 do $$
 declare
@@ -104,7 +118,13 @@ declare
     v_voucher uuid;
     v_ok      boolean;
 begin
-    update public.tenants set requires_redeem_code = true where id = v_tenant;
+    -- Den Code hier selbst setzen: Ein Test, der einen Code aus den
+    -- Beispieldaten braucht, haelt genau den Fehler am Leben, den er
+    -- pruefen soll.
+    update public.tenants
+       set requires_redeem_code = true,
+           redeem_code_hash     = extensions.crypt('pruef-4711', extensions.gen_salt('bf'))
+     where id = v_tenant;
 
     insert into auth.users default values returning id into v_bob;
     insert into public.memberships (user_id, tenant_id) values (v_bob, v_tenant);
@@ -132,11 +152,14 @@ begin
     call test.check(not v_ok, 'Nach den Fehlversuchen ist der Gutschein unverändert');
 
     -- ------------------------------------------ Richtiger Code
-    perform * from public.redeem_voucher(v_voucher, '1234');
+    perform * from public.redeem_voucher(v_voucher, 'pruef-4711');
     select is_redeemed into v_ok from public.vouchers where id = v_voucher;
     call test.check(v_ok, 'Mit richtigem Code wird eingelöst');
 
-    update public.tenants set requires_redeem_code = false where id = v_tenant;
+    update public.tenants
+       set requires_redeem_code = false,
+           redeem_code_hash     = null
+     where id = v_tenant;
     raise notice '--- Einlöse-Tests (mit Code) bestanden ---';
 end
 $$;
