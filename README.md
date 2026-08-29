@@ -52,6 +52,8 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 - [x] **Web-App für Kunden:** `web/app/` als Progressive Web App — sammeln und
   einlösen im Browser, ohne Installation, auf iPhone wie Android. Der Betrieb
   steht als Slug in der Adresse.
+- [x] **Signaturprüfung des Belegs:** Edge Function `beleg-pruefen` prüft die
+  ECDSA-Signatur des Kassenbons, gegen echte TSE-Signaturen verifiziert.
 - [x] **Verwaltung durch den Betrieb:** Eigene Seite unter `web/verwaltung/`
   für Stammdaten, Kartenregeln, Angebote und Einlöse-Code. Zwei Rollen in
   `tenant_staff`: `staff` bedient die Kasse, `owner` verwaltet zusätzlich.
@@ -172,6 +174,7 @@ ablehnen als eine erfundene Zeichenkette durchwinken.
 | Tageslimit je Kunde | `daily_stamp_limit` | 25 | Massenmissbrauch — Fangnetz, nicht Hauptmittel |
 | Nur eingetragene Kassen | `require_known_register` | aus | Bons aus fremden Betrieben |
 | Freie Nachweise zulassen | `allow_opaque_proofs` | an | Muss aus, sobald produktiv gescannt wird |
+| Signatur prüfen | `require_signed_proof` | aus | Selbst gebaute QR-Codes — siehe unten |
 
 Die Vorgaben sind bewusst mild: Das Einspielen des Skripts darf ein
 bestehendes Projekt nicht plötzlich Stempel ablehnen lassen. Scharf stellt der
@@ -183,13 +186,54 @@ Der Schlüssel in `stamp_proofs` ist kanonisch (`Kasse:Transaktion:Zähler`), ni
 die rohe Zeichenkette — sonst zählte derselbe Bon erneut, sobald ein Leerzeichen
 anders steht.
 
-> **Was fehlt: die Signatur.** Der QR-Code enthält eine ECDSA-Signatur und den
-> öffentlichen Schlüssel. Postgres kann sie nicht prüfen — `pgcrypto` kann kein
-> ECDSA verifizieren. Gegen das Einsammeln fremder Bons helfen die Regeln oben;
-> gegen einen **selbst gebauten** QR-Code hilft nur die Signaturprüfung, und die
-> braucht eine Supabase Edge Function. Solange sie fehlt, ist
-> `require_known_register` das schärfste verfügbare Mittel: Wer fälscht, muss
-> zumindest eine echte, eingetragene Kassennummer treffen.
+#### Signaturprüfung (Edge Function)
+
+Der QR-Code enthält eine ECDSA-Signatur und den öffentlichen Schlüssel. Postgres
+kann sie nicht prüfen — `pgcrypto` verifiziert kein ECDSA. Deshalb läuft die
+Prüfung in `supabase/functions/beleg-pruefen/`.
+
+**Der QR enthält nicht die signierten Daten, sondern die Felder, aus denen sie
+sich zusammensetzen.** Sie müssen nach BSI TR-03151, Anhang A, als Folge
+DER-kodierter ASN.1-Objekte nachgebaut werden — nicht in eine `SEQUENCE`
+gepackt, mit kontextspezifischen Tags `[0]`, `[1]`, `[2]`, `[3]`, `[5]` und der
+SHA-256-Summe des öffentlichen Schlüssels als `serialNumber`. Ein Byte an der
+falschen Stelle, und jede echte Signatur gilt als ungültig.
+
+**Warum nicht WebCrypto:** Deutsche TSEn signieren überwiegend über
+Brainpool-Kurven, und `crypto.subtle.importKey` lehnt `brainpoolP384r1` mit
+*„Unrecognized namedCurve"* ab. Die Prüfung rechnet deshalb selbst, über
+BigInt. Das ist vertretbar, weil ausschließlich öffentliche Daten verarbeitet
+werden — kein geheimer Schlüssel, also keine Seitenkanäle. Bleibt die
+Richtigkeit, und die ist geprüft:
+
+- gegen **zwei echte TSE-Signaturen** (secp256r1 und brainpoolP384r1) aus der
+  Testsammlung von [berohndo/tse_signature_verification](https://github.com/berohndo/tse_signature_verification) (Apache-2.0)
+- gegen **sieben Manipulationen** — Betrag, Kassennummer, Belegzeit,
+  Transaktionsnummer, Signaturzähler, ein Zeichen der Signatur, fremder Schlüssel
+- die Kurvenparameter prüfen sich selbst: G muss auf der Kurve liegen, `n·G`
+  unendlich sein. Ein Tippfehler in den Konstanten würde sonst einfach jede
+  Signatur ablehnen — und das sähe aus wie ein gefälschter Beleg.
+
+```bash
+node --experimental-strip-types supabase/functions/beleg-pruefen/pruefung_test.ts
+```
+
+**Warum die Vergabe gleich in der Funktion passiert:** Sonst müsste die App der
+Datenbank sagen „ich habe prüfen lassen", und genau das darf sie nicht behaupten
+können. `service_issue_stamp` ist deshalb nur für `service_role` freigegeben;
+der Schlüssel liegt in der Edge Function, nicht im Browser. Der gewöhnliche
+`issue_stamp` setzt `signature_verified` immer auf `false`.
+
+Ausrollen und einschalten — **in dieser Reihenfolge**, sonst kommt kein Stempel
+mehr durch:
+
+```bash
+supabase functions deploy beleg-pruefen
+```
+
+Danach in der Verwaltung „Signatur des Belegs prüfen" setzen
+(`tenants.require_signed_proof`). Ist sie an, lehnt `issue_stamp` jeden Beleg
+ab, auch jeden freien Nachweis.
 
 ### 1. Kassenseite für den Betrieb
 
@@ -481,10 +525,6 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **Kassen-Seriennummern registrieren:** Voraussetzung dafür, dass
       `issue_stamp` einen Beleg gegen die Kassen des Betriebs prüfen kann. Die
       Nummer steht im Beleg-QR; die Prüfung dagegen gibt es noch nicht.
-- [ ] **Signaturprüfung per Edge Function:** Das einzige Mittel gegen einen
-      selbst gebauten Beleg-QR. Postgres kann kein ECDSA; eine Edge Function
-      mit WebCrypto kann es. Bis dahin bleibt `require_known_register` die
-      schärfste verfügbare Hürde.
 - [ ] **Beleg-Scanner in der Android-App:** ML Kit Barcode Scanning. Die
       Web-App liest den QR bereits (BarcodeDetector, sonst jsQR), die
       serverseitige Prüfung steht — es fehlt der native Scanner.

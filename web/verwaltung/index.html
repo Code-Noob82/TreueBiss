@@ -252,6 +252,16 @@
         <input id="b-frei" type="checkbox">
         <span>Auch Nachweise ohne Beleg-QR zulassen</span>
       </label>
+      <label class="schalter">
+        <input id="b-signatur" type="checkbox">
+        <span>Signatur des Belegs prüfen</span>
+      </label>
+      <p class="hinweis">
+        Die Signaturprüfung ist das einzige Mittel gegen einen selbst gebauten
+        QR-Code. Sie läuft über die Edge Function <code>beleg-pruefen</code> —
+        <strong>ohne ausgerollte Funktion kommt kein Stempel mehr durch</strong>.
+        Erst ausrollen, dann einschalten.
+      </p>
       <p class="hinweis">
         Solange kein Scanner im Einsatz ist, muss das Zweite an bleiben — sonst
         zählt gar nichts mehr. Wer produktiv scannt, schaltet es aus: Sonst
@@ -489,6 +499,7 @@ function formularFuellen() {
   $('b-limit').value = aktiv.daily_stamp_limit ?? 25;
   $('b-nurkassen').checked = !!aktiv.require_known_register;
   $('b-frei').checked = aktiv.allow_opaque_proofs !== false;
+  $('b-signatur').checked = !!aktiv.require_signed_proof;
 }
 
 /** Farbwaehler und Textfeld zeigen denselben Wert. */
@@ -675,6 +686,7 @@ $('b-speichern').onclick = async () => {
     p_daily_limit: Number($('b-limit').value),
     p_require_known: $('b-nurkassen').checked,
     p_allow_opaque: $('b-frei').checked,
+    p_require_signed: $('b-signatur').checked,
   });
   beschaeftigt($('b-speichern'), false);
   if (error) { console.error('owner_update_proof_rules', error); melden(fehlertext(error)); return; }

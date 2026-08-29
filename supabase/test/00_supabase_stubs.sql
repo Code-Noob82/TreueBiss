@@ -28,10 +28,14 @@ begin
     if not exists (select 1 from pg_roles where rolname = 'authenticated') then
         create role authenticated nologin;
     end if;
+    -- Die Rolle, unter der die Edge Function arbeitet.
+    if not exists (select 1 from pg_roles where rolname = 'service_role') then
+        create role service_role nologin;
+    end if;
 end
 $$;
 
-grant usage on schema public to anon, authenticated;
+grant usage on schema public to anon, authenticated, service_role;
 
 -- Wichtig fuer aussagekraeftige Tests: In einem echten Supabase-Projekt haben
 -- anon und authenticated Tabellenrechte auf public - eingeschraenkt wird
@@ -55,7 +59,7 @@ $$;
 
 -- Die Testhilfen muessen auch aus der eingeschraenkten Rolle heraus
 -- aufrufbar sein, sonst laesst sich RLS nicht pruefen.
-grant usage on schema test to anon, authenticated;
+grant usage on schema test to anon, authenticated, service_role;
 
 create or replace procedure test.check(p_condition boolean, p_label text)
 language plpgsql

@@ -237,3 +237,85 @@ begin
     raise notice '--- Kassenliste bestanden ---';
 end
 $$;
+
+-- ============================ Signaturpflicht
+do $$
+declare
+    v_t     uuid;
+    v_kunde uuid;
+    v_ok    boolean;
+    v_zahl  int;
+begin
+    insert into public.tenants (id, slug, name, stamps_per_card)
+    values (gen_random_uuid(), 'signatur-test', 'Signaturpflicht', 50)
+    returning id into v_t;
+    insert into auth.users default values returning id into v_kunde;
+    insert into public.memberships (user_id, tenant_id) values (v_kunde, v_t);
+
+    update public.tenants set require_signed_proof = true where id = v_t;
+
+    -- ------------------------------------------ Der gewöhnliche Weg ist zu
+    call auth.become(v_kunde);
+    begin
+        perform public.issue_stamp(v_t, test.bon(p_tx => '3001'));
+        v_ok := false;
+    exception when insufficient_privilege then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Mit Signaturpflicht geht der gewöhnliche Weg nicht mehr');
+
+    -- Auch nicht mit einem freien Nachweis - sonst wäre die Pflicht umgehbar.
+    begin
+        perform public.issue_stamp(v_t, 'IRGENDEINE-NUMMER');
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Mit Signaturpflicht zählt auch kein freier Nachweis');
+
+    -- ------------------------------------------ Der geprüfte Weg geht
+    perform public.service_issue_stamp(v_kunde, v_t, test.bon(p_tx => '3002'));
+    select count(*) into v_zahl from public.stamps where tenant_id = v_t;
+    call test.check(v_zahl = 1, 'Über die geprüfte Vergabe entsteht der Stempel');
+
+    select count(*) into v_zahl from public.stamp_proofs
+     where tenant_id = v_t and signature_verified;
+    call test.check(v_zahl = 1, 'Der Nachweis ist als signaturgeprüft vermerkt');
+
+    -- ------------------------------------------ Die App darf das nicht
+    set local role authenticated;
+    begin
+        perform public.service_issue_stamp(v_kunde, v_t, test.bon(p_tx => '3003'));
+        v_ok := false;
+    exception when insufficient_privilege then
+        v_ok := true;
+    end;
+    reset role;
+    call test.check(v_ok, 'Die App kann sich die Prüfung nicht selbst bescheinigen');
+
+    -- ------------------------------------------ Die Regeln gelten weiter
+    begin
+        perform public.service_issue_stamp(
+            v_kunde, v_t, test.bon(p_tx => '3004', p_zeit => now() - interval '5 hours'));
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Auch ein signierter Beleg darf nicht zu alt sein');
+
+    -- Fremde Mitgliedschaft bleibt fremd, auch mit Service-Rolle.
+    declare v_fremd uuid;
+    begin
+        insert into auth.users default values returning id into v_fremd;
+        begin
+            perform public.service_issue_stamp(v_fremd, v_t, test.bon(p_tx => '3005'));
+            v_ok := false;
+        exception when insufficient_privilege then
+            v_ok := true;
+        end;
+        call test.check(v_ok, 'Ohne Mitgliedschaft gibt es auch geprüft keinen Stempel');
+    end;
+
+    raise notice '--- Signaturpflicht bestanden ---';
+end
+$$;

@@ -86,6 +86,15 @@ function fehlertext(fehler) {
   if (/no redeem code configured/i.test(t)) {
     return 'Einlösen ist hier gerade nicht eingerichtet. Bitte wende dich an das Personal.';
   }
+  if (/signature check required|Signatur des Belegs/i.test(t)) {
+    return 'Die Signatur auf dem Beleg stimmt nicht. Bitte wende dich an das Personal.';
+  }
+  if (/receipt qr required/i.test(t)) return 'Hier zählt nur der QR-Code vom Kassenbon.';
+  if (/receipt too old/i.test(t)) return 'Dieser Beleg ist zu alt.';
+  if (/receipt from the future/i.test(t)) return 'Die Uhrzeit auf dem Beleg passt nicht.';
+  if (/amount below minimum/i.test(t)) return 'Für diesen Betrag gibt es keinen Stempel.';
+  if (/unknown register/i.test(t)) return 'Dieser Beleg gehört nicht zu diesem Betrieb.';
+  if (/daily limit reached/i.test(t)) return 'Für heute ist die Karte voll genug. Bis morgen!';
   if (/invalid redeem code/i.test(t)) return 'Falscher Einlöse-Code.';
   if (/already redeemed/i.test(t)) return 'Dieser Gutschein wurde bereits eingelöst.';
   if (/expired/i.test(t)) return 'Dieser Gutschein ist abgelaufen.';
@@ -250,6 +259,34 @@ async function datenHolen() {
 
 // ------------------------------------------------------------------ Sammeln
 
+/*
+ * Verlangt der Betrieb eine geprüfte Signatur, geht der Beleg über die Edge
+ * Function - die Datenbank kann ECDSA nicht selbst prüfen. Sonst weiterhin
+ * geradeaus über die Datenbankfunktion.
+ */
+async function stempelVergeben(ref) {
+  if (!betrieb.require_signed_proof) {
+    return await db.rpc('issue_stamp', {
+      p_tenant_id: betrieb.id, p_proof_ref: ref, p_source: 'receipt',
+    });
+  }
+  const { data: sitzung } = await db.auth.getSession();
+  const antwort = await fetch(`${konfig.SUPABASE_URL}/functions/v1/beleg-pruefen`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sitzung?.session?.access_token ?? ''}`,
+      apikey: konfig.SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ tenant_id: betrieb.id, qr: ref }),
+  });
+  const koerper = await antwort.json().catch(() => ({}));
+  if (antwort.ok) return { data: [koerper], error: null };
+  // In dieselbe Form bringen wie ein PostgrestError, damit fehlertext()
+  // nicht zweimal geschrieben werden muss.
+  return { data: null, error: { message: koerper.fehler ?? 'Prüfung fehlgeschlagen', code: koerper.code ?? String(antwort.status) } };
+}
+
 async function stempelHolen(belegRef) {
   const ref = (belegRef ?? '').trim();
   if (!ref) { melden('Da war keine Belegnummer dabei.'); return; }
@@ -258,9 +295,7 @@ async function stempelHolen(belegRef) {
   melden('');
 
   beschaeftigt($('beleg-senden'), true, 'Einen Moment …');
-  const { data, error } = await db.rpc('issue_stamp', {
-    p_tenant_id: betrieb.id, p_proof_ref: ref, p_source: 'receipt',
-  });
+  const { data, error } = await stempelVergeben(ref);
   sammelnLaeuft = false;
   beschaeftigt($('beleg-senden'), false);
   if (error) { console.error('issue_stamp', error); melden(fehlertext(error)); return; }
