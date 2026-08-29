@@ -31,8 +31,9 @@ class MainActivity : ComponentActivity() {
             // hier den Activity-Scope, also dieselbe Instanz.
             val mainViewModel: MainViewModel = hiltViewModel()
             val tenant by mainViewModel.activeTenant.collectAsState()
+            val themeMode by mainViewModel.themeMode.collectAsState()
 
-            TreueBissTheme(brandPrimaryColor = tenant.primaryColor) {
+            TreueBissTheme(themeMode = themeMode, brandPrimaryColor = tenant.primaryColor) {
                 CompositionLocalProvider(LocalBrandingConfig provides tenant.toBrandingConfig()) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),

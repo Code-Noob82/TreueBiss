@@ -76,22 +76,19 @@
     <string name="onboarding_1_description">Sammle bei jedem Einkauf Punkte und vergiss nie wieder deine Bonuskarte.</string>
     <string name="onboarding_2_title">Gutscheine sichern</string>
     <string name="onboarding_2_description">Volle Karte? Erhalte automatisch einen Gutschein für deinen nächsten Einkauf.</string>
-    <string name="onboarding_3_title">Ganz wie dahäm</string>
-    <string name="onboarding_3_description">Wähle deinen lokalen Dialekt und fühle dich wie zu Hause.</string>
 
     <!-- Einstellungen -->
-    <string name="settings_section_general">Allgemein</string>
-    <string name="settings_dark_mode">Dunkelmodus</string>
-    <string name="settings_dark_mode_subtitle">Reduziert die Belastung für die Augen.</string>
-    <string name="settings_notifications">Benachrichtigungen</string>
-    <string name="settings_notifications_subtitle">Angebote &amp; Gutscheine erhalten.</string>
-    <string name="settings_section_account">Konto</string>
-    <string name="settings_edit_profile">Profil bearbeiten</string>
-    <string name="settings_edit_profile_subtitle">Namen und persönliche Daten ändern.</string>
-    <string name="settings_logout">Abmelden</string>
-    <string name="settings_logout_subtitle">Du wirst von diesem Gerät abgemeldet.</string>
-    <string name="settings_section_legal">Rechtliches &amp; Info</string>
+    <string name="settings_section_appearance">Darstellung</string>
+    <string name="settings_theme">Erscheinungsbild</string>
+    <string name="settings_theme_system">Wie das System</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_section_legal">Rechtliches</string>
+    <string name="settings_section_about">Über die App</string>
+    <string name="settings_link_failed">Die Seite konnte nicht geöffnet werden.</string>
     <string name="settings_privacy">Datenschutz</string>
+    <string name="settings_app_privacy">Datenschutz in der App</string>
+    <string name="settings_terms">AGB</string>
     <string name="settings_imprint">Impressum</string>
     <string name="settings_app_version">App-Version</string>
 </resources>

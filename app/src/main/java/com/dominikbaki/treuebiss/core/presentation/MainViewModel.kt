@@ -9,6 +9,7 @@ import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
 import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.core.domain.models.Tenant
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.ThemeMode
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -87,6 +88,17 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = Tenant.fallback(tenantRepository.activeTenantId)
+        )
+
+    /**
+     * Gewähltes Erscheinungsbild. Sitzt hier, weil das Theme die gesamte
+     * Oberfläche umschließt und schon vor dem ersten Screen feststehen muss.
+     */
+    val themeMode: StateFlow<ThemeMode> = userPreferencesRepository.themeMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = ThemeMode.System
         )
 
     private var connectJob: Job? = null
