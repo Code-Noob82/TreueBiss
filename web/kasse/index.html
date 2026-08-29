@@ -70,6 +70,25 @@
     margin: var(--s5) calc(var(--s5) * -1);
   }
 
+  /*
+    Der Code muss aus einem Meter Abstand scanbar sein, quer über den Tresen -
+    also so groß wie die Karte hergibt, auf weißem Grund. Ein dunkler
+    Hintergrund macht ihn für manche Kameras unlesbar, deshalb ist das Feld
+    hier bewusst nicht themenabhängig.
+  */
+  .qr-feld {
+    background: #fff; border-radius: var(--s3); padding: var(--s4);
+    /* minmax(0, 1fr) statt auto: Sonst waechst die Spalte auf die Eigenbreite
+       des Canvas (640 px), und der Code ragt aus der Karte heraus. */
+    display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center;
+    margin-bottom: var(--s3);
+  }
+  .qr-feld canvas { width: 100%; height: auto; max-width: 320px; image-rendering: pixelated; }
+  .frist {
+    font-size: var(--t-klein); color: var(--tinte-leise);
+    font-variant-numeric: tabular-nums; margin: 0; text-align: center;
+  }
+
   /* Zahlen sind Nachschlagewerk, nicht Hauptsache - deshalb nebenan. */
   .zahlen { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
   .zahl {
@@ -127,6 +146,14 @@
     <button id="einloesen" class="still">Von Hand einlösen</button>
   </section>
 
+  <!-- Stempel-QR für den Tresen -->
+  <section id="tresen" class="karte verborgen">
+    <p class="marke">Stempel sammeln</p>
+    <p class="hinweis" id="tresen-hinweis">Kunde scannt diesen Code.</p>
+    <div class="qr-feld"><canvas id="tresen-qr"></canvas></div>
+    <p class="frist" id="tresen-frist"></p>
+  </section>
+
   <!-- Zahlen -->
   <section id="zahlen-bereich" class="karte neben verborgen">
     <p class="marke">Zahlen dieses Betriebs</p>
@@ -163,6 +190,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
   { auth: { storageKey: 'treuebiss-betrieb' } });
 const $ = (id) => document.getElementById(id);
 let scanLaeuft = false;
+let aktiverBetrieb = null;
 
 function melden(text) {
   $('meldung').innerHTML = text ? `<div class="meldung">${text}</div>` : '';
@@ -283,6 +311,7 @@ async function zahlenLaden() {
   }
   if (!data?.length) return 'kein-betrieb';
   const z = data[0];
+  aktiverBetrieb = z.tenant_id;
   $('betrieb').textContent = z.tenant;
   $('zahlen').innerHTML = [
     [z.members, 'Teilnehmer'],
@@ -365,11 +394,60 @@ async function wechselPruefen() {
   $('wechsel').classList.toggle('verborgen', !darf);
 }
 
+/*
+ * Der rotierende Tresen-Code.
+ *
+ * Er wird nicht gespeichert, sondern aus Betrieb und Zeitfenster gerechnet -
+ * die Kasse holt ihn nur ab und zeichnet ihn. Kurz vor Ablauf wird neu
+ * geholt, damit nie ein toter Code auf dem Tresen steht.
+ */
+let tresenUhr = null;
+
+async function tresenZeigen(tenantId) {
+  clearTimeout(tresenUhr);
+  const { data, error } = await db.rpc('staff_counter_token', { p_tenant_id: tenantId });
+  if (error || !data?.length) {
+    // Nicht eingeschaltet ist kein Fehler, sondern der Normalfall.
+    $('tresen').classList.add('verborgen');
+    if (error && !/not enabled/.test(error.message ?? '')) console.error('staff_counter_token', error);
+    return;
+  }
+  const { token, gueltig_bis } = data[0];
+  $('tresen').classList.remove('verborgen');
+
+  const { default: QRCode } = await import('https://esm.sh/qrcode@1.5.4');
+  const leinwand = $('tresen-qr');
+  await QRCode.toCanvas(leinwand, 'tresen:' + token, {
+    width: 640, margin: 1, errorCorrectionLevel: 'M',
+    color: { dark: '#000000', light: '#ffffff' },
+  });
+  // Die Bibliothek schreibt width und height als Inline-Stil auf das Canvas.
+  // Der schlaegt jede Regel im Stylesheet, und der Code ragt aus der Karte.
+  // Die 640 bleiben als Aufloesung erhalten, die Darstellung macht das CSS.
+  leinwand.style.width = '';
+  leinwand.style.height = '';
+
+  const bis = new Date(gueltig_bis).getTime();
+  const ticken = () => {
+    const rest = Math.max(0, Math.round((bis - Date.now()) / 1000));
+    $('tresen-frist').textContent = rest > 0
+      ? `Wechselt in ${rest} Sekunde${rest === 1 ? '' : 'n'}`
+      : 'Wird erneuert …';
+    if (rest > 0) tresenUhr = setTimeout(ticken, 1000);
+    else tresenZeigen(tenantId);
+  };
+  ticken();
+}
+
 function zeigeAngemeldet(ja) {
   $('anmeldung').classList.toggle('verborgen', ja);
   $('kasse').classList.toggle('verborgen', !ja);
   $('zahlen-bereich').classList.toggle('verborgen', !ja);
-  if (!ja) $('wechsel').classList.add('verborgen');
+  if (!ja) {
+    $('wechsel').classList.add('verborgen');
+    $('tresen').classList.add('verborgen');
+    clearTimeout(tresenUhr);
+  }
 }
 
 $('anmelden').onclick = async () => {
@@ -408,6 +486,7 @@ async function starten() {
   if (!data.session) { zeigeAngemeldet(false); return; }
   zeigeAngemeldet(true);
   const stand = await zahlenLaden();
+  if (aktiverBetrieb) await tresenZeigen(aktiverBetrieb);
   await wechselPruefen();
   await scannerVorbereiten();
 

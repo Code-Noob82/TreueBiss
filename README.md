@@ -52,6 +52,8 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 - [x] **Web-App für Kunden:** `web/app/` als Progressive Web App — sammeln und
   einlösen im Browser, ohne Installation, auf iPhone wie Android. Der Betrieb
   steht als Slug in der Adresse.
+- [x] **Zweiter Vergabeweg:** Rotierender Tresen-QR für Kassen ohne QR-Druck.
+  Gerechnet statt gespeichert, mit Nachfrist für den Wechselmoment.
 - [x] **Signaturprüfung des Belegs:** Edge Function `beleg-pruefen` prüft die
   ECDSA-Signatur des Kassenbons, gegen echte TSE-Signaturen verifiziert.
 - [x] **Verwaltung durch den Betrieb:** Eigene Seite unter `web/verwaltung/`
@@ -175,6 +177,8 @@ ablehnen als eine erfundene Zeichenkette durchwinken.
 | Nur eingetragene Kassen | `require_known_register` | aus | Bons aus fremden Betrieben |
 | Freie Nachweise zulassen | `allow_opaque_proofs` | an | Muss aus, sobald produktiv gescannt wird |
 | Signatur prüfen | `require_signed_proof` | aus | Selbst gebaute QR-Codes — siehe unten |
+| Tresen-QR anbieten | `counter_qr_enabled` | aus | Zweiter Weg für Kassen ohne QR-Druck |
+| Wechselintervall | `counter_qr_seconds` | 60 | Abfotografierte Tresen-Codes |
 
 Die Vorgaben sind bewusst mild: Das Einspielen des Skripts darf ein
 bestehendes Projekt nicht plötzlich Stempel ablehnen lassen. Scharf stellt der
@@ -185,6 +189,29 @@ Abschalten der Stempelvergabe.
 Der Schlüssel in `stamp_proofs` ist kanonisch (`Kasse:Transaktion:Zähler`), nicht
 die rohe Zeichenkette — sonst zählte derselbe Bon erneut, sobald ein Leerzeichen
 anders steht.
+
+#### Zweiter Vergabeweg: der Tresen-QR
+
+Für Kassen, die keinen QR drucken — und das sind mehr, als die Beleg-QR-Wette
+unterstellt. Die Kassenseite zeigt einen Code, der Kunde scannt ihn.
+
+**Er wird nicht gespeichert, sondern gerechnet:** HMAC über Betrieb und
+Zeitfenster mit einem Schlüssel aus `tenant_secrets`. Dadurch entsteht kein
+Schreibvorgang je Rotation und es gibt nichts aufzuräumen. Gültig sind das
+laufende und das eben abgelaufene Fenster — ohne diese Nachfrist verlöre genau
+der Kunde seinen Stempel, der im Moment des Wechsels scannt.
+
+Der Schlüssel in `stamp_proofs` trägt den Nutzer mit
+(`tresen:<code>:<user-id>`). Sonst bekäme in einer Warteschlange nur der erste
+Kunde seinen Stempel, weil ein Nachweis je Betrieb nur einmal vorkommen darf.
+
+> **Ehrlich dazu:** Der Tresen-Code belegt **Anwesenheit am Tresen, nicht den
+> Kauf** — anders als der Kassenbon. Das ist der Preis dafür, dass er ohne
+> mitspielende Kasse überhaupt funktioniert. Dagegen stehen die kurze
+> Gültigkeit (Vorgabe 60 Sekunden) und das Tageslimit: Wer den Code
+> abfotografiert, kann ihn Sekunden später noch benutzen und dann erst wieder
+> am nächsten Tag. Deshalb ist er standardmäßig aus und muss vom Betrieb
+> ausdrücklich eingeschaltet werden.
 
 #### Signaturprüfung (Edge Function)
 
@@ -570,14 +597,6 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
       `web/app/config.js` sind leer ausgeliefert. **Vor einem Piloten mit
       echten Nutzern müssen mindestens Impressum und Datenschutz stehen** —
       Anbieter ist byte & Handwerk, nicht der Betrieb.
-- [ ] **Zweiter Vergabeweg (Tresen-QR):** Ein rotierender QR-Code am Tresen
-      oder Kundendisplay als gleichrangiger Weg neben dem Beleg-QR. Vier
-      Gründe, jeder für sich ausreichend: Der Beleg-QR ist nach § 6 Satz 2
-      KassenSichV optional und muss je Kasse eingeschaltet sein; in Bäckereien
-      bleiben die Bons überwiegend liegen; die Papier-Belegausgabepflicht
-      endet zum 01.01.2028; und selbst wo ein QR gedruckt wird, lässt er sich
-      nicht immer verifizieren (siehe Signaturprüfung). **Ohne diesen Weg
-      kann ein Betrieb ohne QR-Druck das Produkt gar nicht einsetzen.**
 - [ ] **Beitritt per Code:** Mehrere Betriebe in einer App.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.

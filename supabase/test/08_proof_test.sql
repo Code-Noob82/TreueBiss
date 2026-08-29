@@ -319,3 +319,122 @@ begin
     raise notice '--- Signaturpflicht bestanden ---';
 end
 $$;
+
+-- ============================ Tresen-QR
+do $$
+declare
+    v_t      uuid;
+    v_chef   uuid;
+    v_kasse  uuid;
+    v_kunde  uuid;
+    v_zwei   uuid;
+    v_token  text;
+    v_alt    text;
+    v_ok     boolean;
+    v_zahl   int;
+begin
+    insert into public.tenants (id, slug, name, stamps_per_card)
+    values (gen_random_uuid(), 'tresen-test', 'Tresen', 50)
+    returning id into v_t;
+    insert into auth.users default values returning id into v_chef;
+    insert into auth.users default values returning id into v_kasse;
+    insert into auth.users default values returning id into v_kunde;
+    insert into auth.users default values returning id into v_zwei;
+    insert into public.tenant_staff (user_id, tenant_id, role) values (v_chef, v_t, 'owner');
+    insert into public.tenant_staff (user_id, tenant_id) values (v_kasse, v_t);
+    insert into public.memberships (user_id, tenant_id) values (v_kunde, v_t);
+    insert into public.memberships (user_id, tenant_id) values (v_zwei, v_t);
+
+    -- ------------------------------------------ Ausgeschaltet zählt nichts
+    call auth.become(v_kunde);
+    begin
+        perform public.issue_stamp(v_t, 'tresen:egal');
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Ohne eingeschalteten Tresen-QR zählt kein Tresen-Code');
+
+    -- ------------------------------------------ Einschalten legt einen Schlüssel an
+    call auth.become(v_chef);
+    perform public.owner_update_proof_rules(v_t, 120, 0, 25, false, true, false, true, 60);
+    select count(*) into v_zahl from public.tenant_secrets
+     where tenant_id = v_t and counter_secret is not null;
+    call test.check(v_zahl = 1, 'Beim Einschalten entsteht ein Schlüssel');
+
+    -- ------------------------------------------ Das Personal bekommt den Code
+    call auth.become(v_kasse);
+    select token into v_token from public.staff_counter_token(v_t);
+    call test.check(v_token is not null and length(v_token) = 24, 'Die Kasse bekommt einen Code');
+
+    -- ------------------------------------------ Der Kunde nicht
+    call auth.become(v_kunde);
+    begin
+        perform * from public.staff_counter_token(v_t);
+        v_ok := false;
+    exception when insufficient_privilege then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Ein Kunde kann den Code nicht abrufen');
+
+    -- ------------------------------------------ Scannen gibt einen Stempel
+    perform public.issue_stamp(v_t, 'tresen:' || v_token);
+    select count(*) into v_zahl from public.stamps where tenant_id = v_t and user_id = v_kunde;
+    call test.check(v_zahl = 1, 'Der gescannte Tresen-Code gibt einen Stempel');
+
+    select count(*) into v_zahl from public.stamp_proofs
+     where tenant_id = v_t and source = 'counter';
+    call test.check(v_zahl = 1, 'Der Nachweis ist als Tresen-Vergabe vermerkt');
+
+    -- ------------------------------------------ Nicht zweimal derselbe Kunde
+    begin
+        perform public.issue_stamp(v_t, 'tresen:' || v_token);
+        v_ok := false;
+    exception when unique_violation then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Derselbe Kunde bekommt für denselben Code nur einen Stempel');
+
+    -- ------------------------------------------ Aber die Warteschlange kommt durch
+    call auth.become(v_zwei);
+    perform public.issue_stamp(v_t, 'tresen:' || v_token);
+    select count(*) into v_zahl from public.stamps where tenant_id = v_t and user_id = v_zwei;
+    call test.check(v_zahl = 1, 'Der nächste Kunde bekommt mit demselben Code seinen Stempel');
+
+    -- ------------------------------------------ Ein erfundener Code nicht
+    begin
+        perform public.issue_stamp(v_t, 'tresen:000000000000000000000000');
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Ein erfundener Tresen-Code wird abgelehnt');
+
+    -- ------------------------------------------ Ein Code von vorgestern auch nicht
+    select public.counter_token(v_t, -50) into v_alt;
+    call test.check(v_alt is distinct from v_token, 'Ein älteres Zeitfenster ergibt einen anderen Code');
+    begin
+        perform public.issue_stamp(v_t, 'tresen:' || v_alt);
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Ein abgelaufener Tresen-Code wird abgelehnt');
+
+    -- ------------------------------------------ Nachfrist für den Wechselmoment
+    call auth.become(v_kunde);
+    perform public.issue_stamp(v_t, 'tresen:' || public.counter_token(v_t, -1));
+    call test.check(true, 'Der eben abgelaufene Code zählt noch');
+
+    -- ------------------------------------------ Fremder Betrieb, fremder Code
+    declare v_fremd uuid;
+    begin
+        insert into public.tenants (id, slug, name) values (gen_random_uuid(), 'tresen-fremd', 'Fremd')
+        returning id into v_fremd;
+        call test.check(public.counter_token(v_fremd, 0) is null,
+                        'Ohne Schlüssel gibt es keinen Code');
+    end;
+
+    raise notice '--- Tresen-QR bestanden ---';
+end
+$$;

@@ -62,6 +62,12 @@ create table if not exists public.tenant_secrets (
     updated_at       timestamptz not null default now()
 );
 
+-- Schluessel fuer den rotierenden Tresen-QR. Liegt hier, weil diese Tabelle
+-- keine Policy hat: Wer ihn lesen koennte, koennte sich beliebig viele
+-- gueltige Codes ausrechnen.
+alter table public.tenant_secrets
+    add column if not exists counter_secret text;
+
 -- Bestehende Projekte nachziehen: Das `create table if not exists` oben
 -- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
 -- Spalte. Muss vor allem stehen, was sie verwendet.
@@ -96,7 +102,14 @@ alter table public.tenants
     -- Verlangt eine geprüfte ECDSA-Signatur. Nur einschaltbar, wo die Edge
     -- Function `beleg-pruefen` ausgerollt ist - sonst kommt kein Stempel
     -- mehr durch.
-    add column if not exists require_signed_proof boolean not null default false;
+    add column if not exists require_signed_proof boolean not null default false,
+    -- Zweiter Vergabeweg: ein rotierender QR-Code am Tresen. Braucht keinen
+    -- Beleg-QR und keine Kasse, die einen druckt.
+    add column if not exists counter_qr_enabled boolean not null default false,
+    -- Wie lange ein Tresen-Code gilt. Kurz genug, dass ein abfotografierter
+    -- Code nichts nuetzt; lang genug, dass eine Warteschlange durchkommt.
+    add column if not exists counter_qr_seconds int not null default 60
+        check (counter_qr_seconds between 15 and 900);
 
 -- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
 -- steht; auf einer frischen Datenbank passiert nichts.
@@ -654,6 +667,7 @@ declare
     v_now       timestamptz := now();
     v_beleg     record;
     v_ref       text;
+    v_token     text;
     v_heute     int;
 begin
     if v_user is null then
@@ -718,6 +732,28 @@ begin
         -- derselbe Bon erneut, sobald ein Leerzeichen anders steht.
         v_ref := v_beleg.register_serial || ':' || v_beleg.transaction_no
                  || ':' || v_beleg.signature_ctr;
+    elsif trim(p_proof_ref) like 'tresen:%' then
+        /*
+         * Der Tresen-Code. Beweist Anwesenheit, nicht Kauf - deshalb muss
+         * der Betrieb ihn ausdruecklich einschalten.
+         *
+         * Zwei Zeitfenster gelten: das laufende und das eben abgelaufene.
+         * Ohne diese Nachfrist verliert genau der Kunde seinen Stempel, der
+         * in dem Moment scannt, in dem der Code wechselt.
+         */
+        if not v_tenant.counter_qr_enabled then
+            raise exception 'counter qr not enabled' using errcode = '22023';
+        end if;
+        v_token := substr(trim(p_proof_ref), 8);
+        if v_token is distinct from public.counter_token(p_tenant_id, 0)
+           and v_token is distinct from public.counter_token(p_tenant_id, -1) then
+            raise exception 'counter token expired' using errcode = '22023';
+        end if;
+
+        -- Der Schluessel traegt den Nutzer mit: Sonst bekaeme in einer
+        -- Warteschlange nur der erste Kunde seinen Stempel, weil der
+        -- Nachweis je Betrieb nur einmal vorkommen darf.
+        v_ref := 'tresen:' || v_token || ':' || v_user::text;
     else
         -- Kein Beleg-QR. Solange der Betrieb das erlaubt, zaehlt der freie
         -- Nachweis weiter - sonst waere die Pruefung ohnehin umgehbar,
@@ -742,7 +778,9 @@ begin
         tenant_id, user_id, proof_ref, source, register_serial, amount_cents,
         signature_verified
     ) values (
-        p_tenant_id, v_user, v_ref, p_source,
+        p_tenant_id, v_user,
+        v_ref,
+        case when v_ref like 'tresen:%' then 'counter' else p_source end,
         v_beleg.register_serial, v_beleg.amount_cents,
         coalesce(p_signiert, false)
     );
@@ -775,6 +813,83 @@ end;
 $$;
 
 revoke all on function public.issue_stamp_intern(uuid, uuid, text, text, boolean) from public;
+
+/*
+ * Der rotierende Code fuer den Tresen.
+ *
+ * Nicht gespeichert, sondern gerechnet: HMAC ueber Betrieb und Zeitfenster
+ * mit einem Schluessel, der in tenant_secrets liegt. Dadurch entsteht kein
+ * Schreibvorgang je Rotation, und es gibt nichts aufzuraeumen.
+ *
+ * Der Code beweist Anwesenheit am Tresen, NICHT einen Kauf - anders als der
+ * Beleg-QR. Das ist der Preis dafuer, dass er ueberhaupt ohne mitspielende
+ * Kasse funktioniert. Dagegen stehen die kurze Gueltigkeit und das
+ * Tageslimit; wer den Code abfotografiert, kann ihn hoechstens Sekunden
+ * spaeter noch benutzen und dann erst wieder am naechsten Tag.
+ */
+create or replace function public.counter_token(p_tenant_id uuid, p_fenster int)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_secret text;
+    v_dauer  int;
+begin
+    select s.counter_secret, t.counter_qr_seconds
+      into v_secret, v_dauer
+      from public.tenants t
+      left join public.tenant_secrets s on s.tenant_id = t.id
+     where t.id = p_tenant_id and t.is_active;
+    if v_secret is null then return null; end if;
+
+    return substr(encode(hmac(
+        p_tenant_id::text || ':' ||
+        (floor(extract(epoch from now()) / v_dauer)::bigint + p_fenster)::text,
+        v_secret, 'sha256'), 'hex'), 1, 24);
+end;
+$$;
+
+revoke all on function public.counter_token(uuid, int) from public;
+
+/*
+ * Liefert dem Personal den aktuellen Tresen-Code samt Restlaufzeit.
+ *
+ * Nur fuer das Personal des Betriebs: Kunden duerfen den Code nicht abrufen,
+ * sondern muessen ihn am Tresen scannen - sonst waere die Anwesenheit, die
+ * er belegen soll, nicht mehr noetig.
+ */
+create or replace function public.staff_counter_token(p_tenant_id uuid)
+returns table (token text, gueltig_bis timestamptz, sekunden int)
+language plpgsql
+stable
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_dauer int;
+    v_an    boolean;
+begin
+    if not public.is_staff_of(p_tenant_id) then
+        raise exception 'not staff of this tenant' using errcode = '42501';
+    end if;
+    select counter_qr_seconds, counter_qr_enabled into v_dauer, v_an
+      from public.tenants where id = p_tenant_id and is_active;
+    if not coalesce(v_an, false) then
+        raise exception 'counter qr not enabled' using errcode = '22023';
+    end if;
+
+    return query select
+        public.counter_token(p_tenant_id, 0),
+        to_timestamp((floor(extract(epoch from now()) / v_dauer) + 1) * v_dauer),
+        v_dauer;
+end;
+$$;
+
+revoke all on function public.staff_counter_token(uuid) from public;
+grant execute on function public.staff_counter_token(uuid) to authenticated;
 
 /*
  * Der gewoehnliche Weg: Die App ruft das mit ihrer eigenen Anmeldung auf.
@@ -1127,6 +1242,7 @@ grant execute on function public.owner_update_tenant(
 -- Die Signaturpflicht ist spaeter dazugekommen. Ohne dieses drop staende
 -- die alte sechsstellige Fassung daneben, und der Aufruf waere mehrdeutig.
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean);
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean);
 
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
@@ -1135,7 +1251,9 @@ create or replace function public.owner_update_proof_rules(
     p_daily_limit     int,
     p_require_known   boolean,
     p_allow_opaque    boolean,
-    p_require_signed  boolean default false
+    p_require_signed  boolean default false,
+    p_counter_enabled boolean default false,
+    p_counter_seconds int default 60
 )
 returns setof public.tenants
 language plpgsql
@@ -1158,6 +1276,10 @@ begin
 
     -- Nur Belege zulassen, ohne eine einzige Kasse eingetragen zu haben,
     -- waere das sichere Abschalten der Stempelvergabe.
+    if p_counter_seconds is null or p_counter_seconds < 15 or p_counter_seconds > 900 then
+        raise exception 'counter seconds out of range' using errcode = '22023';
+    end if;
+
     if p_require_known and not exists (
         select 1 from public.tenant_registers r where r.tenant_id = p_tenant_id
     ) then
@@ -1170,15 +1292,28 @@ begin
            daily_stamp_limit      = p_daily_limit,
            require_known_register = coalesce(p_require_known, false),
            allow_opaque_proofs    = coalesce(p_allow_opaque, true),
-           require_signed_proof   = coalesce(p_require_signed, false)
+           require_signed_proof   = coalesce(p_require_signed, false),
+           counter_qr_enabled     = coalesce(p_counter_enabled, false),
+           counter_qr_seconds     = p_counter_seconds
      where id = p_tenant_id;
+
+    -- Beim Einschalten einen Schluessel anlegen, falls noch keiner da ist.
+    -- Ohne ihn liefert counter_token null und der Betrieb stuende vor einem
+    -- Schalter, der nichts tut.
+    if coalesce(p_counter_enabled, false) then
+        insert into public.tenant_secrets (tenant_id, redeem_code_hash, counter_secret)
+        values (p_tenant_id, '', encode(extensions.gen_random_bytes(32), 'hex'))
+            on conflict (tenant_id) do update
+            set counter_secret = coalesce(public.tenant_secrets.counter_secret,
+                                          encode(extensions.gen_random_bytes(32), 'hex'));
+    end if;
 
     return query select * from public.tenants where id = p_tenant_id;
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean) from public;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int) from public;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*
