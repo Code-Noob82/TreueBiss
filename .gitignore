@@ -27,3 +27,7 @@ web/app/config.js
 
 # Werkzeug-Konfiguration, gehoert nicht zum Projekt
 .claude/
+
+# Obsidian-Vault. Liegt im Projektordner, gehoert aber nicht ins Repo:
+# private Notizen plus .obsidian/ mit Arbeitsplatz-Zustand und Plugins.
+/TreueBiss/
