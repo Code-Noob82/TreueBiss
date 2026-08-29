@@ -77,7 +77,10 @@ fun AppNavigation(
         }
         // ---------- Settings ----------
         composable<Screen.Settings> {
-            SettingsScreen()
+            SettingsScreen(
+                snackBarHostState = snackBarHostState,
+                paddingValues = paddingValues
+            )
         }
     }
 }

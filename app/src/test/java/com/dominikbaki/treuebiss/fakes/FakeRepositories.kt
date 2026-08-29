@@ -12,6 +12,7 @@ import com.dominikbaki.treuebiss.core.domain.models.Voucher
 import com.dominikbaki.treuebiss.core.domain.repository.AuthRepository
 import com.dominikbaki.treuebiss.core.domain.repository.AuthStatus
 import com.dominikbaki.treuebiss.core.domain.repository.StampRepository
+import com.dominikbaki.treuebiss.core.domain.repository.ThemeMode
 import com.dominikbaki.treuebiss.core.domain.repository.TenantRepository
 import com.dominikbaki.treuebiss.core.domain.repository.UserPreferencesRepository
 import com.dominikbaki.treuebiss.core.domain.repository.VoucherRepository
@@ -210,5 +211,12 @@ class FakeUserPreferencesRepository(
 
     override suspend fun setRemoteDataRestored(restoredValue: Boolean) {
         restored.value = restoredValue
+    }
+
+    private val theme = MutableStateFlow(ThemeMode.System)
+    override val themeMode: Flow<ThemeMode> = theme.asStateFlow()
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        theme.value = mode
     }
 }

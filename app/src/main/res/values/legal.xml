@@ -1,0 +1,14 @@
+<resources>
+    <!--
+      Rechtliche Seiten von TreueBiss. Zentral gepflegt: Anbieter der App ist
+      TreueBiss, die Betriebe sind Kunden.
+
+      Leer lassen, solange die Seite nicht existiert - der zugehörige Eintrag
+      erscheint dann gar nicht erst in den Einstellungen. Vor einem Pilotbetrieb
+      mit echten Nutzern müssen Impressum und Datenschutzerklärung stehen.
+    -->
+    <string name="legal_imprint_url" translatable="false"></string>
+    <string name="legal_privacy_url" translatable="false"></string>
+    <string name="legal_app_privacy_url" translatable="false"></string>
+    <string name="legal_terms_url" translatable="false"></string>
+</resources>

@@ -2,6 +2,9 @@ package com.dominikbaki.treuebiss.core.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 
+/** Wie die App ihr Erscheinungsbild wählt. */
+enum class ThemeMode { System, Hell, Dunkel }
+
 /**
  * Interface für den Zugriff auf gespeicherte Benutzereinstellungen.
  */
@@ -27,4 +30,9 @@ interface UserPreferencesRepository {
     val hasRestoredRemoteData: Flow<Boolean>
 
     suspend fun setRemoteDataRestored(restored: Boolean)
+
+    /** Gewähltes Erscheinungsbild. Standard ist [ThemeMode.System]. */
+    val themeMode: Flow<ThemeMode>
+
+    suspend fun setThemeMode(mode: ThemeMode)
 }

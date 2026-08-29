@@ -50,6 +50,15 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 - [x] **Angebote:** Werden im Backend gepflegt und auf dem HomeScreen angezeigt.
 - [x] **Corporate Branding:** Zur Laufzeit aus dem Betrieb, mit neutralem
   Platzhalter solange keine Serverdaten vorliegen.
+- [x] **Einstellungen:** Erscheinungsbild (System/Hell/Dunkel, dauerhaft
+  gespeichert), Rechtliches, App-Version. Einträge ohne Funktion wurden entfernt
+  statt vorgetäuscht — „Abmelden" wäre sogar schädlich gewesen, weil es die
+  anonyme Identität und damit alle Stempel verwirft.
+- [x] **Rechtliche Seiten zentral:** Anbieter der App ist TreueBiss, die Betriebe
+  sind Kunden — also stehen Impressum, Datenschutz, Datenschutz in der App und
+  AGB einmal zentral in `res/values/legal.xml` und nicht pro Betrieb im Backend.
+  Leere Adressen blenden den jeweiligen Eintrag aus; der Abschnitt „Rechtliches"
+  verschwindet ganz, solange keine einzige Seite hinterlegt ist.
 
 ### Sicherheit & Datenschutz (anonyme Anmeldung)
 
@@ -63,16 +72,16 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 
 > Geplant, aber noch **nicht** umgesetzt: eine pseudonyme Geräte-ID mit
 > mandantenfähigem JWT (`device_id`/`tenant_id`) über eine Supabase Edge Function
-> sowie eine vollständige Datenlöschung aus den App-Einstellungen heraus. Der
-> Einstellungs-Screen ist derzeit reine Oberfläche ohne Funktion.
+> sowie eine vollständige Datenlöschung aus den App-Einstellungen heraus.
+>
+> Vor einem Pilotbetrieb mit echten Nutzern müssen die Adressen in
+> `res/values/legal.xml` gefüllt sein — sie sind bewusst leer ausgeliefert.
 
 ## Design
 
 <p>
   <img src="./img/Onboarding1.png" width="200" alt="">
   <img src="./img/Onboarding2.png" width="200" alt="">
-  <img src="./img/Onboarding3.png" width="200" alt="">
-  <img src="./img/Onboarding4.png" width="200" alt="">
   <img src="./img/Home.png" width="200" alt="">
   <img src="./img/StampCard.png" width="200" alt="">
   <img src="./img/Vouchers.png" width="200" alt="">
@@ -257,13 +266,16 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **Beleg-Scanner:** ML Kit Barcode Scanning, um den QR-Code auf dem Kassenbon
       einzulesen. Die serverseitige Vergabe dahinter steht bereits; es fehlt der
       Scanner und das Auslesen der TSE-Transaktionsnummer.
-- [ ] **Einlösen serverseitig autorisieren:** Der Kunde markiert seinen Gutschein
-      weiterhin selbst als eingelöst. Für den Einsatz an der Kasse muss auch das
-      über eine geprüfte Funktion laufen.
+- [ ] **Einlösen serverseitig autorisieren:** Über die Kassenseite läuft das
+      Einlösen bereits durch `staff_redeem_voucher`. Der Kunde kann seinen
+      Gutschein aber weiterhin selbst als eingelöst markieren, solange der
+      Betrieb `requires_redeem_code` nicht setzt.
 - [ ] **Beitritt per Code:** Mehrere Betriebe in einer App.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.
-- [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt beim App-Start.
+- [ ] **Dialekt-Umschaltung:** Auswahl zwischen Hochdeutsch und Monnemer Dialekt.
+      Bleibt auf der Liste, ist aber vorerst nicht produktiv — die Onboarding-Seite,
+      die den Dialekt ankündigte, ohne dass es ihn gab, ist deshalb entfallen.
 - [ ] **Mehrsprachigkeit:** Erweiterung um weitere Dialekte/Sprachen.
 - [ ] **Cross-Platform:** iOS-Version mit SwiftUI.
 - [ ] **Gutscheinverwaltung:**
@@ -274,8 +286,13 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
       beim Anlegen geschrieben und einmalig nach einer Neuinstallation gelesen -
       es gibt keinen laufenden Abgleich und keine Warteschlange für
       fehlgeschlagene Schreibvorgänge.
-- [ ] **Einstellungen:** Funktionen hinterlegen (Dunkelmodus, Benachrichtigungen,
-      Datenlöschung) - der Screen ist bisher statisch.
+- [ ] **Konto-Verknüpfung:** Optional über Google. Löst zwei Datenverluste:
+      Beim Handywechsel entsteht heute eine neue Identität, und Supabase löscht
+      anonyme Konten nach 30 Tagen (die automatische Bereinigung muss deshalb
+      ausgeschaltet bleiben). Danach kommt „Profil bearbeiten" in die
+      Einstellungen zurück — sichtbar nur bei verknüpftem Konto.
+- [ ] **Benachrichtigungen:** Braucht Push-Infrastruktur. Der Schalter dafür
+      ist entfernt, statt ihn ohne Wirkung stehen zu lassen.
 - [ ] **Corporate Branding:** Zentrale Theme-Datei
 
 

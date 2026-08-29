@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import com.dominikbaki.treuebiss.core.domain.repository.ThemeMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -38,15 +39,21 @@ private val LightColorScheme = lightColorScheme(
 )
 
 /**
+ * @param themeMode Vom Nutzer gewähltes Erscheinungsbild.
  * @param brandPrimaryColor Primärfarbe des Betriebs als Hex-String (z. B. "#4CAF50").
  *   Ist sie null oder unlesbar, bleibt es beim Standard-Grün.
  */
 @Composable
 fun TreueBissTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.System,
     brandPrimaryColor: String? = null,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Hell -> false
+        ThemeMode.Dunkel -> true
+    }
     val base = if (darkTheme) DarkColorScheme else LightColorScheme
     val colorScheme = remember(base, brandPrimaryColor) {
         parseHexColor(brandPrimaryColor)?.let { base.copy(primary = it) } ?: base
