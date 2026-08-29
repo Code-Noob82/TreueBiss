@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TreueBiss – Verwaltung</title>
+<style>
+  :root {
+    --gruen: #4CAF50; --gruen-dunkel: #3d8b40; --rot: #c62828;
+    --grau: #f4f4f5; --text: #18181b; --schwach: #71717a; --rand: #d4d4d8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--grau); color: var(--text); padding: 24px 16px 64px;
+    line-height: 1.5;
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 20px; }
+  h1 { font-size: 1.3rem; margin: 0; }
+  .betrieb { color: var(--schwach); font-size: .9rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0 0 14px; }
+  .karte {
+    background: #fff; border-radius: 14px; padding: 20px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / .08); margin-bottom: 16px;
+  }
+  label { display: block; font-size: .85rem; color: var(--schwach); margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 12px; font-size: 1rem; border: 1px solid var(--rand);
+    border-radius: 10px; margin-bottom: 12px; font-family: inherit; background: #fff;
+    color: inherit;
+  }
+  textarea { resize: vertical; min-height: 68px; }
+  input[type="color"] { padding: 4px; height: 44px; cursor: pointer; }
+  .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  @media (max-width: 520px) { .paar { grid-template-columns: 1fr; } }
+  button {
+    padding: 12px 18px; font-size: 1rem; font-weight: 600;
+    border: 0; border-radius: 10px; background: var(--gruen); color: #fff;
+    cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+  button.sekundaer { background: #fff; color: var(--text); border: 1px solid var(--rand); }
+  button.gefahr { background: #fff; color: var(--rot); border: 1px solid var(--rand); }
+  button.schmal { padding: 8px 12px; font-size: .85rem; }
+  .knopfreihe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .meldung { padding: 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 500; }
+  .meldung.gut { background: #e8f5e9; color: var(--gruen-dunkel); }
+  .meldung.schlecht { background: #ffebee; color: var(--rot); }
+  .meldung code, .hinweis code {
+    background: rgb(0 0 0 / .07); padding: 1px 5px; border-radius: 4px; font-size: .9em;
+  }
+  .zahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .zahl { background: #fff; border-radius: 12px; padding: 14px; }
+  .zahl b { display: block; font-size: 1.6rem; }
+  .zahl span { font-size: .8rem; color: var(--schwach); }
+  .hinweis { font-size: .82rem; color: var(--schwach); margin: -4px 0 14px; }
+  .angebot {
+    border: 1px solid var(--rand); border-radius: 10px; padding: 12px 14px;
+    margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px 12px;
+    align-items: center; justify-content: space-between;
+  }
+  .angebot .text { flex: 1 1 260px; min-width: 0; }
+  .angebot b { display: block; }
+  .angebot small { color: var(--schwach); }
+  .leer { color: var(--schwach); font-size: .9rem; margin: 0 0 12px; }
+  .verborgen { display: none; }
+  .stand { font-size: .85rem; color: var(--schwach); margin: 0 0 12px; }
+  .stand.an { color: var(--gruen-dunkel); font-weight: 600; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>TreueBiss – Verwaltung</h1>
+    <p class="betrieb" id="betrieb"></p>
+  </header>
+
+  <div id="meldung"></div>
+
+  <!-- Anmeldung -->
+  <section id="anmeldung" class="karte">
+    <h2>Anmeldung</h2>
+    <label for="email">E-Mail</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email">
+    <label for="passwort">Passwort</label>
+    <input id="passwort" type="password" autocomplete="current-password">
+    <button id="anmelden">Anmelden</button>
+  </section>
+
+  <div id="verwaltung" class="verborgen">
+
+    <!-- Betriebswahl, nur bei mehreren -->
+    <section id="wahl-bereich" class="karte verborgen">
+      <label for="wahl">Betrieb</label>
+      <select id="wahl"></select>
+    </section>
+
+    <!-- Zahlen -->
+    <section class="karte">
+      <h2>Zahlen</h2>
+      <div class="zahlen" id="zahlen"></div>
+    </section>
+
+    <!-- Stammdaten -->
+    <section class="karte">
+      <h2>Stammdaten</h2>
+      <label for="name">Name des Betriebs</label>
+      <input id="name" maxlength="80">
+
+      <div class="paar">
+        <div>
+          <label for="t-punkte">Bezeichnung für Stempel</label>
+          <input id="t-punkte" maxlength="40">
+        </div>
+        <div>
+          <label for="t-gutscheine">Bezeichnung für Gutscheine</label>
+          <input id="t-gutscheine" maxlength="40">
+        </div>
+      </div>
+
+      <label for="t-angebot">Überschrift für das Tagesangebot</label>
+      <input id="t-angebot" maxlength="40">
+
+      <div class="paar">
+        <div>
+          <label for="farbe">Primärfarbe</label>
+          <input id="farbe" type="color">
+        </div>
+        <div>
+          <label for="farbe-text">Farbwert</label>
+          <input id="farbe-text" maxlength="7" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+
+      <label for="logo">Logo-Adresse (optional)</label>
+      <input id="logo" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
+
+      <h2 style="margin-top:20px">Kartenregeln</h2>
+      <div class="paar">
+        <div>
+          <label for="stempel">Stempel pro Karte</label>
+          <input id="stempel" type="number" min="1" max="50" inputmode="numeric">
+        </div>
+        <div>
+          <label for="tage">Gültigkeit des Gutscheins in Tagen</label>
+          <input id="tage" type="number" min="1" inputmode="numeric">
+        </div>
+      </div>
+      <p class="hinweis">
+        Die Kartengröße wirkt sofort, auch auf angefangene Karten. Wer die Zahl
+        senkt, beschert Kunden mit voller Karte beim nächsten Einkauf einen
+        Gutschein; wer sie erhöht, verlangt von ihnen mehr Einkäufe als beim
+        Sammelstart angekündigt.
+      </p>
+
+      <div class="knopfreihe">
+        <button id="speichern">Speichern</button>
+        <button id="zuruecksetzen" class="sekundaer">Änderungen verwerfen</button>
+      </div>
+    </section>
+
+    <!-- Angebote -->
+    <section class="karte">
+      <h2>Angebote</h2>
+      <p class="hinweis">Erscheinen in der App auf der Startseite.</p>
+      <div id="angebote"></div>
+
+      <div class="paar">
+        <div>
+          <label for="a-titel">Titel</label>
+          <input id="a-titel" maxlength="80" placeholder="z. B. Dinkel-Kracher">
+        </div>
+        <div>
+          <label for="a-bild">Bild-Adresse (optional)</label>
+          <input id="a-bild" type="url" placeholder="https://…" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+      <label for="a-text">Beschreibung (optional)</label>
+      <textarea id="a-text" maxlength="240" placeholder="Heute frisch aus dem Ofen, nur 3,50 €!"></textarea>
+      <div class="paar">
+        <div>
+          <label for="a-von">Gültig ab (optional)</label>
+          <input id="a-von" type="date">
+        </div>
+        <div>
+          <label for="a-bis">Gültig bis (optional)</label>
+          <input id="a-bis" type="date">
+        </div>
+      </div>
+      <div class="knopfreihe">
+        <button id="a-speichern">Angebot anlegen</button>
+        <button id="a-abbrechen" class="sekundaer verborgen">Bearbeiten abbrechen</button>
+      </div>
+    </section>
+
+    <!-- Einlöse-Code -->
+    <section class="karte">
+      <h2>Einlöse-Code</h2>
+      <p class="stand" id="code-stand"></p>
+      <p class="hinweis">
+        Ohne Code löst der Kunde selbst ein und zeigt die Bestätigung vor; das
+        geht schneller. Mit Code muss die Verkaufskraft ihn auf dem Kundengerät
+        eingeben. Der Code wird nur als Hash gespeichert und lässt sich hier
+        nicht auslesen – nur neu setzen.
+      </p>
+      <label for="code">Neuer Code (mindestens 6 Zeichen)</label>
+      <input id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="knopfreihe">
+        <button id="code-setzen">Code setzen</button>
+        <button id="code-loeschen" class="gefahr">Code entfernen</button>
+      </div>
+    </section>
+
+    <p class="knopfreihe">
+      <button id="abmelden" class="sekundaer">Abmelden</button>
+    </p>
+  </div>
+</main>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Siehe web/verwaltung/config.example.js
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
+
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+
+/** Betriebe, die dieser Zugang verwalten darf. */
+let betriebe = [];
+/** Der gerade gewählte Betrieb, so wie er zuletzt vom Server kam. */
+let aktiv = null;
+/** Angebot, das gerade bearbeitet wird - null heisst "neu anlegen". */
+let bearbeitet = null;
+
+function melden(text, gut = false) {
+  $('meldung').innerHTML = text
+    ? `<div class="meldung ${gut ? 'gut' : 'schlecht'}">${text}</div>`
+    : '';
+  if (text) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** Fremder Text gehoert nie ungeprueft ins HTML. */
+function h(wert) {
+  return String(wert ?? '').replace(/[&<>"']/g, (z) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[z]);
+}
+
+/**
+ * Erreichte die Anfrage den Server ueberhaupt? Ein Netzwerkfehler hat weder
+ * SQLSTATE noch HTTP-Status. Wer nur auf `status` prueft, haelt jeden
+ * Datenbankfehler faelschlich fuer einen Verbindungsabbruch.
+ */
+function istNetzfehler(fehler) {
+  if (/fetch|network|Failed to send/i.test(fehler?.message ?? '')) return true;
+  if (fehler?.name?.includes('Retryable')) return true;
+  return !fehler?.code && !fehler?.status;
+}
+
+/** Uebersetzt die Fehler der Datenbankfunktionen in Klartext. */
+function fehlertext(fehler) {
+  if (istNetzfehler(fehler)) return 'Keine Verbindung zum Server.';
+  const t = (fehler?.message ?? '') + (fehler?.details ?? '');
+  if (/does not exist|schema cache/i.test(t)) {
+    return 'Diese Funktionen fehlen in der Datenbank. Wurde '
+         + '<code>supabase/schema.sql</code> in der aktuellen Fassung eingespielt?';
+  }
+  if (t.includes('not owner')) return 'Dieser Zugang darf diesen Betrieb nicht verwalten.';
+  if (t.includes('name and titles')) return 'Name und die drei Bezeichnungen dürfen nicht leer sein.';
+  if (t.includes('invalid primary color')) return 'Die Farbe braucht die Form <code>#4CAF50</code>.';
+  if (t.includes('stamps per card')) return 'Stempel pro Karte muss zwischen 1 und 50 liegen.';
+  if (t.includes('validity days')) return 'Die Gültigkeit muss mindestens einen Tag betragen.';
+  if (t.includes('redeem code too short')) return 'Der Einlöse-Code braucht mindestens 6 Zeichen.';
+  // Verletzte Policy: PostgREST meldet das, wenn gar keine Zeile passt.
+  if (fehler?.code === '42501') return 'Dafür fehlt diesem Zugang die Berechtigung.';
+  return 'Es hat nicht geklappt: ' + (fehler?.message ?? 'unbekannter Fehler');
+}
+
+function anmeldeFehlertext(fehler) {
+  if (istNetzfehler(fehler)) {
+    return 'Keine Verbindung zum Server. Prüfe die Internetverbindung '
+         + 'und die Adresse in <code>config.js</code>.';
+  }
+  const t = fehler?.message ?? '';
+  if (/not confirmed/i.test(t)) {
+    return 'Dieser Zugang ist noch nicht bestätigt. Im Supabase-Dashboard '
+         + 'unter Authentication → Users „Auto Confirm User“ setzen.';
+  }
+  if (/invalid login/i.test(t)) return 'E-Mail oder Passwort stimmt nicht.';
+  return 'Anmeldung fehlgeschlagen: ' + t;
+}
+
+function konfigurationFehlt() {
+  return !SUPABASE_URL || SUPABASE_URL.includes('DEIN-PROJEKT')
+      || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes('DEIN_ANON_KEY');
+}
+
+/**
+ * Holt die Betriebe, die dieser Zugang verwalten darf.
+ *
+ * Trennt drei Faelle, die sonst alle wie "geht nicht" aussehen: gar keine
+ * Zuordnung, nur Kasse, und ein echter Fehler. Wer sie zusammenwirft,
+ * schickt jemanden auf die Suche nach dem falschen Problem.
+ *
+ * @returns {'ok'|'keine-zuordnung'|'nur-kasse'|{fehler: string}}
+ */
+async function betriebeLaden() {
+  const { data: rollen, error } = await db
+    .from('tenant_staff').select('tenant_id, role');
+  if (error) return { fehler: fehlertext(error) };
+  if (!rollen?.length) return 'keine-zuordnung';
+
+  const ids = rollen.filter((r) => r.role === 'owner').map((r) => r.tenant_id);
+  if (!ids.length) return 'nur-kasse';
+
+  const { data, error: fehler2 } = await db
+    .from('tenants').select('*').in('id', ids).order('name');
+  if (fehler2) return { fehler: fehlertext(fehler2) };
+
+  betriebe = data ?? [];
+  if (!betriebe.length) {
+    // Zuordnung da, Betrieb aber nicht lesbar: Die Lese-Policy verlangt
+    // is_active. Ein stillgelegter Betrieb sieht sonst aus wie gar keiner.
+    return { fehler: 'Der zugeordnete Betrieb ist stillgelegt. '
+                   + 'Das lässt sich nur beim Anbieter wieder einschalten.' };
+  }
+  return 'ok';
+}
+
+function betriebWaehlen(id) {
+  aktiv = betriebe.find((b) => b.id === id) ?? betriebe[0];
+  $('betrieb').textContent = aktiv.name;
+  formularFuellen();
+  codeStandZeigen();
+  angeboteLaden();
+  zahlenLaden();
+}
+
+function formularFuellen() {
+  $('name').value = aktiv.name ?? '';
+  $('t-punkte').value = aktiv.loyalty_points_title ?? '';
+  $('t-gutscheine').value = aktiv.vouchers_title ?? '';
+  $('t-angebot').value = aktiv.daily_special_title ?? '';
+  farbeSetzen(aktiv.primary_color ?? '#4CAF50');
+  $('logo').value = aktiv.logo_url ?? '';
+  $('stempel').value = aktiv.stamps_per_card ?? 10;
+  $('tage').value = aktiv.voucher_validity_days ?? 90;
+}
+
+/** Farbwaehler und Textfeld zeigen denselben Wert. */
+function farbeSetzen(wert) {
+  const sauber = /^#[0-9A-Fa-f]{6}$/.test(wert) ? wert : '#4CAF50';
+  $('farbe').value = sauber.toLowerCase();
+  $('farbe-text').value = wert;
+}
+
+function codeStandZeigen() {
+  const an = aktiv.requires_redeem_code;
+  $('code-stand').textContent = an
+    ? 'Eingeschaltet: Ohne Code lässt sich kein Gutschein einlösen.'
+    : 'Ausgeschaltet: Der Kunde löst selbst ein.';
+  $('code-stand').classList.toggle('an', an);
+  $('code-loeschen').disabled = !an;
+}
+
+async function zahlenLaden() {
+  const { data, error } = await db.rpc('staff_pilot_summary');
+  if (error) { $('zahlen').innerHTML = ''; melden(fehlertext(error)); return; }
+  const z = (data ?? []).find((r) => r.tenant_id === aktiv.id);
+  if (!z) { $('zahlen').innerHTML = '<p class="leer">Noch keine Zahlen.</p>'; return; }
+  $('zahlen').innerHTML = [
+    [z.members, 'Teilnehmer'],
+    [z.stamps_issued, 'Stempel gesamt'],
+    [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
+    [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
+  ].map(([wert, was]) => `<div class="zahl"><b>${h(wert)}</b><span>${h(was)}</span></div>`).join('');
+}
+
+async function angeboteLaden() {
+  const { data, error } = await db
+    .from('offers').select('*').eq('tenant_id', aktiv.id).order('created_at');
+  if (error) { melden(fehlertext(error)); return; }
+  const liste = data ?? [];
+  if (!liste.length) {
+    $('angebote').innerHTML = '<p class="leer">Noch kein Angebot angelegt.</p>';
+    return;
+  }
+  $('angebote').innerHTML = liste.map((a) => {
+    const zeitraum = [a.valid_from, a.valid_to].some(Boolean)
+      ? `${a.valid_from ? datum(a.valid_from) : '…'} – ${a.valid_to ? datum(a.valid_to) : '…'}`
+      : '';
+    const unten = [a.description, zeitraum].filter(Boolean).map(h).join(' · ');
+    return `<div class="angebot">
+      <div class="text"><b>${h(a.title)}</b>${unten ? `<small>${unten}</small>` : ''}</div>
+      <div class="knopfreihe">
+        <button class="sekundaer schmal" data-bearbeiten="${h(a.id)}">Bearbeiten</button>
+        <button class="gefahr schmal" data-loeschen="${h(a.id)}">Löschen</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  $('angebote').querySelectorAll('[data-bearbeiten]').forEach((k) => {
+    k.onclick = () => angebotInsFormular(liste.find((a) => a.id === k.dataset.bearbeiten));
+  });
+  $('angebote').querySelectorAll('[data-loeschen]').forEach((k) => {
+    k.onclick = () => angebotLoeschen(liste.find((a) => a.id === k.dataset.loeschen));
+  });
+}
+
+function datum(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('de-DE');
+}
+
+function angebotInsFormular(a) {
+  if (!a) return;
+  bearbeitet = a.id;
+  $('a-titel').value = a.title ?? '';
+  $('a-text').value = a.description ?? '';
+  $('a-bild').value = a.image_url ?? '';
+  $('a-von').value = a.valid_from ?? '';
+  $('a-bis').value = a.valid_to ?? '';
+  $('a-speichern').textContent = 'Änderung speichern';
+  $('a-abbrechen').classList.remove('verborgen');
+  $('a-titel').focus();
+}
+
+function angebotFormularLeeren() {
+  bearbeitet = null;
+  ['a-titel', 'a-text', 'a-bild', 'a-von', 'a-bis'].forEach((id) => { $(id).value = ''; });
+  $('a-speichern').textContent = 'Angebot anlegen';
+  $('a-abbrechen').classList.add('verborgen');
+}
+
+async function angebotLoeschen(a) {
+  if (!a) return;
+  if (!confirm(`Angebot „${a.title}“ löschen?`)) return;
+  const { error } = await db.from('offers').delete().eq('id', a.id);
+  if (error) { console.error('offers.delete', error); melden(fehlertext(error)); return; }
+  if (bearbeitet === a.id) angebotFormularLeeren();
+  melden('Angebot gelöscht.', true);
+  await angeboteLaden();
+}
+
+function zeigeAngemeldet(ja) {
+  $('anmeldung').classList.toggle('verborgen', ja);
+  $('verwaltung').classList.toggle('verborgen', !ja);
+}
+
+// -------------------------------------------------------------- Bedienung
+
+$('farbe').oninput = () => { $('farbe-text').value = $('farbe').value; };
+$('farbe-text').oninput = () => {
+  const wert = $('farbe-text').value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(wert)) $('farbe').value = wert.toLowerCase();
+};
+
+$('speichern').onclick = async () => {
+  melden('');
+  $('speichern').disabled = true;
+  const { data, error } = await db.rpc('owner_update_tenant', {
+    p_tenant_id: aktiv.id,
+    p_name: $('name').value,
+    p_loyalty_points_title: $('t-punkte').value,
+    p_vouchers_title: $('t-gutscheine').value,
+    p_daily_special_title: $('t-angebot').value,
+    p_primary_color: $('farbe-text').value.trim() || null,
+    p_logo_url: $('logo').value.trim() || null,
+    p_stamps_per_card: Number($('stempel').value),
+    p_voucher_validity_days: Number($('tage').value),
+  });
+  $('speichern').disabled = false;
+  if (error) { console.error('owner_update_tenant', error); melden(fehlertext(error)); return; }
+
+  // Den Stand vom Server uebernehmen, nicht den aus den Feldern: Der Server
+  // schneidet Leerzeichen ab, und was er zurueckgibt, steht wirklich drin.
+  aktiv = data[0];
+  betriebe = betriebe.map((b) => (b.id === aktiv.id ? aktiv : b));
+  $('betrieb').textContent = aktiv.name;
+  formularFuellen();
+  codeStandZeigen();
+  melden('Gespeichert. Die App übernimmt es beim nächsten Start.', true);
+};
+
+$('zuruecksetzen').onclick = () => { formularFuellen(); melden(''); };
+
+$('a-speichern').onclick = async () => {
+  melden('');
+  const titel = $('a-titel').value.trim();
+  if (!titel) { melden('Das Angebot braucht einen Titel.'); return; }
+  const von = $('a-von').value || null;
+  const bis = $('a-bis').value || null;
+  if (von && bis && von > bis) {
+    melden('„Gültig ab“ liegt nach „gültig bis“.');
+    return;
+  }
+
+  const felder = {
+    title: titel,
+    description: $('a-text').value.trim() || null,
+    image_url: $('a-bild').value.trim() || null,
+    valid_from: von,
+    valid_to: bis,
+  };
+
+  $('a-speichern').disabled = true;
+  const { error } = bearbeitet
+    ? await db.from('offers').update(felder).eq('id', bearbeitet)
+    : await db.from('offers').insert({ ...felder, tenant_id: aktiv.id });
+  $('a-speichern').disabled = false;
+  if (error) { console.error('offers.save', error); melden(fehlertext(error)); return; }
+
+  melden(bearbeitet ? 'Angebot geändert.' : 'Angebot angelegt.', true);
+  angebotFormularLeeren();
+  await angeboteLaden();
+};
+
+$('a-abbrechen').onclick = () => { angebotFormularLeeren(); melden(''); };
+
+$('code-setzen').onclick = async () => {
+  melden('');
+  const code = $('code').value.trim();
+  if (code.length < 6) { melden('Der Einlöse-Code braucht mindestens 6 Zeichen.'); return; }
+  const { error } = await db.rpc('owner_set_redeem_code', {
+    p_tenant_id: aktiv.id, p_code: code,
+  });
+  if (error) { console.error('owner_set_redeem_code', error); melden(fehlertext(error)); return; }
+  $('code').value = '';
+  aktiv.requires_redeem_code = true;
+  codeStandZeigen();
+  melden('Code gesetzt. Ab sofort verlangt das Einlösen ihn.', true);
+};
+
+$('code-loeschen').onclick = async () => {
+  melden('');
+  if (!confirm('Einlöse-Code entfernen? Danach lösen Kunden wieder selbst ein.')) return;
+  const { error } = await db.rpc('owner_clear_redeem_code', { p_tenant_id: aktiv.id });
+  if (error) { console.error('owner_clear_redeem_code', error); melden(fehlertext(error)); return; }
+  aktiv.requires_redeem_code = false;
+  codeStandZeigen();
+  melden('Code entfernt. Kunden lösen jetzt selbst ein.', true);
+};
+
+$('wahl').onchange = () => { melden(''); betriebWaehlen($('wahl').value); };
+
+$('anmelden').onclick = async () => {
+  melden('');
+  const { error } = await db.auth.signInWithPassword({
+    email: $('email').value.trim(),
+    password: $('passwort').value,
+  });
+  if (error) { console.error('signIn', error); melden(anmeldeFehlertext(error)); return; }
+  $('passwort').value = '';
+  await starten();
+};
+
+$('abmelden').onclick = async () => {
+  await db.auth.signOut();
+  betriebe = []; aktiv = null;
+  $('betrieb').textContent = '';
+  melden('');
+  zeigeAngemeldet(false);
+};
+
+async function starten() {
+  if (konfigurationFehlt()) {
+    melden('<code>web/verwaltung/config.js</code> ist nicht ausgefüllt. '
+         + 'Trage dort URL und Anon-Key deines Supabase-Projekts ein.');
+    $('anmeldung').classList.add('verborgen');
+    return;
+  }
+  const { data } = await db.auth.getSession();
+  if (!data.session) { zeigeAngemeldet(false); return; }
+
+  const stand = await betriebeLaden();
+  if (stand === 'keine-zuordnung') {
+    zeigeAngemeldet(false);
+    melden('Dieser Zugang ist keinem Betrieb zugeordnet. Fehlt der Eintrag '
+         + 'in <code>tenant_staff</code>?');
+    return;
+  }
+  if (stand === 'nur-kasse') {
+    zeigeAngemeldet(false);
+    melden('Dieser Zugang gehört zur Kasse, nicht zur Betriebsleitung. '
+         + 'Für die Verwaltung braucht er in <code>tenant_staff</code> '
+         + 'die Rolle <code>owner</code>. Zum Einlösen geht es unter '
+         + '<code>web/kasse/</code>.');
+    return;
+  }
+  if (typeof stand === 'object') { zeigeAngemeldet(false); melden(stand.fehler); return; }
+
+  zeigeAngemeldet(true);
+  if (betriebe.length > 1) {
+    $('wahl-bereich').classList.remove('verborgen');
+    $('wahl').innerHTML = betriebe
+      .map((b) => `<option value="${h(b.id)}">${h(b.name)}</option>`).join('');
+  }
+  betriebWaehlen(betriebe[0].id);
+}
+
+starten();
+</script>
+</body>
+</html>

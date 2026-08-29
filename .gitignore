@@ -22,3 +22,7 @@ local.properties
 
 # Konfiguration der Kassenseite - pro Installation, nicht im Quelltext.
 web/kasse/config.js
+web/verwaltung/config.js
+
+# Werkzeug-Konfiguration, gehoert nicht zum Projekt
+.claude/

@@ -687,3 +687,201 @@ $$;
 
 revoke all on function public.staff_pilot_summary() from public;
 grant execute on function public.staff_pilot_summary() to authenticated;
+
+-- ============================================ Verwaltung durch den Betrieb
+-- Bis hierher pflegt der Anbieter jeden Betrieb von Hand per SQL. Das
+-- skaliert nicht und laesst sich nicht verkaufen: Jede Farbaenderung waere
+-- eine Anbieterleistung. Ab hier macht der Betrieb es selbst.
+--
+-- Zwei Rollen im Personal:
+--   staff - Kasse: Gutscheine einloesen, Zahlen sehen.
+--   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
+--
+-- Was der Betrieb ausdruecklich NICHT selbst kann, bleibt beim Anbieter:
+-- is_active, slug und die Zuordnung von Personal. Ein Betrieb, der sich
+-- selbst abschaltet oder seinen Bezeichner aendert, ist ein Supportfall -
+-- der Build der App haengt an beidem.
+alter table public.tenant_staff
+    add column if not exists role text not null default 'staff';
+
+-- `add constraint if not exists` gibt es nicht; auf einem schon
+-- eingerichteten Projekt liefe das Skript sonst beim zweiten Lauf auf.
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'tenant_staff_role_check'
+    ) then
+        alter table public.tenant_staff
+            add constraint tenant_staff_role_check check (role in ('staff', 'owner'));
+    end if;
+end
+$$;
+
+-- Darf der Aufrufer diesen Betrieb verwalten?
+create or replace function public.is_owner_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid()
+          and s.tenant_id = target_tenant
+          and s.role = 'owner'
+    );
+$$;
+
+-- ------------------------------------------------------------- Angebote
+-- Angebote tragen nichts Schuetzenswertes, deshalb reichen hier Policies;
+-- fuer tenants braucht es weiter unten eine Funktion, weil dort einzelne
+-- Spalten tabu bleiben muessen.
+drop policy if exists offers_owner_insert on public.offers;
+drop policy if exists offers_owner_update on public.offers;
+drop policy if exists offers_owner_delete on public.offers;
+
+create policy offers_owner_insert on public.offers
+    for insert to authenticated
+    with check (public.is_owner_of(tenant_id));
+
+-- Das `with check` steht hier ausgeschrieben, obwohl Postgres ohne es
+-- denselben Ausdruck verwendet: Es haelt fest, dass auch die neue Zeile
+-- geprueft wird - ein Angebot laesst sich also nicht in einen fremden
+-- Betrieb umhaengen.
+create policy offers_owner_update on public.offers
+    for update to authenticated
+    using (public.is_owner_of(tenant_id))
+    with check (public.is_owner_of(tenant_id));
+
+create policy offers_owner_delete on public.offers
+    for delete to authenticated
+    using (public.is_owner_of(tenant_id));
+
+-- ----------------------------------------------------------- Stammdaten
+/*
+ * Aendert die Angaben, die der Betrieb selbst verantwortet.
+ *
+ * Bewusst eine Funktion statt einer update-Policy: PostgREST wuerde sonst
+ * die ganze Zeile freigeben. Spaltenrechte gaebe es zwar, sie waeren aber
+ * still - eine neue Spalte an tenants waere ohne Zutun mitfreigegeben.
+ * Hier steht ausbuchstabiert, was aenderbar ist.
+ */
+create or replace function public.owner_update_tenant(
+    p_tenant_id             uuid,
+    p_name                  text,
+    p_loyalty_points_title  text,
+    p_vouchers_title        text,
+    p_daily_special_title   text,
+    p_primary_color         text,
+    p_logo_url              text,
+    p_stamps_per_card       int,
+    p_voucher_validity_days int
+)
+returns setof public.tenants
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if auth.uid() is null then
+        raise exception 'not authenticated' using errcode = '28000';
+    end if;
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+
+    -- Die drei Bezeichnungen stehen in der App als Ueberschriften. Leer
+    -- waeren sie dort ein Loch, deshalb hier abgelehnt statt stumm auf
+    -- den Vorgabewert zurueckgesetzt.
+    if coalesce(length(trim(p_name)), 0) = 0
+       or coalesce(length(trim(p_loyalty_points_title)), 0) = 0
+       or coalesce(length(trim(p_vouchers_title)), 0) = 0
+       or coalesce(length(trim(p_daily_special_title)), 0) = 0 then
+        raise exception 'name and titles required' using errcode = '22023';
+    end if;
+    if p_primary_color is not null and p_primary_color !~ '^#[0-9A-Fa-f]{6}$' then
+        raise exception 'invalid primary color' using errcode = '22023';
+    end if;
+    if p_stamps_per_card is null or p_stamps_per_card < 1 or p_stamps_per_card > 50 then
+        raise exception 'stamps per card out of range' using errcode = '22023';
+    end if;
+    if p_voucher_validity_days is null or p_voucher_validity_days < 1 then
+        raise exception 'validity days out of range' using errcode = '22023';
+    end if;
+
+    update public.tenants
+       set name                  = trim(p_name),
+           loyalty_points_title  = trim(p_loyalty_points_title),
+           vouchers_title        = trim(p_vouchers_title),
+           daily_special_title   = trim(p_daily_special_title),
+           primary_color         = p_primary_color,
+           logo_url              = nullif(trim(coalesce(p_logo_url, '')), ''),
+           stamps_per_card       = p_stamps_per_card,
+           voucher_validity_days = p_voucher_validity_days
+     where id = p_tenant_id;
+
+    return query select * from public.tenants where id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_update_tenant(
+    uuid, text, text, text, text, text, text, int, int) from public;
+grant execute on function public.owner_update_tenant(
+    uuid, text, text, text, text, text, text, int, int) to authenticated;
+
+-- -------------------------------------------------------- Einloese-Code
+/*
+ * Setzt den Einloese-Code. Muss eine Funktion sein: tenant_secrets hat
+ * keine Policy und ist von aussen unerreichbar - genau das ist der Sinn.
+ */
+create or replace function public.owner_set_redeem_code(
+    p_tenant_id uuid,
+    p_code      text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+begin
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+    -- Untergrenze mit Absicht: Ein vierstelliger Code ist der Fall, den wir
+    -- gerade erst aus dem Schema entfernt haben. Er haelt den Kunden nicht
+    -- auf, der zu Hause selbst einloesen will.
+    if p_code is null or length(trim(p_code)) < 6 then
+        raise exception 'redeem code too short' using errcode = '22023';
+    end if;
+
+    insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+    values (p_tenant_id, crypt(trim(p_code), gen_salt('bf')))
+        on conflict (tenant_id) do update
+        set redeem_code_hash = excluded.redeem_code_hash,
+            updated_at       = now();
+
+    update public.tenants set requires_redeem_code = true where id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_set_redeem_code(uuid, text) from public;
+grant execute on function public.owner_set_redeem_code(uuid, text) to authenticated;
+
+/*
+ * Nimmt den Code wieder zurueck. Beides in einem Schritt: Ein Betrieb, der
+ * requires_redeem_code stehen liesse und den Hash loeschte, koennte gar
+ * nicht mehr einloesen.
+ */
+create or replace function public.owner_clear_redeem_code(p_tenant_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if not public.is_owner_of(p_tenant_id) then
+        raise exception 'not owner of this tenant' using errcode = '42501';
+    end if;
+    update public.tenants set requires_redeem_code = false where id = p_tenant_id;
+    delete from public.tenant_secrets where tenant_id = p_tenant_id;
+end;
+$$;
+
+revoke all on function public.owner_clear_redeem_code(uuid) from public;
+grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;

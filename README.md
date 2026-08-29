@@ -47,7 +47,11 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
 - [x] **Mandantenfähigkeit:** Betriebe liegen als `tenants` im Backend. Ein Build
   ist über `TENANT_ID` einem Betrieb zugeordnet; Name, Bezeichnungen, Primärfarbe
   und die Kartenregeln (Stempel pro Karte, Gültigkeitsdauer) kommen von dort.
-- [x] **Angebote:** Werden im Backend gepflegt und auf dem HomeScreen angezeigt.
+- [x] **Angebote:** Werden vom Betrieb selbst gepflegt und auf dem HomeScreen
+  angezeigt.
+- [x] **Verwaltung durch den Betrieb:** Eigene Seite unter `web/verwaltung/`
+  für Stammdaten, Kartenregeln, Angebote und Einlöse-Code. Zwei Rollen in
+  `tenant_staff`: `staff` bedient die Kasse, `owner` verwaltet zusätzlich.
 - [x] **Corporate Branding:** Zur Laufzeit aus dem Betrieb, mit neutralem
   Platzhalter solange keine Serverdaten vorliegen.
 - [x] **Einstellungen:** Erscheinungsbild (System/Hell/Dunkel, dauerhaft
@@ -163,6 +167,8 @@ sieht die Zahlen des eigenen Betriebs.
    insert into public.tenant_staff (user_id, tenant_id)
    values ('<user-id>', '<tenant-id>');
    ```
+   Ohne Rollenangabe entsteht ein Kassenzugang. Wer auch verwalten soll,
+   braucht `role = 'owner'` — siehe [Verwaltung](#2-verwaltung-durch-den-betrieb).
 4. Die Seite über `https` oder `localhost` ausliefern. **Die Kamera funktioniert
    nicht aus einer lokal geöffneten Datei** (`file://` ist kein sicherer
    Kontext). Zum Ausprobieren genügt:
@@ -193,7 +199,56 @@ Sekunden geknackt — der Code hätte also genau den nicht aufgehalten, gegen de
 er gerichtet ist. `tenant_secrets` hat RLS an und **keine einzige Policy**; nur
 die `security definer`-Funktionen kommen heran.
 
-### 2. Auswertung für den Piloten
+### 2. Verwaltung durch den Betrieb
+
+`web/verwaltung/index.html` — dieselbe Machart wie die Kassenseite: eine
+einzelne Seite, kein Build-Schritt. Hier pflegt der Betrieb selbst, was vorher
+nur der Anbieter per SQL ändern konnte.
+
+- **Stammdaten:** Name, die drei Bezeichnungen in der App, Primärfarbe, Logo.
+- **Kartenregeln:** Stempel pro Karte, Gültigkeit des Gutscheins.
+- **Angebote:** anlegen, ändern, löschen — samt Zeitraum.
+- **Einlöse-Code:** setzen oder entfernen, mindestens sechs Zeichen.
+- **Zahlen:** dieselbe Auswertung wie auf der Kassenseite.
+
+**Warum überhaupt.** Ohne Dashboard ist jede Farbänderung eine Anbieterleistung.
+Das skaliert bei rund 25.000 Kleinstbetrieben nicht und macht jedes
+Preisgespräch unmöglich. Im geprüften Wettbewerbsumfeld gibt es keinen Anbieter
+ohne Dashboard, auch nicht im kostenlosen Tarif.
+
+**Zwei Rollen** in `tenant_staff`:
+
+| Rolle | Darf |
+|---|---|
+| `staff` (Vorgabe) | Gutscheine einlösen, Zahlen sehen |
+| `owner` | zusätzlich Stammdaten, Kartenregeln, Angebote, Einlöse-Code |
+
+Einen bestehenden Zugang zur Betriebsleitung machen:
+
+```sql
+update public.tenant_staff set role = 'owner'
+ where user_id = '<user-id>' and tenant_id = '<tenant-id>';
+```
+
+**Was der Betrieb ausdrücklich nicht selbst kann:** `is_active`, `slug` und die
+Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
+Betrieb, der sich selbst abschaltet, ist ein Supportfall.
+
+**Warum Stammdaten über eine Funktion laufen und Angebote über Policies.**
+Angebote tragen nichts Schützenswertes, dort reichen Policies. Bei `tenants`
+würde eine `update`-Policy die ganze Zeile freigeben — Spaltenrechte gäbe es
+zwar, sie wären aber still: Eine neue Spalte an `tenants` wäre ohne Zutun
+mitfreigegeben. `owner_update_tenant()` schreibt dagegen aus, was änderbar ist.
+
+**Einrichten** wie bei der Kassenseite: `config.example.js` nach `config.js`
+kopieren, Seite über `https` oder `localhost` ausliefern. Eine Kamera braucht
+diese Seite nicht.
+
+```bash
+python3 -m http.server 8765 --directory web
+```
+
+### 3. Auswertung für den Piloten
 
 Vier Views in `supabase/schema.sql` liefern die Zahlen, an denen sich
 entscheidet, ob das Programm trägt:
@@ -226,7 +281,7 @@ weist sie getrennt aus. Und Nutzer aus der Zeit vor den Mitgliedschaften haben
 Gutscheine, aber keinen Eintrag in `memberships`; `members` zählt sie deshalb
 nicht mit.
 
-### 3. Mandantenfähigkeit
+### 4. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -237,16 +292,17 @@ Das Schema ist damit bereits auf mehrere Betriebe ausgelegt. Der Wechsel auf ein
 App mit Beitritt per Code (mehrere Betriebe gleichzeitig) braucht keine
 Schemaänderung mehr, nur noch die Oberfläche dafür.
 
-Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
-App - hier dockt später ein Admin-Backend an.
+Pflege von `tenants` und `offers` läuft nicht aus der Kunden-App, sondern über
+die Verwaltungsseite (siehe oben). `is_active` und `slug` bleiben beim Anbieter
+und brauchen weiterhin den Service-Role-Key.
 
-### 4. Architektur: Hexagonal + MVVM
+### 5. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 5. Abstraktion der Datenquelle: Repository Pattern
+### 6. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 
@@ -279,8 +335,11 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 ## Ausblick
 
 - [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
-- [ ] **Admin-Panel:** Oberfläche, über die Betriebe Angebote und Branding selbst
-      pflegen. Datenseitig ist alles vorhanden, es fehlt die Bedienoberfläche.
+- [ ] **Personalverwaltung im Dashboard:** Zugänge anlegen und Rollen vergeben
+      kann bisher nur der Anbieter, weil dafür der Service-Role-Key nötig ist.
+- [ ] **Kassen-Seriennummern registrieren:** Voraussetzung dafür, dass
+      `issue_stamp` einen Beleg gegen die Kassen des Betriebs prüfen kann. Die
+      Nummer steht im Beleg-QR; die Prüfung dagegen gibt es noch nicht.
 - [ ] **Beleg-Scanner:** ML Kit Barcode Scanning, um den QR-Code auf dem Kassenbon
       einzulesen. Die serverseitige Vergabe dahinter steht bereits; es fehlt der
       Scanner und das Auslesen der TSE-Transaktionsnummer.
