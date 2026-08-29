@@ -68,6 +68,14 @@
   .eintrag small { color: var(--tinte-leise); }
   .eintrag .reihe { flex: 0 0 auto; }
 
+  .schalter {
+    display: flex; align-items: flex-start; gap: var(--s3);
+    text-transform: none; letter-spacing: 0; font-size: var(--t-body);
+    font-weight: 400; color: var(--tinte); margin-bottom: var(--s3);
+    cursor: pointer;
+  }
+  .schalter input { width: auto; margin: 3px 0 0; accent-color: var(--marke); flex: none; }
+
   .stand { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
   .stand.an { color: var(--gut-text); font-weight: 600; }
   .hinweis { margin: calc(var(--s2) * -1) 0 var(--s4); }
@@ -213,6 +221,72 @@
       </div>
     </section>
 
+    <!-- Belegprüfung -->
+    <section class="karte">
+      <p class="marke">Belegprüfung</p>
+      <p class="hinweis">
+        Die Einmaligkeitsprüfung schützt nur davor, dass derselbe Bon zweimal
+        zählt. Sie schützt nicht davor, dass jemand liegengebliebene Bons
+        einsammelt — und genau die bleiben in einer Bäckerei liegen. Dagegen
+        stehen diese Regeln.
+      </p>
+
+      <div class="paar">
+        <div>
+          <label for="b-alter">Beleg höchstens alt (Minuten)</label>
+          <input id="b-alter" type="number" min="1" max="43200" inputmode="numeric">
+        </div>
+        <div>
+          <label for="b-betrag">Mindestbetrag (€)</label>
+          <input id="b-betrag" type="number" min="0" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+      <label for="b-limit">Stempel je Kunde und Tag</label>
+      <input id="b-limit" type="number" min="1" max="100" inputmode="numeric">
+
+      <label class="schalter">
+        <input id="b-nurkassen" type="checkbox">
+        <span>Nur Belege von eingetragenen Kassen zählen</span>
+      </label>
+      <label class="schalter">
+        <input id="b-frei" type="checkbox">
+        <span>Auch Nachweise ohne Beleg-QR zulassen</span>
+      </label>
+      <p class="hinweis">
+        Solange kein Scanner im Einsatz ist, muss das Zweite an bleiben — sonst
+        zählt gar nichts mehr. Wer produktiv scannt, schaltet es aus: Sonst
+        lässt sich die ganze Prüfung umgehen, indem man irgendeine Zeichenkette
+        schickt.
+      </p>
+
+      <div class="reihe">
+        <button id="b-speichern">Regeln speichern</button>
+      </div>
+    </section>
+
+    <!-- Kassen -->
+    <section class="karte neben">
+      <p class="marke">Kassen</p>
+      <p class="hinweis">
+        Die Seriennummer steht im QR-Code auf jedem Bon — im amtlichen Beispiel
+        <code>AMA-2642</code>. Sie ändert sich beim Tausch von Kasse oder TSE.
+      </p>
+      <div id="kassen"></div>
+      <div class="paar">
+        <div>
+          <label for="k-serial">Seriennummer</label>
+          <input id="k-serial" autocapitalize="characters" spellcheck="false" placeholder="z. B. AMA-2642">
+        </div>
+        <div>
+          <label for="k-label">Bezeichnung (optional)</label>
+          <input id="k-label" maxlength="60" placeholder="z. B. Theke vorn">
+        </div>
+      </div>
+      <div class="reihe">
+        <button id="k-anlegen" class="still">Kasse eintragen</button>
+      </div>
+    </section>
+
     <!-- Einlöse-Code -->
     <section class="karte">
       <p class="marke">Einlöse-Code</p>
@@ -323,6 +397,14 @@ function fehlertext(fehler) {
   if (t.includes('stamps per card')) return 'Stempel pro Karte muss zwischen 1 und 50 liegen.';
   if (t.includes('validity days')) return 'Die Gültigkeit muss mindestens einen Tag betragen.';
   if (t.includes('redeem code too short')) return 'Der Einlöse-Code braucht mindestens 6 Zeichen.';
+  if (t.includes('no register configured')) {
+    return 'Trage erst eine Kasse ein. Sonst würde die Kassenpflicht jede '
+         + 'Stempelvergabe abschalten.';
+  }
+  if (t.includes('max age out of range')) return 'Das Zeitfenster muss zwischen 1 Minute und 30 Tagen liegen.';
+  if (t.includes('min amount out of range')) return 'Der Mindestbetrag darf nicht negativ sein.';
+  if (t.includes('daily limit out of range')) return 'Das Tageslimit muss zwischen 1 und 100 liegen.';
+  if (fehler?.code === '23505') return 'Diese Kasse ist schon eingetragen.';
   // Verletzte Policy: PostgREST meldet das, wenn gar keine Zeile passt.
   if (fehler?.code === '42501') return 'Dafür fehlt diesem Zugang die Berechtigung.';
   return 'Es hat nicht geklappt: ' + (fehler?.message ?? 'unbekannter Fehler');
@@ -385,6 +467,7 @@ function betriebWaehlen(id) {
   formularFuellen();
   codeStandZeigen();
   angeboteLaden();
+  kassenLaden();
   zahlenLaden();
 }
 
@@ -398,6 +481,14 @@ function formularFuellen() {
   $('logo').value = aktiv.logo_url ?? '';
   $('stempel').value = aktiv.stamps_per_card ?? 10;
   $('tage').value = aktiv.voucher_validity_days ?? 90;
+
+  $('b-alter').value = aktiv.proof_max_age_minutes ?? 120;
+  // Im Formular Euro, in der Datenbank Cent - Rundungsfehler haben in
+  // Betraegen nichts verloren.
+  $('b-betrag').value = ((aktiv.proof_min_cents ?? 0) / 100).toFixed(2);
+  $('b-limit').value = aktiv.daily_stamp_limit ?? 25;
+  $('b-nurkassen').checked = !!aktiv.require_known_register;
+  $('b-frei').checked = aktiv.allow_opaque_proofs !== false;
 }
 
 /** Farbwaehler und Textfeld zeigen denselben Wert. */
@@ -463,6 +554,36 @@ async function angeboteLaden() {
   $('angebote').querySelectorAll('[data-loeschen]').forEach((k) => {
     k.onclick = () => angebotLoeschen(liste.find((a) => a.id === k.dataset.loeschen));
   });
+}
+
+async function kassenLaden() {
+  const { data, error } = await db
+    .from('tenant_registers').select('serial, label').eq('tenant_id', aktiv.id).order('serial');
+  if (error) { melden(fehlertext(error)); return; }
+  const liste = data ?? [];
+  if (!liste.length) {
+    $('kassen').innerHTML = '<p class="leer-text">Noch keine Kasse eingetragen.</p>';
+    return;
+  }
+  $('kassen').innerHTML = liste.map((k) => `<div class="eintrag">
+      <div class="text"><b>${h(k.serial)}</b>${k.label ? `<small>${h(k.label)}</small>` : ''}</div>
+      <div class="reihe">
+        <button class="gefahr schmal" data-kasse="${h(k.serial)}">Entfernen</button>
+      </div>
+    </div>`).join('');
+  $('kassen').querySelectorAll('[data-kasse]').forEach((b) => {
+    b.onclick = () => kasseEntfernen(b.dataset.kasse);
+  });
+}
+
+async function kasseEntfernen(serial) {
+  if (!confirm(`Kasse „${serial}" entfernen?`)) return;
+  melden('');
+  const { error } = await db.from('tenant_registers')
+    .delete().eq('tenant_id', aktiv.id).eq('serial', serial);
+  if (error) { console.error('tenant_registers.delete', error); melden(fehlertext(error)); return; }
+  melden('Kasse entfernt.', true);
+  await kassenLaden();
 }
 
 function datum(iso) {
@@ -540,6 +661,45 @@ $('speichern').onclick = async () => {
 };
 
 $('zuruecksetzen').onclick = () => { formularFuellen(); melden(''); };
+
+$('b-speichern').onclick = async () => {
+  melden('');
+  const euro = Number($('b-betrag').value.replace(',', '.'));
+  if (!Number.isFinite(euro) || euro < 0) { melden('Der Mindestbetrag ist keine Zahl.'); return; }
+
+  beschaeftigt($('b-speichern'), true, 'Wird gespeichert …');
+  const { data, error } = await db.rpc('owner_update_proof_rules', {
+    p_tenant_id: aktiv.id,
+    p_max_age_minutes: Number($('b-alter').value),
+    p_min_cents: Math.round(euro * 100),
+    p_daily_limit: Number($('b-limit').value),
+    p_require_known: $('b-nurkassen').checked,
+    p_allow_opaque: $('b-frei').checked,
+  });
+  beschaeftigt($('b-speichern'), false);
+  if (error) { console.error('owner_update_proof_rules', error); melden(fehlertext(error)); return; }
+
+  aktiv = data[0];
+  betriebe = betriebe.map((b) => (b.id === aktiv.id ? aktiv : b));
+  formularFuellen();
+  melden('Regeln gespeichert. Sie gelten ab dem nächsten Beleg.', true);
+};
+
+$('k-anlegen').onclick = async () => {
+  melden('');
+  const serial = $('k-serial').value.trim();
+  if (!serial) { melden('Ohne Seriennummer geht es nicht.'); return; }
+
+  beschaeftigt($('k-anlegen'), true, 'Wird eingetragen …');
+  const { error } = await db.from('tenant_registers').insert({
+    tenant_id: aktiv.id, serial, label: $('k-label').value.trim() || null,
+  });
+  beschaeftigt($('k-anlegen'), false);
+  if (error) { console.error('tenant_registers.insert', error); melden(fehlertext(error)); return; }
+  $('k-serial').value = ''; $('k-label').value = '';
+  melden('Kasse eingetragen.', true);
+  await kassenLaden();
+};
 
 $('a-speichern').onclick = async () => {
   melden('');

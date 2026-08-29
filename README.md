@@ -153,6 +153,44 @@ statt einen Stempel zu vergeben, der später zurückgenommen werden müsste.
 
 Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
 
+#### Missbrauchsschutz
+
+Die Einmaligkeitsprüfung schützt nur davor, dass **derselbe** Bon zweimal
+zählt. Sie schützt nicht davor, dass jemand liegengebliebene Bons einsammelt —
+und das ist der tatsächliche Fall: In Bäckereien nimmt die Kundschaft den Bon
+überwiegend nicht mit. Deshalb liest `issue_stamp` den Beleg-QR selbst und
+prüft ihn gegen Regeln, die der Betrieb in der Verwaltung einstellt.
+
+`parse_receipt_qr()` zerlegt den DSFinV-K-QR (Anhang I, zwölf Felder). Was sich
+nicht sauber lesen lässt, gilt als **kein** Beleg — lieber einen echten Bon
+ablehnen als eine erfundene Zeichenkette durchwinken.
+
+| Regel | Spalte an `tenants` | Vorgabe | Wogegen |
+|---|---|---|---|
+| Zeitfenster | `proof_max_age_minutes` | 120 | Eingesammelte Bons sind meist Stunden alt |
+| Mindestbetrag | `proof_min_cents` | 0 | Kleinstbeträge, die keinen Stempel wert sind |
+| Tageslimit je Kunde | `daily_stamp_limit` | 25 | Massenmissbrauch — Fangnetz, nicht Hauptmittel |
+| Nur eingetragene Kassen | `require_known_register` | aus | Bons aus fremden Betrieben |
+| Freie Nachweise zulassen | `allow_opaque_proofs` | an | Muss aus, sobald produktiv gescannt wird |
+
+Die Vorgaben sind bewusst mild: Das Einspielen des Skripts darf ein
+bestehendes Projekt nicht plötzlich Stempel ablehnen lassen. Scharf stellt der
+Betrieb selbst. Ein Sonderfall ist abgefangen — die Kassenpflicht lässt sich
+nicht einschalten, solange keine Kasse eingetragen ist; das wäre das stille
+Abschalten der Stempelvergabe.
+
+Der Schlüssel in `stamp_proofs` ist kanonisch (`Kasse:Transaktion:Zähler`), nicht
+die rohe Zeichenkette — sonst zählte derselbe Bon erneut, sobald ein Leerzeichen
+anders steht.
+
+> **Was fehlt: die Signatur.** Der QR-Code enthält eine ECDSA-Signatur und den
+> öffentlichen Schlüssel. Postgres kann sie nicht prüfen — `pgcrypto` kann kein
+> ECDSA verifizieren. Gegen das Einsammeln fremder Bons helfen die Regeln oben;
+> gegen einen **selbst gebauten** QR-Code hilft nur die Signaturprüfung, und die
+> braucht eine Supabase Edge Function. Solange sie fehlt, ist
+> `require_known_register` das schärfste verfügbare Mittel: Wer fälscht, muss
+> zumindest eine echte, eingetragene Kassennummer treffen.
+
 ### 1. Kassenseite für den Betrieb
 
 `web/kasse/index.html` — eine einzelne Seite ohne Build-Schritt. Das Personal
@@ -303,6 +341,8 @@ nur der Anbieter per SQL ändern konnte.
 
 - **Stammdaten:** Name, die drei Bezeichnungen in der App, Primärfarbe, Logo.
 - **Kartenregeln:** Stempel pro Karte, Gültigkeit des Gutscheins.
+- **Belegprüfung:** Zeitfenster, Mindestbetrag, Tageslimit, Kassenpflicht — und
+  die Liste der eigenen Kassen-Seriennummern.
 - **Angebote:** anlegen, ändern, löschen — samt Zeitraum.
 - **Einlöse-Code:** setzen oder entfernen, mindestens sechs Zeichen.
 - **Zahlen:** dieselbe Auswertung wie auf der Kassenseite.
@@ -441,9 +481,13 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 - [ ] **Kassen-Seriennummern registrieren:** Voraussetzung dafür, dass
       `issue_stamp` einen Beleg gegen die Kassen des Betriebs prüfen kann. Die
       Nummer steht im Beleg-QR; die Prüfung dagegen gibt es noch nicht.
-- [ ] **Beleg-Scanner:** ML Kit Barcode Scanning, um den QR-Code auf dem Kassenbon
-      einzulesen. Die serverseitige Vergabe dahinter steht bereits; es fehlt der
-      Scanner und das Auslesen der TSE-Transaktionsnummer.
+- [ ] **Signaturprüfung per Edge Function:** Das einzige Mittel gegen einen
+      selbst gebauten Beleg-QR. Postgres kann kein ECDSA; eine Edge Function
+      mit WebCrypto kann es. Bis dahin bleibt `require_known_register` die
+      schärfste verfügbare Hürde.
+- [ ] **Beleg-Scanner in der Android-App:** ML Kit Barcode Scanning. Die
+      Web-App liest den QR bereits (BarcodeDetector, sonst jsQR), die
+      serverseitige Prüfung steht — es fehlt der native Scanner.
 - [ ] **Einlösen serverseitig autorisieren:** Über die Kassenseite läuft das
       Einlösen bereits durch `staff_redeem_voucher`. Der Kunde kann seinen
       Gutschein aber weiterhin selbst als eingelöst markieren, solange der

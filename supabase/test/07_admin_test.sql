@@ -232,6 +232,90 @@ begin
 end
 $$;
 
+-- ============================ Belegregeln aus der Verwaltung heraus
+do $$
+declare
+    v_tenant uuid;
+    v_chef   uuid;
+    v_kasse  uuid;
+    v_zahl   int;
+    v_ok     boolean;
+begin
+    select id into v_tenant from public.tenants where slug = 'verwaltung-test';
+    select s.user_id into v_chef  from public.tenant_staff s
+     where s.tenant_id = v_tenant and s.role = 'owner';
+    select s.user_id into v_kasse from public.tenant_staff s
+     where s.tenant_id = v_tenant and s.role = 'staff';
+
+    call auth.become(v_kasse);
+    begin
+        perform public.owner_update_proof_rules(v_tenant, 60, 100, 3, false, true);
+        v_ok := false;
+    exception when insufficient_privilege then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Die Kasse ändert die Belegregeln nicht');
+
+    call auth.become(v_chef);
+    perform public.owner_update_proof_rules(v_tenant, 45, 150, 4, false, false);
+    select proof_max_age_minutes into v_zahl from public.tenants where id = v_tenant;
+    call test.check(v_zahl = 45, 'Der Inhaber setzt das Zeitfenster');
+    select proof_min_cents into v_zahl from public.tenants where id = v_tenant;
+    call test.check(v_zahl = 150, 'Der Inhaber setzt den Mindestbetrag');
+
+    -- Unsinn wird abgelehnt
+    begin
+        perform public.owner_update_proof_rules(v_tenant, 0, 0, 3, false, true);
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Ein Zeitfenster von null Minuten wird abgelehnt');
+
+    -- Kassenpflicht ohne eingetragene Kasse waere das Abschalten der Vergabe.
+    begin
+        perform public.owner_update_proof_rules(v_tenant, 60, 0, 3, true, true);
+        v_ok := false;
+    exception when data_exception then
+        v_ok := true;
+    end;
+    call test.check(v_ok, 'Kassenpflicht ohne eingetragene Kasse wird abgelehnt');
+
+    -- Kassen pflegen: Policies, kein RPC.
+    set local role authenticated;
+    insert into public.tenant_registers (tenant_id, serial, label)
+    values (v_tenant, 'KASSE-1', 'Theke');
+    select count(*) into v_zahl from public.tenant_registers where tenant_id = v_tenant;
+    reset role;
+    call test.check(v_zahl = 1, 'Der Inhaber trägt eine Kasse ein');
+
+    perform public.owner_update_proof_rules(v_tenant, 60, 0, 3, true, true);
+    select require_known_register into v_ok from public.tenants where id = v_tenant;
+    call test.check(v_ok, 'Mit eingetragener Kasse lässt sich die Pflicht einschalten');
+
+    call auth.become(v_kasse);
+    set local role authenticated;
+    begin
+        insert into public.tenant_registers (tenant_id, serial) values (v_tenant, 'KASSE-2');
+    exception when insufficient_privilege then null;
+    end;
+    select count(*) into v_zahl from public.tenant_registers where tenant_id = v_tenant;
+    reset role;
+    call test.check(v_zahl = 1, 'Die Kasse trägt keine Kasse ein');
+
+    -- Aufräumen: Die folgenden Blöcke arbeiten auf demselben Betrieb, und
+    -- ein Tageslimit von 3 bringt jede volle Karte zu Fall. Vorher zurück in
+    -- die Inhaberrolle - zuletzt lief hier die Kasse.
+    call auth.become(v_chef);
+    perform public.owner_update_proof_rules(v_tenant, 120, 0, 25, false, true);
+    set local role authenticated;
+    delete from public.tenant_registers where tenant_id = v_tenant;
+    reset role;
+
+    raise notice '--- Belegregeln aus der Verwaltung bestanden ---';
+end
+$$;
+
 -- ============================ Einlöse-Code aus der Verwaltung heraus
 do $$
 declare

@@ -61,12 +61,17 @@ run_scenario() {
             return 1
         fi
         # Ein selbst gesetzter Einloese-Code, wie ihn ein Pilotbetrieb haette.
-        # Er muss den Umzug nach tenant_secrets ueberleben - anders als das
-        # mitgelieferte "1234", das dabei verschwindet.
-        "${psql[@]}" -c "update public.tenants
-                            set redeem_code_hash = extensions.crypt(
-                                    'umzug-4711', extensions.gen_salt('bf'))
-                          where id = '00000000-0000-4000-8000-000000000001';" >/dev/null
+        # Er muss das erneute Einspielen ueberleben - anders als das frueher
+        # mitgelieferte "1234", das dabei eingesammelt wird.
+        #
+        # Bis zum Merge von PR #17 stand der Hash noch als Spalte an tenants
+        # und der Umzug nach tenant_secrets war das, was hier geprueft wurde.
+        # Seit der Umzug auf main liegt, setzt der Test ihn gleich dort.
+        "${psql[@]}" -c "insert into public.tenant_secrets (tenant_id, redeem_code_hash)
+                         values ('00000000-0000-4000-8000-000000000001',
+                                 extensions.crypt('umzug-4711', extensions.gen_salt('bf')))
+                             on conflict (tenant_id) do update
+                             set redeem_code_hash = excluded.redeem_code_hash;" >/dev/null
     fi
 
     # Zweimal einspielen: Das Skript muss wiederholbar sein. NOTICEs ueber
@@ -91,9 +96,9 @@ run_scenario() {
              where tenant_id = '00000000-0000-4000-8000-000000000001'
                and extensions.crypt('umzug-4711', redeem_code_hash) = redeem_code_hash;")"
         if [ "$ueberlebt" = "1" ]; then
-            echo "OK    Ein selbst gesetzter Einloese-Code ueberlebt den Umzug"
+            echo "OK    Ein selbst gesetzter Einloese-Code ueberlebt das Einspielen"
         else
-            echo "FEHLGESCHLAGEN: Der selbst gesetzte Einloese-Code ging beim Umzug verloren"
+            echo "FEHLGESCHLAGEN: Der selbst gesetzte Einloese-Code ging beim Einspielen verloren"
             FAILED=1
         fi
     fi
@@ -103,18 +108,23 @@ run_scenario() {
         yes)      files=("$T/03_upgrade_test.sql") ;;
         # Nach dem Upgrade muss die volle Funktion stehen, nicht nur das Schema.
         previous) files=("$T/01_issue_stamp_test.sql" "$T/04_redeem_test.sql"
-                          "$T/07_admin_test.sql") ;;
+                          "$T/07_admin_test.sql" "$T/08_proof_test.sql") ;;
         *)        files=("$T/01_issue_stamp_test.sql" "$T/02_rls_test.sql"
                           "$T/04_redeem_test.sql" "$T/05_telemetry_test.sql"
-                          "$T/06_staff_test.sql" "$T/07_admin_test.sql") ;;
+                          "$T/06_staff_test.sql" "$T/07_admin_test.sql"
+                          "$T/08_proof_test.sql") ;;
     esac
 
+    # Ausgabe erst in eine Datei, dann filtern. Direkt durch die Pipe
+    # gefiltert liefert `if !` den Ausgang von sed, nicht den von psql - ein
+    # komplett fehlgeschlagenes Testskript blieb so unbemerkt, solange
+    # irgendeine Zeile noch auf NOTICE passte.
     local f
     for f in "${files[@]}"; do
-        if ! "${psql[@]}" -f "$f" 2>&1 \
-             | grep -E "(NOTICE|ERROR):" | sed -E 's/^.*(NOTICE|ERROR):  //'; then
+        if ! "${psql[@]}" -f "$f" > "$tmp/lauf.log" 2>&1; then
             FAILED=1
         fi
+        grep -E "(NOTICE|ERROR):" "$tmp/lauf.log" | sed -E 's/^.*(NOTICE|ERROR):  //' || true
     done
 
     "$PGBIN/pg_ctl" -D "$tmp/data" -m immediate stop >/dev/null 2>&1 || true
