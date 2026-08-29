@@ -228,8 +228,15 @@ Ausrollen und einschalten — **in dieser Reihenfolge**, sonst kommt kein Stempe
 mehr durch:
 
 ```bash
-supabase functions deploy beleg-pruefen
+brew install supabase/tap/supabase   # einmalig
+supabase login                        # einmalig, öffnet den Browser
+supabase functions deploy beleg-pruefen --project-ref <projekt-ref>
 ```
+
+`supabase link` ist dafür nicht nötig — mit `--project-ref` entfällt die Frage
+nach dem Datenbankpasswort. `SUPABASE_URL`, `SUPABASE_ANON_KEY` und
+`SUPABASE_SERVICE_ROLE_KEY` stellt die Laufzeit selbst bereit; es sind keine
+eigenen Secrets zu setzen.
 
 Danach in der Verwaltung „Signatur des Belegs prüfen" setzen
 (`tenants.require_signed_proof`). Ist sie an, lehnt `issue_stamp` jeden Beleg
