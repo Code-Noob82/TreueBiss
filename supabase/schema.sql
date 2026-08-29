@@ -138,7 +138,9 @@ begin
         end if;
     end if;
 
-    update public.vouchers set is_redeemed = true where id = p_voucher_id;
+    update public.vouchers
+       set is_redeemed = true, redeemed_at = v_now
+     where id = p_voucher_id;
 
     return query select p_voucher_id, v_now;
 end;
@@ -186,6 +188,9 @@ create table if not exists public.vouchers (
     creation_date int8 not null,
     expires_at    int8 not null,
     is_redeemed   boolean not null default false,
+    -- Wann eingeloest wurde. Ohne das laesst sich die Einloesequote nicht
+    -- ueber die Zeit betrachten, nur als Gesamtzahl.
+    redeemed_at   timestamptz,
     user_id       uuid not null references auth.users(id) on delete cascade,
     tenant_id     uuid not null references public.tenants(id) on delete cascade
 );
@@ -198,6 +203,8 @@ create table if not exists public.vouchers (
 --
 -- Bestehende Zeilen werden dem Demo-Betrieb zugeordnet. Wenn deine Daten zu
 -- einem anderen Betrieb gehoeren, passe v_default_tenant an.
+alter table public.vouchers add column if not exists redeemed_at timestamptz;
+
 do $$
 declare
     v_default_tenant uuid := '00000000-0000-4000-8000-000000000001';
@@ -413,3 +420,93 @@ where not exists (
     select 1 from public.offers
     where tenant_id = '00000000-0000-4000-8000-000000000001'
 );
+
+-- ================================================ Auswertung fuer den Piloten
+--
+-- Die Zahlen stammen aus den Tabellen, die ohnehin gefuehrt werden - es gibt
+-- bewusst kein zusaetzliches Event-Log. Die Views sind fuer den Betreiber
+-- gedacht (Supabase-Studio oder Service-Role), nicht fuer die App: Sie
+-- aggregieren ueber alle Nutzer eines Betriebs.
+--
+-- Was die App NICHT messen kann: wie viele Menschen den Flyer gesehen haben.
+-- Der Nenner der Installationsrate muss vom Betrieb kommen.
+--
+-- Die Tagesgrenze liegt in Europe/Berlin, nicht in UTC. Ohne die Umrechnung
+-- haengt das Ergebnis an der Zeitzone der lesenden Sitzung - in Supabase UTC.
+-- Abendliche Vergaben nach 22 Uhr Ortszeit landeten dann auf dem Folgetag,
+-- und niemand haette gemerkt, dass die Tageszahlen verschoben sind.
+
+-- Neue Teilnehmer pro Tag - Zaehler der Installationsrate.
+create or replace view public.pilot_daily_signups as
+select
+    tenant_id,
+    (joined_at at time zone 'Europe/Berlin')::date as day,
+    count(*)        as new_members
+from public.memberships
+group by tenant_id, (joined_at at time zone 'Europe/Berlin')::date;
+
+-- Vergebene Stempel pro Tag. Faellt die Zahl nach Woche zwei ab, ist der
+-- Kassenablauf das Problem, nicht die App.
+create or replace view public.pilot_daily_stamps as
+select
+    tenant_id,
+    (created_at at time zone 'Europe/Berlin')::date         as day,
+    count(*)                 as stamps,
+    count(distinct user_id)  as customers
+from public.stamp_proofs
+group by tenant_id, (created_at at time zone 'Europe/Berlin')::date;
+
+-- Einloesungen pro Tag.
+create or replace view public.pilot_daily_redemptions as
+select
+    tenant_id,
+    (redeemed_at at time zone 'Europe/Berlin')::date as day,
+    count(*)          as redemptions
+from public.vouchers
+where is_redeemed and redeemed_at is not null
+group by tenant_id, (redeemed_at at time zone 'Europe/Berlin')::date;
+
+-- Gesamtbild pro Betrieb.
+create or replace view public.pilot_summary as
+select
+    t.id   as tenant_id,
+    t.name as tenant,
+    (select count(*) from public.memberships m where m.tenant_id = t.id)
+        as members,
+    (select count(*) from public.stamp_proofs s where s.tenant_id = t.id)
+        as stamps_issued,
+    (select count(distinct (s.created_at at time zone 'Europe/Berlin')::date)
+       from public.stamp_proofs s where s.tenant_id = t.id)
+        as active_days,
+    round(
+        (select count(*) from public.stamp_proofs s where s.tenant_id = t.id)::numeric
+        / nullif((select count(distinct (s.created_at at time zone 'Europe/Berlin')::date)
+                    from public.stamp_proofs s where s.tenant_id = t.id), 0),
+        1
+    ) as stamps_per_active_day,
+    (select count(*) from public.vouchers v where v.tenant_id = t.id)
+        as vouchers_created,
+    (select count(*) from public.vouchers v where v.tenant_id = t.id and v.is_redeemed)
+        as vouchers_redeemed,
+    round(
+        100.0 * (select count(*) from public.vouchers v
+                  where v.tenant_id = t.id and v.is_redeemed)
+        / nullif((select count(*) from public.vouchers v where v.tenant_id = t.id), 0),
+        1
+    ) as redemption_rate_percent,
+    -- Einloesungen aus der Zeit vor der Spalte redeemed_at. Sie zaehlen oben
+    -- mit, tauchen in pilot_daily_redemptions aber nicht auf - ohne diese
+    -- Spalte sieht die Differenz nach einem Rechenfehler aus. Nachtragen
+    -- laesst sie sich nicht: Wann eingeloest wurde, weiss niemand mehr.
+    (select count(*) from public.vouchers v
+      where v.tenant_id = t.id and v.is_redeemed and v.redeemed_at is null)
+        as redemptions_without_timestamp
+from public.tenants t;
+
+-- Die Views gehoeren dem Betreiber, nicht der App. Ohne diesen Entzug waeren
+-- sie ueber die Standardrechte fuer authenticated lesbar - und damit
+-- aggregierte Fremddaten fuer jeden Kunden.
+revoke all on public.pilot_daily_signups     from anon, authenticated;
+revoke all on public.pilot_daily_stamps      from anon, authenticated;
+revoke all on public.pilot_daily_redemptions from anon, authenticated;
+revoke all on public.pilot_summary           from anon, authenticated;

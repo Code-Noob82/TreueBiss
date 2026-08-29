@@ -14,3 +14,8 @@ local.properties
 *.log
 *.keystore
 .kotlin/
+
+# Datenexporte aus dem Supabase-Dashboard - enthalten Nutzer-IDs und
+# gehoeren nicht ins Repository.
+*_rows.csv
+*_rows.sql

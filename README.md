@@ -133,7 +133,40 @@ statt einen Stempel zu vergeben, der später zurückgenommen werden müsste.
 
 Der Demo-Knopf, der ohne Beleg stempelt, ist auf Debug-Builds beschränkt.
 
-### 1. Mandantenfähigkeit
+### 1. Auswertung für den Piloten
+
+Vier Views in `supabase/schema.sql` liefern die Zahlen, an denen sich
+entscheidet, ob das Programm trägt:
+
+| View | Beantwortet |
+|---|---|
+| `pilot_daily_signups` | Wie viele Teilnehmer kommen pro Tag dazu? |
+| `pilot_daily_stamps` | Werden Stempel weiterhin vergeben, oder bricht es nach Woche zwei ab? |
+| `pilot_daily_redemptions` | Werden Gutscheine tatsächlich eingelöst? |
+| `pilot_summary` | Gesamtbild pro Betrieb, inkl. Stempel pro aktivem Tag und Einlösequote |
+
+Zu lesen im Supabase-Studio unter *Table Editor* oder per SQL. Die Views sind
+für die App **nicht** lesbar — sie aggregieren über alle Kunden eines Betriebs.
+
+Bewusst gibt es **kein zusätzliches Event-Log**: Die Zahlen stammen aus
+`memberships`, `stamp_proofs` und `vouchers`, die ohnehin geführt werden.
+
+Die Tagesgrenze liegt in **Europe/Berlin**, nicht in UTC. Ohne das hinge das
+Ergebnis an der Zeitzone der lesenden Sitzung, und abendliche Vergaben nach
+22 Uhr Ortszeit landeten still auf dem Folgetag.
+
+Was die App **nicht** messen kann: wie viele Menschen den Flyer gesehen haben.
+Der Nenner der Installationsrate muss vom Betrieb kommen — notiere die Zahl
+der ausgegebenen Flyer, sonst ist die wichtigste Quote später nicht bildbar.
+
+Zwei Dinge, die bei bestehenden Projekten auffallen können: Vor der Einführung
+von `redeemed_at` eingelöste Gutscheine erscheinen nicht in
+`pilot_daily_redemptions` — `pilot_summary.redemptions_without_timestamp`
+weist sie getrennt aus. Und Nutzer aus der Zeit vor den Mitgliedschaften haben
+Gutscheine, aber keinen Eintrag in `memberships`; `members` zählt sie deshalb
+nicht mit.
+
+### 2. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -147,13 +180,13 @@ Schemaänderung mehr, nur noch die Oberfläche dafür.
 Pflege von `tenants` und `offers` läuft über den Service-Role-Key, nicht aus der
 App - hier dockt später ein Admin-Backend an.
 
-### 2. Architektur: Hexagonal + MVVM
+### 3. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 3. Abstraktion der Datenquelle: Repository Pattern
+### 4. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 
