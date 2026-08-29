@@ -49,6 +49,9 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
   und die Kartenregeln (Stempel pro Karte, Gültigkeitsdauer) kommen von dort.
 - [x] **Angebote:** Werden vom Betrieb selbst gepflegt und auf dem HomeScreen
   angezeigt.
+- [x] **Web-App für Kunden:** `web/app/` als Progressive Web App — sammeln und
+  einlösen im Browser, ohne Installation, auf iPhone wie Android. Der Betrieb
+  steht als Slug in der Adresse.
 - [x] **Verwaltung durch den Betrieb:** Eigene Seite unter `web/verwaltung/`
   für Stammdaten, Kartenregeln, Angebote und Einlöse-Code. Zwei Rollen in
   `tenant_staff`: `staff` bedient die Kasse, `owner` verwaltet zusätzlich.
@@ -168,7 +171,7 @@ sieht die Zahlen des eigenen Betriebs.
    values ('<user-id>', '<tenant-id>');
    ```
    Ohne Rollenangabe entsteht ein Kassenzugang. Wer auch verwalten soll,
-   braucht `role = 'owner'` — siehe [Verwaltung](#2-verwaltung-durch-den-betrieb).
+   braucht `role = 'owner'` — siehe [Verwaltung](#3-verwaltung-durch-den-betrieb).
 4. Die Seite über `https` oder `localhost` ausliefern. **Die Kamera funktioniert
    nicht aus einer lokal geöffneten Datei** (`file://` ist kein sicherer
    Kontext). Zum Ausprobieren genügt:
@@ -199,7 +202,54 @@ Sekunden geknackt — der Code hätte also genau den nicht aufgehalten, gegen de
 er gerichtet ist. `tenant_secrets` hat RLS an und **keine einzige Policy**; nur
 die `security definer`-Funktionen kommen heran.
 
-### 2. Verwaltung durch den Betrieb
+### 2. Web-App für Kunden (PWA)
+
+`web/app/` — dieselbe Stempelkarte im Browser, ohne Installation, auf iPhone
+wie auf Android. Der Betrieb steht in der Adresse:
+
+```
+https://…/app/?b=baeckerei-mustermann
+```
+
+Ein QR-Aufsteller am Tresen oder ein Link auf dem Beleg führt direkt dorthin.
+Kein Store, kein Build je Betrieb, kein eigenes Entwicklerkonto.
+
+**Warum neben der Android-App.** Ein Drittel der mobilen Nutzung in Deutschland
+läuft über iOS, und der Wettbewerb liefert die Karte überwiegend ganz ohne
+Installation aus. Dazu kommt ein Betriebsrisiko des Build-pro-Mandant-Modells:
+Google Play empfiehlt White-Label-Anbietern ein eigenes Entwicklerkonto je
+Kunde, weil ein Regelverstoß sonst alle Apps eines Kontos mitreißen kann.
+
+**Was sie kann:** Betrieb per Slug laden samt Branding, Bezeichnungen und
+Angeboten; anonym anmelden; Stempel über den Beleg-QR sammeln; Gutscheine
+einlösen — mit Code, wenn der Betrieb einen verlangt.
+
+**QR-Erkennung** nutzt `BarcodeDetector`, wo es sie gibt, und fällt sonst auf
+`jsQR` zurück. Der Rückfall ist kein Beiwerk: Safari hat `BarcodeDetector`
+nicht, und Safari ist der Grund für diese Seite. Die Eingabe der Belegnummer
+von Hand bleibt gleichwertig.
+
+**Offline** zeigt die Seite den letzten bekannten Stand aus `localStorage` und
+sagt es über ein Band. Gesammelt und eingelöst wird ausschließlich auf dem
+Server — offline gibt es beides nicht, und die Seite tut auch nicht so.
+Der Service Worker hält nur die Hülle vor; beim Ändern der Dateien muss
+`VERSION` in `web/app/sw.js` hoch, sonst behalten bestehende Installationen
+den alten Stand.
+
+**Grenze der White-Label-Idee:** Das Manifest ist statisch, die installierte
+App heißt deshalb „TreueBiss" und nicht wie der Betrieb. Farbe, Logo und
+Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
+nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
+es ausliefert.
+
+**Einrichten:** `config.example.js` nach `config.js` kopieren. Kamera und
+Service Worker brauchen `https` oder `localhost`.
+
+```bash
+python3 -m http.server 8765 --directory web
+```
+
+### 3. Verwaltung durch den Betrieb
 
 `web/verwaltung/index.html` — dieselbe Machart wie die Kassenseite: eine
 einzelne Seite, kein Build-Schritt. Hier pflegt der Betrieb selbst, was vorher
@@ -248,7 +298,7 @@ diese Seite nicht.
 python3 -m http.server 8765 --directory web
 ```
 
-### 3. Auswertung für den Piloten
+### 4. Auswertung für den Piloten
 
 Vier Views in `supabase/schema.sql` liefern die Zahlen, an denen sich
 entscheidet, ob das Programm trägt:
@@ -281,7 +331,7 @@ weist sie getrennt aus. Und Nutzer aus der Zeit vor den Mitgliedschaften haben
 Gutscheine, aber keinen Eintrag in `memberships`; `members` zählt sie deshalb
 nicht mit.
 
-### 4. Mandantenfähigkeit
+### 5. Mandantenfähigkeit
 
 Stempel und Gutscheine tragen eine `tenant_id`; die Stempelkarte gilt pro
 (Nutzer, Betrieb). Die ID des Betriebs steht über `BuildConfig.TENANT_ID` fest,
@@ -296,13 +346,13 @@ Pflege von `tenants` und `offers` läuft nicht aus der Kunden-App, sondern über
 die Verwaltungsseite (siehe oben). `is_active` und `slug` bleiben beim Anbieter
 und brauchen weiterhin den Service-Role-Key.
 
-### 5. Architektur: Hexagonal + MVVM
+### 6. Architektur: Hexagonal + MVVM
 - **Data-Layer:** Room (lokal), Supabase (Remote).
 - **Domain-Layer:** Repository-Interfaces als Ports, Business-Logik (Stempelkarte, Gutschein).
 - **UI-Layer:** Jetpack Compose Screens, Navigation, Theme.
 - **DI-Layer:** Hilt-Module für Database, Network, SupabaseClient.
 
-### 6. Abstraktion der Datenquelle: Repository Pattern
+### 7. Abstraktion der Datenquelle: Repository Pattern
 Repositories kapseln Datenzugriff (lokal/remote).  
 UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austauschbarkeit.
 
