@@ -4,12 +4,12 @@
 
 ## Projektbeschreibung
 
-**TreueBiss** ist eine native Android-App, die als Minimum Viable Product (MVP) im Rahmen des **Abschlussprojekts App-Entwicklung am Syntax Institut** entwickelt wurde.  
-Sie dient als White-Label-Grundlage für digitale Kundenbindungs-Apps im Lebensmittelhandwerk (z. B. Bäckereien, Metzgereien, Hofläden).
+**TreueBiss** ist das Produkt von **byte & Handwerk** für Betriebe im Lebensmittelhandwerk — Bäckereien, Metzgereien, Hofläden, Feinkost und ähnliche Betriebe.  
+Entstanden ist es als native Android-App und Minimum Viable Product (MVP) im Rahmen des **Abschlussprojekts App-Entwicklung am Syntax Institut**; die White-Label-Grundlage daraus trägt das Produkt bis heute.
 
 ## Ziel der App
 
-Handwerksbetrieben im Lebensmittelbereich eine **einfache, sofort einsetzbare digitale Stempelkarte** zu bieten – als Ersatz oder Ergänzung zur klassischen Papierkarte. Die App soll die Kundenbindung stärken und Promotions vereinfachen.
+Betrieben im Lebensmittelhandwerk eine **einfache, sofort einsetzbare digitale Stempelkarte** zu bieten – als Ersatz oder Ergänzung zur klassischen Papierkarte. Die App soll die Kundenbindung stärken und Promotions vereinfachen.
 
 ## Problemstellung
 
@@ -54,8 +54,8 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
   gespeichert), Rechtliches, App-Version. Einträge ohne Funktion wurden entfernt
   statt vorgetäuscht — „Abmelden" wäre sogar schädlich gewesen, weil es die
   anonyme Identität und damit alle Stempel verwirft.
-- [x] **Rechtliche Seiten zentral:** Anbieter der App ist TreueBiss, die Betriebe
-  sind Kunden — also stehen Impressum, Datenschutz, Datenschutz in der App und
+- [x] **Rechtliche Seiten zentral:** Anbieter der App ist byte & Handwerk, die
+  Betriebe sind Kunden — also stehen Impressum, Datenschutz, Datenschutz in der App und
   AGB einmal zentral in `res/values/legal.xml` und nicht pro Betrieb im Backend.
   Leere Adressen blenden den jeweiligen Eintrag aus; der Abschnitt „Rechtliches"
   verschwindet ganz, solange keine einzige Seite hinterlegt ist.

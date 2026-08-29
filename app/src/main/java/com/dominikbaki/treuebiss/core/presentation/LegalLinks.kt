@@ -3,8 +3,8 @@ package com.dominikbaki.treuebiss.core.presentation
 /**
  * Die rechtlichen Seiten von TreueBiss.
  *
- * Zentral, nicht pro Betrieb: Anbieter der App ist TreueBiss, der Betrieb ist
- * Kunde. Die Adressen stehen in `res/values/legal.xml` und sind dort zunächst
+ * Zentral, nicht pro Betrieb: Anbieter der App ist byte & Handwerk, TreueBiss
+ * ist das Produkt, der Betrieb ist Kunde. Die Adressen stehen in `res/values/legal.xml` und sind dort zunächst
  * leer - die Einträge erscheinen in den Einstellungen erst, wenn eine Adresse
  * hinterlegt ist. Ein Menüpunkt, der ins Leere führt, wäre schlechter als
  * keiner.
