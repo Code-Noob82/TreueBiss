@@ -556,19 +556,28 @@ UI/ViewModels kommunizieren nur mit Repositories → bessere Testbarkeit & Austa
 
 ## Ausblick
 
-- [ ] **QR-Code-Scanner:** Integration ML Kit Barcode Scanning.
 - [ ] **Personalverwaltung im Dashboard:** Zugänge anlegen und Rollen vergeben
       kann bisher nur der Anbieter, weil dafür der Service-Role-Key nötig ist.
-- [ ] **Kassen-Seriennummern registrieren:** Voraussetzung dafür, dass
-      `issue_stamp` einen Beleg gegen die Kassen des Betriebs prüfen kann. Die
-      Nummer steht im Beleg-QR; die Prüfung dagegen gibt es noch nicht.
 - [ ] **Beleg-Scanner in der Android-App:** ML Kit Barcode Scanning. Die
       Web-App liest den QR bereits (BarcodeDetector, sonst jsQR), die
       serverseitige Prüfung steht — es fehlt der native Scanner.
 - [ ] **Einlösen serverseitig autorisieren:** Über die Kassenseite läuft das
       Einlösen bereits durch `staff_redeem_voucher`. Der Kunde kann seinen
       Gutschein aber weiterhin selbst als eingelöst markieren, solange der
-      Betrieb `requires_redeem_code` nicht setzt.
+      Betrieb `requires_redeem_code` nicht setzt. Laut Marktvalidierung kein
+      Kaufgrund — hier kein weiterer Aufwand, bis Wichtigeres steht.
+- [ ] **Rechtsseiten füllen:** `res/values/legal.xml` und
+      `web/app/config.js` sind leer ausgeliefert. **Vor einem Piloten mit
+      echten Nutzern müssen mindestens Impressum und Datenschutz stehen** —
+      Anbieter ist byte & Handwerk, nicht der Betrieb.
+- [ ] **Zweiter Vergabeweg (Tresen-QR):** Ein rotierender QR-Code am Tresen
+      oder Kundendisplay als gleichrangiger Weg neben dem Beleg-QR. Vier
+      Gründe, jeder für sich ausreichend: Der Beleg-QR ist nach § 6 Satz 2
+      KassenSichV optional und muss je Kasse eingeschaltet sein; in Bäckereien
+      bleiben die Bons überwiegend liegen; die Papier-Belegausgabepflicht
+      endet zum 01.01.2028; und selbst wo ein QR gedruckt wird, lässt er sich
+      nicht immer verifizieren (siehe Signaturprüfung). **Ohne diesen Weg
+      kann ein Betrieb ohne QR-Druck das Produkt gar nicht einsetzen.**
 - [ ] **Beitritt per Code:** Mehrere Betriebe in einer App.
 - [ ] **Pilotkunden-Rollout:** Erste White-Label-Instanzen für Partnerbetriebe.
 - [ ] **Erweiterte Analytics:** Nutzungsauswertung, Conversion-Tracking.
