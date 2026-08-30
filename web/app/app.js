@@ -165,9 +165,41 @@ function standLaden() {
 
 // ------------------------------------------------------------------ Anzeige
 
+/*
+ * Haengt das Manifest dieses Betriebs ein.
+ *
+ * Das statische Manifest hat `start_url: "./"` - ohne Betrieb. Wer die Seite
+ * so auf den Startbildschirm legt, startet spaeter ins Leere, und auf iOS
+ * gibt es keinen Ausweg: Eine Web-App auf dem Startbildschirm hat ihren
+ * eigenen Speicher, in dem weder ein gemerkter Betrieb noch eine
+ * Mitgliedschaft liegt. Das Manifest je Betrieb traegt den Betrieb in der
+ * `start_url` - und nebenbei den Namen des Betriebs statt "TreueBiss".
+ */
+async function manifestSetzen() {
+  const pfad = `./m/${betrieb.slug}.webmanifest`;
+  try {
+    // Erst nachsehen: Ohne den Bauschritt gibt es den Ordner nicht, und ein
+    // Verweis ins Leere waere schlechter als das allgemeine Manifest.
+    const da = await fetch(pfad, { method: 'HEAD' });
+    if (!da.ok) return;
+  } catch {
+    return;
+  }
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', pfad);
+  // Aeltere iOS-Fassungen lesen kein Manifest, aber diesen Titel.
+  let meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'apple-mobile-web-app-title');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', betrieb.name);
+}
+
 function allesZeichnen() {
   $('betrieb').textContent = betrieb.name;
   document.title = betrieb.name + ' – TreueBiss';
+  manifestSetzen();
   $('theme-farbe').setAttribute('content', paletteSetzen(betrieb.primary_color));
 
   if (betrieb.logo_url) {
