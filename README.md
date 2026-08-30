@@ -549,9 +549,23 @@ Zwei Zwecke enden zu verschiedenen Zeiten, also zwei Fristen je Betrieb:
 | `proof_retention_days` | 90 | Der Nachweis wird gelöscht |
 
 `cleanup_expired_proofs()` erledigt beides, ist nur für `service_role`
-freigegeben und folgenlos wiederholbar. **Sie läuft nicht von selbst** — es
-braucht einen Zeitplan (pg_cron oder ein geplanter Aufruf), sonst bleiben die
-Fristen Papier.
+freigegeben und folgenlos wiederholbar. Den Auslöser stellt **Supabase Cron**
+(pg_cron): täglich um **01:20 GMT**, also 02:20 Berliner Zeit im Winter und
+03:20 im Sommer — vor jeder Bäckerei-Öffnung. pg_cron plant in GMT, die
+Sommerzeit verschiebt den Lauf also um eine Stunde; für einen nächtlichen
+Aufräumlauf ohne Belang.
+
+Der Zeitplan wird beim Einspielen des Schemas gesetzt und vorher abgeräumt —
+was pg_cron bei einem schon vergebenen Jobnamen tut, ist nicht dokumentiert.
+Fehlt die Erweiterung, meldet das Schema es und läuft weiter; im lokalen
+Testpostgres gibt es sie nicht.
+
+Nachsehen, ob er lief:
+
+```sql
+select jobname, status, start_time, return_message
+  from cron.job_run_details order by start_time desc limit 5;
+```
 
 **Die Untergrenze ist abgeleitet, nicht gewählt.** Ein Beleg wird abgelehnt,
 sobald er älter ist als `proof_max_age_minutes` — diese Prüfung steht vor dem

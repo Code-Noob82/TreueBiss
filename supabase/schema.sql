@@ -1331,6 +1331,68 @@ begin
 end
 $$;
 
+/*
+ * Zeitplan fuer das Aufraeumen.
+ *
+ * Ohne Ausloeser bleibt die Loeschfrist Papier. Supabase Cron setzt auf
+ * pg_cron auf; die Erweiterung legt ein Schema `cron` an, und Jobs stehen
+ * danach in `cron.job`, ihre Laeufe in `cron.job_run_details`.
+ * (https://supabase.com/docs/guides/cron)
+ *
+ * Taeglich, weil die Fristen in Tagen zaehlen. 01:20 GMT liegt in Berlin bei
+ * 02:20 im Winter und 03:20 im Sommer - vor jeder Baeckerei-Oeffnung.
+ * pg_cron plant in GMT, die Sommerzeit verschiebt den Lauf also um eine
+ * Stunde. Fuer einen naechtlichen Aufraeumlauf ist das ohne Belang; erwaehnt,
+ * damit sich niemand ueber die Uhrzeit in job_run_details wundert.
+ *
+ * Alles ist eingeklammert, weil pg_cron nur auf Supabase existiert. Im
+ * Testpostgres gibt es die Erweiterung nicht, und das Schema muss dort
+ * trotzdem durchlaufen.
+ */
+do $$
+begin
+    if exists (select 1 from pg_extension where extname = 'pg_cron') then
+        return;
+    end if;
+    begin
+        create extension if not exists pg_cron;
+    exception when others then
+        -- Fehlende Rechte oder Erweiterung: kein Grund, das Schema abzubrechen.
+        raise notice 'pg_cron nicht verfuegbar (%). Zeitplan wird uebersprungen.', sqlerrm;
+    end;
+end
+$$;
+
+do $$
+declare
+    v_name text := 'treuebiss-nachweise-aufraeumen';
+begin
+    if not exists (select 1 from pg_extension where extname = 'pg_cron') then
+        raise notice 'Ohne pg_cron laeuft cleanup_expired_proofs() nicht von selbst.';
+        return;
+    end if;
+
+    /*
+     * Erst abraeumen, dann neu anlegen. Was pg_cron bei einem schon
+     * vergebenen Jobnamen tut, ist nicht dokumentiert - darauf zu bauen
+     * hiesse, den Zeitplan dem Zufall zu ueberlassen.
+     *
+     * `execute` statt direktem Aufruf, damit die Namen erst zur Laufzeit
+     * aufgeloest werden: Auf einer Datenbank ohne `cron`-Schema wuerde ein
+     * direkter Aufruf schon beim Uebersetzen scheitern.
+     */
+    if exists (select 1 from cron.job where jobname = v_name) then
+        execute format('select cron.unschedule(%L)', v_name);
+    end if;
+
+    execute format(
+        'select cron.schedule(%L, %L, %L)',
+        v_name, '20 1 * * *', 'select public.cleanup_expired_proofs();'
+    );
+    raise notice 'Zeitplan gesetzt: % taeglich 01:20 GMT', v_name;
+end
+$$;
+
 -- ================================================ Auswertung fuer den Piloten
 --
 -- Die Zahlen stammen aus den Tabellen, die ohnehin gefuehrt werden - es gibt

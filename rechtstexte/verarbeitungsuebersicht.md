@@ -146,9 +146,10 @@ Minimum.
 2. **Löschweg für den Kunden** (Art. 17). Ohne Konto gibt es niemanden, der
    einen Antrag stellen kann — außer über die App selbst, solange sie
    installiert ist. Eine Funktion „Karte löschen" fehlt.
-3. **Der Zeitplan.** `cleanup_expired_proofs()` läuft nicht von selbst; es
-   braucht einen Auslöser (pg_cron oder ein geplanter Aufruf). Ohne den
-   bleiben die Fristen Papier.
+3. ~~Der Zeitplan.~~ **Erledigt:** Supabase Cron ruft
+   `cleanup_expired_proofs()` täglich um 01:20 GMT auf. Die Läufe stehen in
+   `cron.job_run_details` — dort lässt sich im Zweifel belegen, dass gelöscht
+   wurde.
 
 ## 6. Rechtsgrundlagen — Vorschlag zur Prüfung
 
