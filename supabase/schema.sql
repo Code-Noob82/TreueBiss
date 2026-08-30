@@ -68,6 +68,21 @@ create table if not exists public.tenant_secrets (
 alter table public.tenant_secrets
     add column if not exists counter_secret text;
 
+/*
+ * Ein Betrieb kann ein Geheimnis haben, ohne einen Einloese-Code zu haben:
+ * Der Tresen-QR legt hier einen Schluessel an, lange bevor irgendjemand
+ * einen Code setzt. Solange die Spalte `not null` war, musste dafuer ''
+ * eingetragen werden - und '' ist fuer crypt() kein gueltiger Salt, sondern
+ * ein Fehler. Beim naechsten Einspielen brach das Schema deshalb mit
+ * "invalid salt" ab, sobald ein Betrieb den Tresen-QR eingeschaltet hatte.
+ *
+ * NULL ist hier auch inhaltlich das Richtige: "kein Code gesetzt" ist keine
+ * leere Zeichenkette. crypt() ist strikt und gibt bei NULL NULL zurueck -
+ * die Aufraeumschritte unten laufen daran vorbei, statt zu werfen.
+ */
+alter table public.tenant_secrets alter column redeem_code_hash drop not null;
+update public.tenant_secrets set redeem_code_hash = null where redeem_code_hash = '';
+
 -- Bestehende Projekte nachziehen: Das `create table if not exists` oben
 -- laesst eine vorhandene tenants-Tabelle unveraendert, also fehlt dort die
 -- Spalte. Muss vor allem stehen, was sie verwendet.
@@ -128,6 +143,10 @@ begin
            -- "1234" stand frueher im Repository und wurde von einer aelteren
            -- Fassung dieses Skripts jedem Betrieb ohne Code verpasst. Der
            -- zieht nicht mit um, er verschwindet.
+           -- Erst pruefen, dass ueberhaupt ein Hash dasteht: crypt() wirft
+           -- bei allem, was kein gueltiger Salt ist. Ein abgebrochenes
+           -- Schema ist ein schlimmerer Ausgang als ein uebersehener Code.
+           and redeem_code_hash like '$%'
            and extensions.crypt('1234', redeem_code_hash) <> redeem_code_hash
         on conflict (tenant_id) do nothing;
 
@@ -272,7 +291,10 @@ begin
     -- der Kunde selbst ein; das Personal prueft die Bestaetigung per Blick,
     -- oder scannt den QR an der Kasse.
     if v_requires then
-        if v_hash is null then
+        -- '' faengt hier mit ab: Aeltere Projekte koennen den leeren Hash
+        -- noch stehen haben, und crypt() wuerfe damit einen Datenbankfehler
+        -- statt einer Auskunft, die die Kasse anzeigen kann.
+        if v_hash is null or v_hash = '' then
             raise exception 'no redeem code configured for this tenant' using errcode = '22023';
         end if;
         if p_code is null or crypt(p_code, v_hash) <> v_hash then
@@ -386,7 +408,8 @@ insert into public.tenants (
 -- tenant_secrets gelandet ist als ueber den Umzug oben. Nur Hashes, die
 -- genau darauf passen; ein selbst gesetzter Code bleibt unangetastet.
 delete from public.tenant_secrets
- where extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
+ where redeem_code_hash like '$%'
+   and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
 
 -- ----------------------------------------------------------------- Stempel
 create table if not exists public.stamps (
@@ -1327,7 +1350,7 @@ begin
     -- Schalter, der nichts tut.
     if coalesce(p_counter_enabled, false) then
         insert into public.tenant_secrets (tenant_id, redeem_code_hash, counter_secret)
-        values (p_tenant_id, '', encode(extensions.gen_random_bytes(32), 'hex'))
+        values (p_tenant_id, null, encode(extensions.gen_random_bytes(32), 'hex'))
             on conflict (tenant_id) do update
             set counter_secret = coalesce(public.tenant_secrets.counter_secret,
                                           encode(extensions.gen_random_bytes(32), 'hex'));
@@ -1394,7 +1417,18 @@ begin
         raise exception 'not owner of this tenant' using errcode = '42501';
     end if;
     update public.tenants set requires_redeem_code = false where id = p_tenant_id;
-    delete from public.tenant_secrets where tenant_id = p_tenant_id;
+
+    -- Nur den Code entfernen, nicht die Zeile: In derselben Zeile liegt der
+    -- Schluessel des Tresen-QR. Ihn mitzuloeschen machte jeden gerade
+    -- gezeigten Code ungueltig - und zwar lautlos, denn der Schalter bliebe
+    -- an und counter_token() gaebe einfach nichts mehr zurueck.
+    update public.tenant_secrets
+       set redeem_code_hash = null, updated_at = now()
+     where tenant_id = p_tenant_id;
+
+    -- Bleibt nichts uebrig, kann die Zeile weg.
+    delete from public.tenant_secrets
+     where tenant_id = p_tenant_id and counter_secret is null;
 end;
 $$;
 

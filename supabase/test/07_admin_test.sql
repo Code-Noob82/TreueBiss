@@ -520,3 +520,111 @@ begin
     raise notice '--- Gültigkeitszeitraum der Angebote bestanden ---';
 end
 $$;
+
+-- ============================================================================
+-- Tresen-Schlüssel und Einlöse-Code teilen sich eine Zeile
+--
+-- Beide liegen in `tenant_secrets`, weil auf diese Tabelle niemand kommt.
+-- Dass sie sich eine Zeile teilen, hat aber zweimal wehgetan:
+--
+--   1. Der Tresen-QR trug '' als Hash ein, weil die Spalte `not null` war.
+--      '' ist fuer crypt() kein Salt, sondern ein Fehler - das Einspielen
+--      des Schemas brach danach mit "invalid salt" ab.
+--   2. Das Entfernen des Einloese-Codes loeschte die ganze Zeile und nahm
+--      den Tresen-Schluessel mit. Lautlos: Der Schalter blieb an.
+-- ============================================================================
+do $$
+declare
+    v_tenant  uuid;
+    v_chef    uuid;
+    v_zeilen  int;
+    v_hash    text;
+    v_schl    text;
+    v_danach  text;
+    v_code    text;
+begin
+    insert into public.tenants (slug, name) values ('geheimnis-test', 'Schlüsselbetrieb')
+    returning id into v_tenant;
+    insert into auth.users default values returning id into v_chef;
+    insert into public.tenant_staff (user_id, tenant_id, role) values (v_chef, v_tenant, 'owner');
+
+    call auth.become(v_chef);
+    set local role authenticated;
+
+    -- ---------------------------------------------- Kein leerer Hash
+    perform public.owner_update_proof_rules(v_tenant, 120, 0, 25, false, true, false, true, 60);
+    reset role;
+
+    select redeem_code_hash, counter_secret into v_hash, v_schl
+      from public.tenant_secrets where tenant_id = v_tenant;
+    call test.check(v_schl is not null, 'Der Tresen-QR legt einen Schlüssel an');
+    call test.check(v_hash is null,
+        'Ohne Einlösecode steht dort NULL und nicht die leere Zeichenkette');
+
+    /*
+     * Der eigentliche Ausloeser: Genau diese Anweisung steht in schema.sql
+     * und lief bei jedem Einspielen. Mit '' im Hash warf sie 22023 und riss
+     * das ganze Skript mit. Hier steht sie noch einmal, damit ein spaeter
+     * entfernter Schutz sofort auffaellt.
+     */
+    delete from public.tenant_secrets
+     where redeem_code_hash like '$%'
+       and extensions.crypt('1234', redeem_code_hash) = extensions.crypt('1234', redeem_code_hash);
+    select count(*) into v_zeilen from public.tenant_secrets where tenant_id = v_tenant;
+    call test.check(v_zeilen = 1, 'Das Aufräumen des Demo-Codes stolpert nicht über die Zeile');
+
+    -- Und dasselbe gegen einen Altbestand, in dem das '' noch steht.
+    update public.tenant_secrets set redeem_code_hash = '' where tenant_id = v_tenant;
+    delete from public.tenant_secrets
+     where redeem_code_hash like '$%'
+       and extensions.crypt('1234', redeem_code_hash) = redeem_code_hash;
+    call test.check(true, 'Auch ein alter leerer Hash bringt das Aufräumen nicht zu Fall');
+    update public.tenant_secrets set redeem_code_hash = null where tenant_id = v_tenant;
+
+    -- ---------------------------------------------- Code setzen und wieder entfernen
+    call auth.become(v_chef);
+    set local role authenticated;
+
+    perform public.owner_set_redeem_code(v_tenant, 'sonntagsbroetchen');
+    reset role;
+    select redeem_code_hash, counter_secret into v_hash, v_danach
+      from public.tenant_secrets where tenant_id = v_tenant;
+    call test.check(v_hash is not null, 'Der Einlösecode kommt in dieselbe Zeile');
+    call test.check(v_danach = v_schl, 'Das Setzen des Codes lässt den Schlüssel in Ruhe');
+
+    call auth.become(v_chef);
+    set local role authenticated;
+    perform public.owner_clear_redeem_code(v_tenant);
+    reset role;
+
+    select redeem_code_hash, counter_secret into v_hash, v_danach
+      from public.tenant_secrets where tenant_id = v_tenant;
+    call test.check(v_hash is null, 'Das Entfernen räumt den Code weg');
+    call test.check(v_danach = v_schl, 'Der Tresen-Schlüssel überlebt das Entfernen');
+
+    -- Der Beweis, dass das nicht nur in der Spalte steht: Der Code laeuft.
+    call auth.become(v_chef);
+    set local role authenticated;
+    select token into v_code from public.staff_counter_token(v_tenant);
+    reset role;
+    call test.check(v_code is not null and length(v_code) = 24,
+        'Der Tresen-QR gibt danach weiter einen Code aus');
+
+    -- ---------------------------------------------- Ohne Schlüssel darf die Zeile weg
+    update public.tenant_secrets set counter_secret = null where tenant_id = v_tenant;
+    call auth.become(v_chef);
+    set local role authenticated;
+    perform public.owner_set_redeem_code(v_tenant, 'sonntagsbroetchen');
+    perform public.owner_clear_redeem_code(v_tenant);
+    reset role;
+    select count(*) into v_zeilen from public.tenant_secrets where tenant_id = v_tenant;
+    call test.check(v_zeilen = 0, 'Bleibt nichts übrig, verschwindet die Zeile ganz');
+
+    -- ---------------------------------------------- Aufräumen
+    delete from public.tenant_staff where tenant_id = v_tenant;
+    delete from public.tenants where id = v_tenant;
+    delete from auth.users where id = v_chef;
+
+    raise notice '--- Tresen-Schlüssel und Einlöse-Code bestanden ---';
+end
+$$;
