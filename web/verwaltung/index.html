@@ -66,6 +66,8 @@
   .eintrag .text { flex: 1 1 16rem; min-width: 0; }
   .eintrag b { display: block; font-family: var(--display); font-weight: 600; }
   .eintrag small { color: var(--tinte-leise); }
+  /* Angebot ausserhalb seines Zeitraums - beim Kunden unsichtbar, hier nicht. */
+  .eintrag .ruht { color: var(--warn-text); font-weight: 600; }
   .eintrag .reihe { flex: 0 0 auto; }
 
   .schalter {
@@ -578,6 +580,10 @@ async function angeboteLaden() {
     .from('offers').select('*').eq('tenant_id', aktiv.id).order('created_at');
   if (error) { melden(fehlertext(error)); return; }
   const liste = data ?? [];
+  // Heute in Europe/Berlin als YYYY-MM-DD, damit der Vergleich mit den
+  // Datumsfeldern derselbe ist wie in der Policy. 'sv-SE' liefert genau
+  // dieses Format; das Land spielt dabei keine Rolle.
+  const tag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
   if (!liste.length) {
     $('angebote').innerHTML = '<p class="leer-text">Noch kein Angebot angelegt.</p>';
     return;
@@ -587,8 +593,18 @@ async function angeboteLaden() {
       ? `${a.valid_from ? datum(a.valid_from) : '…'} – ${a.valid_to ? datum(a.valid_to) : '…'}`
       : '';
     const unten = [a.description, zeitraum].filter(Boolean).map(h).join(' · ');
+    /*
+     * Ob das Angebot gerade beim Kunden steht, entscheidet die Policy
+     * `offers_read`. Der Betrieb liest ueber `offers_owner_read` auch das
+     * Abgelaufene - dann muss hier aber stehen, dass es ruht. Sonst sieht
+     * eine gepflegte Liste aus wie eine wirksame.
+     */
+    const ruht = a.valid_to && a.valid_to < tag ? 'für Kunden nicht mehr sichtbar'
+      : a.valid_from && a.valid_from > tag ? 'für Kunden noch nicht sichtbar'
+      : '';
+    const zeile = unten + (ruht ? `${unten ? ' · ' : ''}<span class="ruht">${ruht}</span>` : '');
     return `<div class="eintrag">
-      <div class="text"><b>${h(a.title)}</b>${unten ? `<small>${unten}</small>` : ''}</div>
+      <div class="text"><b>${h(a.title)}</b>${zeile ? `<small>${zeile}</small>` : ''}</div>
       <div class="reihe">
         <button class="still schmal" data-bearbeiten="${h(a.id)}">Bearbeiten</button>
         <button class="gefahr schmal" data-loeschen="${h(a.id)}">Löschen</button>

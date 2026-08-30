@@ -517,6 +517,20 @@ update public.tenant_staff set role = 'owner'
 Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
 Betrieb, der sich selbst abschaltet, ist ein Supportfall.
 
+**Der Zeitraum eines Angebots wird serverseitig durchgesetzt.** `offers_read`
+zeigt nur, was gerade läuft; leere Felder heißen offen, und Anfangs- wie
+Endtag zählen mit — ein Angebot „bis 31.08." steht am 31.08. noch da. Die
+Tagesgrenze liegt in `Europe/Berlin` und nicht in der Zeitzone der Sitzung,
+sonst begänne ein Angebot im Sommer schon um 22 Uhr des Vortags.
+
+Die Prüfung gehört in die Policy und nicht in die Abfrage der App: Sonst
+entschiede das Gerät darüber, was es sehen darf. Damit der Betrieb sein
+abgelaufenes Angebot trotzdem verlängern oder löschen kann, gibt es die
+zweite Policy `offers_owner_read` — zwei `select`-Policies auf derselben
+Tabelle werden mit ODER verknüpft. In der Verwaltung steht dann bei so einem
+Eintrag „für Kunden nicht mehr sichtbar", sonst sähe eine gepflegte Liste aus
+wie eine wirksame.
+
 **Warum Stammdaten über eine Funktion laufen und Angebote über Policies.**
 Angebote tragen nichts Schützenswertes, dort reichen Policies. Bei `tenants`
 würde eine `update`-Policy die ganze Zeile freigeben — Spaltenrechte gäbe es

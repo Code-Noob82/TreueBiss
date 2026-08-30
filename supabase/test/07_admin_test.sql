@@ -397,3 +397,126 @@ begin
     raise notice '--- Einlöse-Code aus der Verwaltung bestanden ---';
 end
 $$;
+
+-- ============================================================================
+-- Gueltigkeitszeitraum der Angebote
+--
+-- Die Verwaltung bietet Von- und Bis-Datum an. Bis diese Pruefung dazukam,
+-- taten sie nichts: `offers_read` fragte nur, ob der Betrieb aktiv ist, und
+-- die App las alles. Ein Angebot mit Enddatum von gestern stand weiter auf
+-- der Startseite des Kunden.
+-- ============================================================================
+do $$
+declare
+    v_tenant  uuid;
+    v_fremd   uuid;
+    v_chef    uuid;
+    v_gast    uuid;
+    v_heute   date;
+    v_zeilen  int;
+    v_hier    text[];
+    v_dort    text[];
+begin
+    -- Der Stichtag wird genauso bestimmt wie in der Policy. Mit `current_date`
+    -- haenge der Test an der Zeitzone der Sitzung und nicht an der Regel.
+    v_heute := (now() at time zone 'Europe/Berlin')::date;
+
+    insert into public.tenants (slug, name) values ('angebot-test', 'Zeitraumbetrieb')
+    returning id into v_tenant;
+    insert into public.tenants (slug, name) values ('angebot-fremd', 'Nachbarbetrieb')
+    returning id into v_fremd;
+
+    insert into auth.users default values returning id into v_chef;
+    insert into auth.users default values returning id into v_gast;
+    insert into public.tenant_staff (user_id, tenant_id, role) values (v_chef, v_tenant, 'owner');
+
+    insert into public.offers (tenant_id, title, valid_from, valid_to) values
+        (v_tenant, 'Immer',          null,                    null),
+        (v_tenant, 'Beginnt heute',  v_heute,                 null),
+        (v_tenant, 'Endet heute',    null,                    v_heute),
+        (v_tenant, 'Laeuft',         v_heute - 3,             v_heute + 3),
+        (v_tenant, 'Abgelaufen',     v_heute - 9,             v_heute - 1),
+        (v_tenant, 'Kommt erst',     v_heute + 1,             v_heute + 9);
+
+    -- ---------------------------------------------- Was der Kunde zu sehen bekommt
+    call auth.become(v_gast);
+    set local role authenticated;
+
+    select count(*) into v_zeilen from public.offers where tenant_id = v_tenant;
+    call test.check(v_zeilen = 4, 'Der Kunde sieht nur die vier laufenden Angebote');
+
+    select count(*) into v_zeilen from public.offers
+     where tenant_id = v_tenant and title = 'Abgelaufen';
+    call test.check(v_zeilen = 0, 'Ein abgelaufenes Angebot ist für den Kunden weg');
+
+    select count(*) into v_zeilen from public.offers
+     where tenant_id = v_tenant and title = 'Kommt erst';
+    call test.check(v_zeilen = 0, 'Ein künftiges Angebot ist noch nicht da');
+
+    -- Die Grenztage gehoeren dazu. Ein Angebot "bis 31.08." muss am 31.08.
+    -- noch stehen - alles andere ueberrascht den Betrieb und den Kunden.
+    select count(*) into v_zeilen from public.offers
+     where tenant_id = v_tenant and title in ('Beginnt heute', 'Endet heute');
+    call test.check(v_zeilen = 2, 'Anfangs- und Endtag zählen mit');
+
+    /*
+     * Die Tagesgrenze haengt an Europe/Berlin, nicht an der Zeitzone der
+     * Sitzung. Dafuer laufen zwei Zeitzonen 25 Stunden auseinander - deren
+     * Kalendertage sind zu jedem Zeitpunkt verschieden.
+     *
+     * Verglichen werden die Titel, nicht deren Anzahl: Die Angebote oben
+     * liegen symmetrisch um den heutigen Tag, deshalb gleicht sich ein
+     * verschobener Stichtag in der Summe aus. Mit `current_date` kaeme
+     * dieselbe Zahl heraus - nur eben aus anderen Angeboten. Genau daran
+     * ist diese Pruefung beim ersten Versuch vorbeigelaufen.
+     */
+    set local timezone = 'Pacific/Kiritimati';   -- UTC+14
+    select array_agg(title order by title) into v_hier
+      from public.offers where tenant_id = v_tenant;
+    set local timezone = 'Pacific/Midway';       -- UTC-11
+    select array_agg(title order by title) into v_dort
+      from public.offers where tenant_id = v_tenant;
+    set local timezone = 'UTC';
+    call test.check(v_hier = v_dort and array_length(v_hier, 1) = 4,
+        'Der Stichtag hängt an Europe/Berlin, nicht an der Sitzung');
+
+    reset role;
+
+    -- ---------------------------------------------- Was der Betrieb zu sehen bekommt
+    call auth.become(v_chef);
+    set local role authenticated;
+
+    -- Ohne diese zweite Policy verschwaende ein Angebot am Enddatum aus der
+    -- Verwaltung und liesse sich weder verlaengern noch loeschen.
+    select count(*) into v_zeilen from public.offers where tenant_id = v_tenant;
+    call test.check(v_zeilen = 6, 'Der Inhaber sieht auch das Abgelaufene');
+
+    update public.offers set valid_to = v_heute + 30
+     where tenant_id = v_tenant and title = 'Abgelaufen';
+    select count(*) into v_zeilen from public.offers
+     where tenant_id = v_tenant and title = 'Abgelaufen';
+    call test.check(v_zeilen = 1, 'Ein abgelaufenes Angebot lässt sich verlängern');
+
+    -- Die Leseerlaubnis des Inhabers gilt seinem Betrieb, nicht allen.
+    -- Angelegt wird das fremde Angebot ohne die eingeschraenkte Rolle - als
+    -- Inhaber ginge es gar nicht erst, das prueft weiter oben ein eigener
+    -- Fall. Hier geht es allein ums Lesen.
+    reset role;
+    insert into public.offers (tenant_id, title, valid_to)
+    values (v_fremd, 'Nachbars Ladenhüter', v_heute - 1);
+    set local role authenticated;
+    select count(*) into v_zeilen from public.offers
+     where tenant_id = v_fremd and title = 'Nachbars Ladenhüter';
+    call test.check(v_zeilen = 0, 'Der Inhaber sieht kein fremdes Altangebot');
+
+    reset role;
+
+    -- ---------------------------------------------- Aufräumen
+    delete from public.offers where tenant_id in (v_tenant, v_fremd);
+    delete from public.tenant_staff where tenant_id = v_tenant;
+    delete from public.tenants where id in (v_tenant, v_fremd);
+    delete from auth.users where id in (v_chef, v_gast);
+
+    raise notice '--- Gültigkeitszeitraum der Angebote bestanden ---';
+end
+$$;

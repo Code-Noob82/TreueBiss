@@ -489,9 +489,22 @@ drop policy if exists vouchers_insert_own      on public.vouchers;
 create policy tenants_read on public.tenants
     for select to authenticated using (is_active);
 
+-- Der Gueltigkeitszeitraum wird hier geprueft und nicht in der Abfrage der
+-- App: Sonst entschiede das Geraet darueber, was es sehen darf, und ein
+-- abgelaufenes Angebot liesse sich mit einem einzigen Aufruf wieder
+-- hervorholen. Leer heisst offen - ohne `valid_from` gilt es seit jeher,
+-- ohne `valid_to` bis auf Weiteres. Das Enddatum zaehlt mit: Ein Angebot
+-- "bis 31.08." steht am 31.08. noch da, alles andere ueberrascht den Betrieb.
+-- Die Tagesgrenze liegt in Europe/Berlin, sonst begaenne ein Angebot im
+-- Sommer schon um 22 Uhr des Vortags.
+-- Der Betrieb selbst sieht ueber `offers_owner_read` weiter alles.
 create policy offers_read on public.offers
     for select to authenticated using (
         exists (select 1 from public.tenants t where t.id = tenant_id and t.is_active)
+        and (valid_from is null
+             or valid_from <= (now() at time zone 'Europe/Berlin')::date)
+        and (valid_to is null
+             or valid_to >= (now() at time zone 'Europe/Berlin')::date)
     );
 
 -- Mitgliedschaften gehoeren dem Nutzer.
@@ -1130,9 +1143,21 @@ $$;
 -- Angebote tragen nichts Schuetzenswertes, deshalb reichen hier Policies;
 -- fuer tenants braucht es weiter unten eine Funktion, weil dort einzelne
 -- Spalten tabu bleiben muessen.
+drop policy if exists offers_owner_read   on public.offers;
 drop policy if exists offers_owner_insert on public.offers;
 drop policy if exists offers_owner_update on public.offers;
 drop policy if exists offers_owner_delete on public.offers;
+
+-- Die Verwaltung braucht die ganze Liste, auch das abgelaufene und das noch
+-- nicht begonnene Angebot - sonst verschwaende ein Angebot am Enddatum aus
+-- der Verwaltung und liesse sich weder verlaengern noch loeschen.
+-- Zwei select-Policies auf derselben Tabelle werden mit ODER verknuepft: Der
+-- Kunde sieht das laufende Fenster, der Betrieb seinen ganzen Bestand.
+-- Sie steht hier und nicht oben bei `offers_read`, weil `is_owner_of` erst
+-- in diesem Abschnitt entsteht.
+create policy offers_owner_read on public.offers
+    for select to authenticated
+    using (public.is_owner_of(tenant_id));
 
 create policy offers_owner_insert on public.offers
     for insert to authenticated
