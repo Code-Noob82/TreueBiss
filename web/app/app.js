@@ -583,6 +583,45 @@ async function umzugZeigen() {
   }
 }
 
+/*
+ * "Zu Google Wallet hinzufuegen".
+ *
+ * Das Save-JWT wird mit dem privaten Schluessel eines Google-Dienstkontos
+ * signiert - das kann nur der Server. Die Edge Function liefert den fertigen
+ * Link, geoeffnet wird er hier.
+ *
+ * Das Fenster wird vor dem Warten geoeffnet und danach umgelenkt: Safari
+ * blockiert ein window.open, das erst nach einem await kommt, weil es dann
+ * nicht mehr als Folge des Klicks gilt.
+ */
+async function zuGoogleWallet() {
+  if (!betrieb?.id) return;
+  const knopf = $('wallet-google');
+  const fenster = window.open('', '_blank');
+  beschaeftigt(knopf, true, 'Wird vorbereitet …');
+  try {
+    const { data, error } = await db.functions.invoke('wallet-google', {
+      body: { tenant_id: betrieb.id },
+    });
+    if (error || !data?.url) {
+      fenster?.close();
+      const grund = data?.fehler ?? error?.message ?? '';
+      melden(/eingerichtet/i.test(grund)
+        ? 'Google Wallet ist für TreueBiss noch nicht eingerichtet.'
+        : 'Der Wallet-Pass liess sich nicht erzeugen.');
+      console.error('wallet-google', error ?? data);
+      return;
+    }
+    if (fenster) fenster.location = data.url; else location.href = data.url;
+  } catch (e) {
+    fenster?.close();
+    console.error('wallet-google', e);
+    melden(istNetzfehler(e) ? 'Gerade keine Verbindung.' : 'Der Wallet-Pass liess sich nicht erzeugen.');
+  } finally {
+    beschaeftigt(knopf, false);
+  }
+}
+
 // ------------------------------------------------------------------ Scanner
 
 /*
@@ -684,6 +723,7 @@ $('scan-abbrechen').onclick = () => { scannerSchliessen(); melden(''); };
 $('beleg-senden').onclick = () => stempelHolen($('beleg').value);
 $('beleg').onkeydown = (e) => { if (e.key === 'Enter') stempelHolen($('beleg').value); };
 $('umzug-zeigen').onclick = umzugZeigen;
+$('wallet-google').onclick = zuGoogleWallet;
 
 function rechtlichesZeichnen() {
   const eintraege = [

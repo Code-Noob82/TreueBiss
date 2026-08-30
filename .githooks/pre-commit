@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# Haelt Zugangsdaten aus einem oeffentlichen Repository heraus.
+#
+# Muster nach Dateinamen sind immer umgehbar - Google benennt den
+# Dienstkonto-Schluessel nach dem Projekt, und niemand haelt einen davon ab,
+# die Datei umzubenennen. Deshalb wird hier der Inhalt geprueft.
+#
+# Zwei Signale statt einem: Ein Dokument, das ueber Dienstkonten schreibt,
+# nennt "type": "service_account" - es traegt aber kein Schluesselmaterial.
+# Die erste Fassung dieses Hakens hat genau daran das eigene README
+# abgewiesen.
+#
+# Einschalten:  git config core.hooksPath .githooks
+set -eu
+
+fund=0
+while IFS= read -r datei; do
+    inhalt="$(git show ":$datei" 2>/dev/null || true)"
+    [ -n "$inhalt" ] || continue
+
+    # 1. Eine echte Dienstkonto-JSON traegt beides: Kennung und Schluessel.
+    if printf '%s' "$inhalt" | grep -qE '"type"[[:space:]]*:[[:space:]]*"service_account"' \
+       && printf '%s' "$inhalt" | grep -qE '"private_key"[[:space:]]*:[[:space:]]*"'; then
+        echo "ABGEBROCHEN: $datei ist ein Dienstkonto-Schluessel."
+        fund=1
+        continue
+    fi
+
+    # 2. Ein PEM-Block mit tatsaechlichem Inhalt - eine erwaehnte Kopfzeile
+    #    allein reicht nicht, es muss Base64 dahinter stehen.
+    if printf '%s' "$inhalt" | grep -A2 -E 'BEGIN [A-Z ]*PRIVATE KEY' \
+       | grep -qE '^[A-Za-z0-9+/]{40,}={0,2}$'; then
+        echo "ABGEBROCHEN: $datei enthaelt einen privaten Schluessel."
+        fund=1
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "$fund" -ne 0 ]; then
+    cat <<'HINWEIS'
+
+Dieses Repository ist oeffentlich. Zugangsdaten gehoeren nach
+`supabase secrets set`, nicht in den Quelltext.
+
+Wenn es doch Absicht ist:  git commit --no-verify
+HINWEIS
+    exit 1
+fi

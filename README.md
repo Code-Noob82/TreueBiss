@@ -529,6 +529,27 @@ update public.tenant_staff set role = 'owner'
 Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
 Betrieb, der sich selbst abschaltet, ist ein Supportfall.
 
+### Zugangsdaten und dieses öffentliche Repository
+
+`Code-Noob82/TreueBiss` ist öffentlich. Ein hier abgelegter Dienstkonto-Schlüssel
+wäre binnen Minuten von Scannern gefunden, und ein Commit lässt sich nicht
+wirklich zurücknehmen. Schlüssel gehören nach `supabase secrets set`.
+
+Zwei Netze darunter:
+
+- `.gitignore` deckt die üblichen Namen ab, **einschließlich** der Form, die
+  Google beim Download vergibt (`<projekt-id>-<12 Hexzeichen>.json`).
+- `.githooks/pre-commit` prüft den **Inhalt** jeder eingecheckten Datei auf
+  `"type": "service_account"` und auf `BEGIN … PRIVATE KEY`. Muster nach
+  Dateinamen sind umgehbar — eine umbenannte Datei nicht.
+
+Der Haken muss einmal je Arbeitskopie eingeschaltet werden, denn Git
+versioniert seine Hooks nicht:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ### Der Kartenschlüssel
 
 Bis hierher lebte eine Karte ausschließlich in der anonymen Sitzung im
