@@ -224,6 +224,19 @@
             <input id="a-bis" type="date">
           </div>
         </div>
+        <label class="schalter">
+          <input id="a-einloesbar" type="checkbox">
+          <span><b>Als Coupon einlösbar</b><br>
+            Der Kunde kann das Angebot in der App einlösen. Ohne Haken ist es
+            ein Aushang, der nur angezeigt wird.</span>
+        </label>
+        <div id="a-limit-huelle" class="verborgen">
+          <label for="a-limit">Wie oft je Kunde</label>
+          <select id="a-limit">
+            <option value="einmal">Einmal im ganzen Zeitraum</option>
+            <option value="taeglich">Einmal pro Tag</option>
+          </select>
+        </div>
         <div class="reihe">
           <button id="a-speichern">Angebot anlegen</button>
           <button id="a-abbrechen" class="still verborgen">Bearbeiten abbrechen</button>
@@ -586,10 +599,16 @@ async function zahlenLaden() {
 }
 
 async function angeboteLaden() {
-  const { data, error } = await db
-    .from('offers').select('*').eq('tenant_id', aktiv.id).order('created_at');
+  // Die Einloesungen gleich mit: Ein Betrieb, der einen Coupon ausgibt, will
+  // als Erstes wissen, ob ihn jemand nimmt.
+  const [{ data, error }, { data: eingeloest }] = await Promise.all([
+    db.from('offers').select('*').eq('tenant_id', aktiv.id).order('created_at'),
+    db.from('offer_redemptions').select('offer_id').eq('tenant_id', aktiv.id),
+  ]);
   if (error) { melden(fehlertext(error)); return; }
   const liste = data ?? [];
+  const zaehler = (eingeloest ?? []).reduce((m, e) => m.set(e.offer_id, (m.get(e.offer_id) ?? 0) + 1),
+                                            new Map());
   // Heute in Europe/Berlin als YYYY-MM-DD, damit der Vergleich mit den
   // Datumsfeldern derselbe ist wie in der Policy. 'sv-SE' liefert genau
   // dieses Format; das Land spielt dabei keine Rolle.
@@ -612,7 +631,18 @@ async function angeboteLaden() {
     const ruht = a.valid_to && a.valid_to < tag ? 'für Kunden nicht mehr sichtbar'
       : a.valid_from && a.valid_from > tag ? 'für Kunden noch nicht sichtbar'
       : '';
-    const zeile = unten + (ruht ? `${unten ? ' · ' : ''}<span class="ruht">${ruht}</span>` : '');
+    /*
+     * Ein Aushang bekommt keinen Vermerk - das ist der Normalfall und
+     * braucht kein Etikett. Beim Coupon steht die Regel da, weil sie sich
+     * spaeter nicht mehr aus der Liste ablesen liesse.
+     */
+    const coupon = a.is_redeemable
+      ? `Coupon, ${a.redeem_limit === 'taeglich' ? 'einmal am Tag' : 'einmal je Kunde'}`
+        + ` · ${zaehler.get(a.id) ?? 0}× eingelöst`
+      : '';
+    const teile = [unten, coupon ? h(coupon) : ''].filter(Boolean);
+    const zeile = teile.join(' · ')
+      + (ruht ? `${teile.length ? ' · ' : ''}<span class="ruht">${ruht}</span>` : '');
     return `<div class="eintrag">
       <div class="text"><b>${h(a.title)}</b>${zeile ? `<small>${zeile}</small>` : ''}</div>
       <div class="reihe">
@@ -672,6 +702,9 @@ function angebotInsFormular(a) {
   $('a-bild').value = a.image_url ?? '';
   $('a-von').value = a.valid_from ?? '';
   $('a-bis').value = a.valid_to ?? '';
+  $('a-einloesbar').checked = !!a.is_redeemable;
+  $('a-limit').value = a.redeem_limit ?? 'einmal';
+  limitFeldZeigen();
   $('a-speichern').textContent = 'Änderung speichern';
   $('a-abbrechen').classList.remove('verborgen');
   $('a-titel').focus();
@@ -680,6 +713,9 @@ function angebotInsFormular(a) {
 function angebotFormularLeeren() {
   bearbeitet = null;
   ['a-titel', 'a-text', 'a-bild', 'a-von', 'a-bis'].forEach((id) => { $(id).value = ''; });
+  $('a-einloesbar').checked = false;
+  $('a-limit').value = 'einmal';
+  limitFeldZeigen();
   $('a-speichern').textContent = 'Angebot anlegen';
   $('a-abbrechen').classList.add('verborgen');
 }
@@ -827,6 +863,8 @@ $('a-speichern').onclick = async () => {
     image_url: $('a-bild').value.trim() || null,
     valid_from: von,
     valid_to: bis,
+    is_redeemable: $('a-einloesbar').checked,
+    redeem_limit: $('a-limit').value,
   };
 
   beschaeftigt($('a-speichern'), true, 'Wird gespeichert …');
@@ -840,6 +878,16 @@ $('a-speichern').onclick = async () => {
   angebotFormularLeeren();
   await angeboteLaden();
 };
+
+/*
+ * Die Haeufigkeit ist nur eine Frage, wenn ueberhaupt eingeloest wird. Steht
+ * sie auch beim Aushang da, sieht das Formular nach einer Entscheidung aus,
+ * die gar keine ist.
+ */
+function limitFeldZeigen() {
+  $('a-limit-huelle').classList.toggle('verborgen', !$('a-einloesbar').checked);
+}
+$('a-einloesbar').onchange = limitFeldZeigen;
 
 $('a-abbrechen').onclick = () => { angebotFormularLeeren(); melden(''); };
 

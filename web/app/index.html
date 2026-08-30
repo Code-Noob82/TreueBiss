@@ -159,6 +159,13 @@
   .angebot:first-child { padding-top: 0; border-top: 0; }
   .angebot b { display: block; font-family: var(--display); font-weight: 600; }
   .angebot span { font-size: var(--t-klein); color: var(--tinte-leise); }
+  .angebot button { margin: var(--s3) 0 0; }
+  /* Eingeloest heisst nicht weg: Der Kunde soll sehen, dass er ihn hatte. */
+  .angebot.verbraucht b, .angebot.verbraucht span { opacity: .55; }
+  .angebot .vermerk {
+    margin: var(--s2) 0 0; font-size: var(--t-klein);
+    font-weight: 600; color: var(--gut-text);
+  }
 
   .fuss {
     max-width: 460px; margin: var(--s2) auto 0; padding: 0 var(--s5);

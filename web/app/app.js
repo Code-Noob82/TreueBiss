@@ -25,6 +25,7 @@ let nutzerId = null;       // die anonyme Identitaet dieses Browsers
 let betrieb = null;          // Zeile aus tenants
 let stempel = 0;
 let gutscheine = [];
+let einloesungen = [];   // eingeloeste Coupons dieses Kunden
 let scanLaeuft = false;
 let sammelnLaeuft = false;
 /** Index des gerade gesetzten Stempels - nur der wird animiert. */
@@ -102,10 +103,18 @@ function istNetzfehler(fehler) {
 function fehlertext(fehler) {
   if (istNetzfehler(fehler)) return 'Gerade keine Verbindung. Bitte später noch einmal.';
   const t = (fehler?.message ?? '') + (fehler?.details ?? '');
+  // Muss vor der allgemeinen 23505-Pruefung stehen: Ein bereits eingeloester
+  // Coupon meldet denselben Code, ist aber kein doppelter Beleg.
+  if (/offer already redeemed/i.test(t)) return 'Dieses Angebot hast du schon eingelöst.';
   // Derselbe Beleg zaehlt nur einmal - das ist kein Fehler des Kunden,
   // deshalb hier auch kein Fehlerton.
   if (fehler?.code === '23505' || /duplicate key|stamp_proofs/i.test(t)) {
     return 'Dieser Beleg wurde schon gezählt.';
+  }
+  if (/offer not redeemable/i.test(t)) return 'Dieses Angebot lässt sich nicht einlösen.';
+  if (/offer not valid today/i.test(t)) return 'Dieses Angebot gilt heute nicht.';
+  if (/no membership for this tenant/i.test(t)) {
+    return 'Dafür brauchst du erst eine Karte bei diesem Betrieb.';
   }
   if (/proof reference required/i.test(t)) return 'Da war keine Belegnummer dabei.';
   if (/unknown or inactive tenant/i.test(t)) return 'Dieser Betrieb nimmt gerade nicht teil.';
@@ -328,13 +337,51 @@ function laeuft(a, tag = heute()) {
   return (!a.valid_from || a.valid_from <= tag) && (!a.valid_to || a.valid_to >= tag);
 }
 
+/*
+ * Ist dieser Coupon fuer heute verbraucht?
+ *
+ * Dieselbe Rechnung wie in `redeem_offer`: Bei 'taeglich' sperrt der Tag, bei
+ * 'einmal' ein Wert, der kein Tag ist. Was hier herauskommt, ist nur die
+ * Anzeige - die Sperre selbst steht im Eindeutigkeitsschluessel der Tabelle
+ * und gilt auch dann, wenn dieser Code luegt.
+ */
+function verbraucht(a) {
+  const schluessel = a.redeem_limit === 'taeglich' ? heute() : '-infinity';
+  return einloesungen.some((e) => e.offer_id === a.id && e.sperre === schluessel);
+}
+
 function angeboteZeichnen(liste) {
   liste = liste?.filter((a) => laeuft(a));
   if (!liste?.length) { $('angebote-bereich').classList.add('verborgen'); return; }
-  $('angebote').innerHTML = liste.map((a) => `<div class="angebot">
+  $('angebote').innerHTML = liste.map((a) => {
+    if (!a.is_redeemable) {
+      return `<div class="angebot">
+        <b>${h(a.title)}</b>
+        ${a.description ? `<span>${h(a.description)}</span>` : ''}
+      </div>`;
+    }
+    const weg = verbraucht(a);
+    // Beim taeglichen Coupon ist "heute" die ganze Auskunft: Morgen steht er
+    // wieder da, und das soll der Kunde auch lesen koennen.
+    const vermerk = weg
+      ? (a.redeem_limit === 'taeglich' ? 'Heute schon eingelöst' : 'Eingelöst')
+      : '';
+    return `<div class="angebot${weg ? ' verbraucht' : ''}">
       <b>${h(a.title)}</b>
       ${a.description ? `<span>${h(a.description)}</span>` : ''}
-    </div>`).join('');
+      ${weg ? `<p class="vermerk">${vermerk}</p>` : `
+        <div id="acode-${h(a.id)}" class="verborgen">
+          <label for="acode-feld-${h(a.id)}">Einlöse-Code</label>
+          <input id="acode-feld-${h(a.id)}" autocapitalize="off" spellcheck="false"
+                 placeholder="Die Verkaufskraft tippt ihn ein">
+        </div>
+        <button class="still schmal" data-angebot="${h(a.id)}">Einlösen</button>`}
+    </div>`;
+  }).join('');
+
+  $('angebote').querySelectorAll('[data-angebot]').forEach((k) => {
+    k.onclick = () => angebotEinloesen(k.dataset.angebot);
+  });
   $('angebote-bereich').classList.remove('verborgen');
 }
 
@@ -356,14 +403,18 @@ async function datenHolen() {
     { ignoreDuplicates: true, onConflict: 'user_id,tenant_id' });
   if (mFehler) throw mFehler;
 
-  const [{ count }, { data: gs }, { data: an }] = await Promise.all([
+  const [{ count }, { data: gs }, { data: an }, { data: el }] = await Promise.all([
     db.from('stamps').select('id', { count: 'exact', head: true }).eq('tenant_id', betrieb.id),
     db.from('vouchers').select('*').eq('tenant_id', betrieb.id).eq('is_redeemed', false),
     db.from('offers').select('*').eq('tenant_id', betrieb.id).order('created_at'),
+    // Die Policy laesst nur die eigenen durch, ein Filter auf den Nutzer
+    // waere hier bloss Zierde.
+    db.from('offer_redemptions').select('offer_id, sperre').eq('tenant_id', betrieb.id),
   ]);
 
   stempel = count ?? 0;
   gutscheine = gs ?? [];
+  einloesungen = el ?? [];
   standSichern();
   allesZeichnen();
   angeboteZeichnen(an);
@@ -448,6 +499,35 @@ async function einloesen(gutscheinId) {
   });
   beschaeftigt(knopf, false);
   if (error) { console.error('redeem_voucher', error); melden(fehlertext(error)); return; }
+  await datenHolen();
+  melden('Eingelöst. Guten Appetit!', true);
+}
+
+/*
+ * Coupon einloesen. Bewusst derselbe Ablauf wie beim Gutschein: Verlangt der
+ * Betrieb einen Code, erscheint erst das Feld und dann wird gesendet. Ein
+ * Kunde soll nicht zwei verschiedene Regeln erleben, je nachdem was er
+ * gerade einloest.
+ */
+async function angebotEinloesen(angebotId) {
+  const feld = $(`acode-feld-${angebotId}`);
+  const huelle = $(`acode-${angebotId}`);
+
+  if (betrieb.requires_redeem_code && huelle?.classList.contains('verborgen')) {
+    huelle.classList.remove('verborgen');
+    feld?.focus();
+    melden('Bitte lass die Verkaufskraft den Einlöse-Code eingeben.');
+    return;
+  }
+  const code = betrieb.requires_redeem_code ? (feld?.value.trim() || null) : null;
+  if (betrieb.requires_redeem_code && !code) { melden('Es fehlt der Einlöse-Code.'); return; }
+
+  melden('');
+  const knopf = $('angebote').querySelector(`[data-angebot="${angebotId}"]`);
+  beschaeftigt(knopf, true, 'Wird eingelöst …');
+  const { error } = await db.rpc('redeem_offer', { p_offer_id: angebotId, p_code: code });
+  beschaeftigt(knopf, false);
+  if (error) { console.error('redeem_offer', error); melden(fehlertext(error)); return; }
   await datenHolen();
   melden('Eingelöst. Guten Appetit!', true);
 }

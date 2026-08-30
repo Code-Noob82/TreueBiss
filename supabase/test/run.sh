@@ -108,11 +108,12 @@ run_scenario() {
         yes)      files=("$T/03_upgrade_test.sql") ;;
         # Nach dem Upgrade muss die volle Funktion stehen, nicht nur das Schema.
         previous) files=("$T/01_issue_stamp_test.sql" "$T/04_redeem_test.sql"
-                          "$T/07_admin_test.sql" "$T/08_proof_test.sql") ;;
+                          "$T/07_admin_test.sql" "$T/08_proof_test.sql"
+                          "$T/09_coupon_test.sql") ;;
         *)        files=("$T/01_issue_stamp_test.sql" "$T/02_rls_test.sql"
                           "$T/04_redeem_test.sql" "$T/05_telemetry_test.sql"
                           "$T/06_staff_test.sql" "$T/07_admin_test.sql"
-                          "$T/08_proof_test.sql") ;;
+                          "$T/08_proof_test.sql" "$T/09_coupon_test.sql") ;;
     esac
 
     # Ausgabe erst in eine Datei, dann filtern. Direkt durch die Pipe

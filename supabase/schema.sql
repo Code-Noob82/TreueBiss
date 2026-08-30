@@ -168,6 +168,66 @@ create table if not exists public.offers (
 );
 create index if not exists offers_tenant_idx on public.offers (tenant_id);
 
+/*
+ * Ein Angebot kann ein Aushang sein oder ein Coupon.
+ *
+ * `is_redeemable` steht mit Absicht auf false: Bestehende Angebote sind
+ * Aushaenge und duerfen durch das Einspielen nicht ploetzlich einloesbar
+ * werden. Der Betrieb schaltet das je Angebot ein.
+ *
+ * `redeem_limit` entscheidet, was eine Wiederholung ist - einmal ueber den
+ * ganzen Zeitraum oder einmal je Tag. Beides kommt in einer Baeckerei vor:
+ * der verbilligte Laib zur Einfuehrung gegen den Kaffee zum Broetchen.
+ */
+alter table public.offers
+    add column if not exists is_redeemable boolean not null default false;
+alter table public.offers
+    add column if not exists redeem_limit text not null default 'einmal';
+
+do $$
+begin
+    alter table public.offers add constraint offers_redeem_limit_check
+        check (redeem_limit in ('einmal', 'taeglich'));
+exception when duplicate_object then null;
+end
+$$;
+
+/*
+ * Verbrauchte Coupons. Eine Zeile je Einloesung.
+ *
+ * Warum ueberhaupt eine eigene Tabelle: Der Anspruch aus einem Coupon
+ * gehoert dem Kunden, sein Verbrauch aber dem Betrieb. Laege der Status auf
+ * dem Geraet, waere er nach einer Neuinstallation zurueck - genau die
+ * Luecke, die in einer produktiven Baeckerei-App seit Jahren steht.
+ */
+create table if not exists public.offer_redemptions (
+    id          uuid primary key default gen_random_uuid(),
+    offer_id    uuid not null references public.offers(id)   on delete cascade,
+    user_id     uuid not null references auth.users(id)      on delete cascade,
+    tenant_id   uuid not null references public.tenants(id)  on delete cascade,
+    redeemed_at timestamptz not null default now(),
+    /*
+     * Der Schluessel, der eine Wiederholung sperrt - nicht das Datum der
+     * Einloesung, das steht in redeemed_at.
+     *
+     * Bei 'taeglich' ist es der Tag in Europe/Berlin, bei 'einmal' ein Wert,
+     * der kein Tag sein kann. Dann kollidiert jede zweite Einloesung mit der
+     * ersten, ganz gleich wann sie kommt. So steht die Regel im Index und
+     * nicht bloss in der Funktion, die ihn fuellt.
+     *
+     * Stellt ein Betrieb mitten im Zeitraum von 'taeglich' auf 'einmal' um,
+     * hat ein Kunde mit alten Tageszeilen noch eine Einloesung frei. Das ist
+     * gewollt: Eine geaenderte Regel wirkt nach vorn, sie nimmt niemandem
+     * rueckwirkend etwas weg.
+     */
+    sperre      date not null,
+    unique (offer_id, user_id, sperre)
+);
+create index if not exists offer_redemptions_user_idx
+    on public.offer_redemptions (user_id, offer_id);
+create index if not exists offer_redemptions_tenant_idx
+    on public.offer_redemptions (tenant_id, redeemed_at);
+
 -- ----------------------------------------------------------- Mitgliedschaft
 -- Haelt fest, bei welchen Betrieben ein Nutzer sammelt. Auch im Ein-Betrieb-
 -- Build vorhanden, damit die RLS-Policies unten einheitlich greifen.
@@ -312,6 +372,112 @@ $$;
 
 revoke all on function public.redeem_voucher(uuid, text) from public;
 grant execute on function public.redeem_voucher(uuid, text) to authenticated;
+
+/*
+ * Loest ein Angebot ein, das der Betrieb als Coupon freigegeben hat.
+ *
+ * Der Unterschied zum Gutschein: Ein Gutschein ist erarbeitet und gehoert
+ * genau einem Kunden, ein Coupon wird ausgegeben und steht allen offen. Was
+ * beide teilen, ist die Stelle, an der ueber den Verbrauch entschieden wird -
+ * hier, nicht auf dem Geraet.
+ *
+ * Laeuft als security definer: Die App hat auf offer_redemptions kein
+ * Schreibrecht. Koennte sie schreiben, koennte sie auch loeschen.
+ *
+ * Fehlercodes:
+ *   42501  falscher Einloese-Code
+ *   23505  von diesem Kunden bereits eingeloest
+ *   22023  unbekannt, nicht einloesbar, ausserhalb des Zeitraums,
+ *          oder der Kunde gehoert nicht zu diesem Betrieb
+ */
+create or replace function public.redeem_offer(
+    p_offer_id uuid,
+    p_code     text default null
+)
+returns table (redemption_id uuid, redeemed_at timestamptz)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_user     uuid := auth.uid();
+    v_tenant   uuid;
+    v_limit    text;
+    v_von      date;
+    v_bis      date;
+    v_heute    date := (now() at time zone 'Europe/Berlin')::date;
+    v_requires boolean;
+    v_hash     text;
+    v_sperre   date;
+    v_id       uuid;
+    v_zeit     timestamptz := now();
+begin
+    if v_user is null then
+        raise exception 'not signed in' using errcode = '42501';
+    end if;
+
+    -- Der Betrieb muss aktiv sein, das Angebot einloesbar. Beides in einem
+    -- Zug, damit ein abgeschalteter Betrieb nicht ueber seine alten Coupons
+    -- weiterlaeuft.
+    select o.tenant_id, o.redeem_limit, o.valid_from, o.valid_to
+      into v_tenant, v_limit, v_von, v_bis
+      from public.offers o
+      join public.tenants t on t.id = o.tenant_id
+     where o.id = p_offer_id and o.is_redeemable and t.is_active;
+
+    if v_tenant is null then
+        raise exception 'offer not redeemable' using errcode = '22023';
+    end if;
+
+    -- Derselbe Zeitraum wie in der Lese-Policy. Er steht hier ein zweites
+    -- Mal, weil security definer an der Policy vorbeilaeuft: Sonst liesse
+    -- sich ein abgelaufener Coupon ueber die Funktion noch einloesen.
+    if (v_von is not null and v_von > v_heute)
+       or (v_bis is not null and v_bis < v_heute) then
+        raise exception 'offer not valid today' using errcode = '22023';
+    end if;
+
+    -- Nur wer zu diesem Betrieb gehoert. Sonst sammelte ein Fremder Coupons
+    -- aus Betrieben ein, deren Karte er nie angefasst hat.
+    if not exists (select 1 from public.memberships m
+                    where m.user_id = v_user and m.tenant_id = v_tenant) then
+        raise exception 'no membership for this tenant' using errcode = '22023';
+    end if;
+
+    -- Verlangt der Betrieb einen Code zum Einloesen, gilt das hier genauso
+    -- wie beim Gutschein. Ein Kunde soll nicht zwei verschiedene Regeln
+    -- erleben, je nachdem was er gerade einloest.
+    select requires_redeem_code into v_requires
+      from public.tenants where id = v_tenant;
+    if v_requires then
+        select redeem_code_hash into v_hash
+          from public.tenant_secrets where tenant_id = v_tenant;
+        if v_hash is null or v_hash = '' then
+            raise exception 'no redeem code configured for this tenant' using errcode = '22023';
+        end if;
+        if p_code is null or crypt(p_code, v_hash) <> v_hash then
+            raise exception 'invalid redeem code' using errcode = '42501';
+        end if;
+    end if;
+
+    -- '-infinity' ist kein Tag und kann keiner werden. Bei 'einmal' stossen
+    -- deshalb alle Einloesungen desselben Kunden auf denselben Schluessel.
+    v_sperre := case when v_limit = 'taeglich' then v_heute else '-infinity'::date end;
+
+    begin
+        insert into public.offer_redemptions (offer_id, user_id, tenant_id, redeemed_at, sperre)
+        values (p_offer_id, v_user, v_tenant, v_zeit, v_sperre)
+        returning id into v_id;
+    exception when unique_violation then
+        raise exception 'offer already redeemed' using errcode = '23505';
+    end;
+
+    return query select v_id, v_zeit;
+end;
+$$;
+
+revoke all on function public.redeem_offer(uuid, text) from public;
+grant execute on function public.redeem_offer(uuid, text) to authenticated;
 
 -- ================================================ Kassenseite des Betriebs
 
@@ -487,6 +653,7 @@ alter table public.offers      enable row level security;
 alter table public.memberships enable row level security;
 alter table public.stamps      enable row level security;
 alter table public.vouchers    enable row level security;
+alter table public.offer_redemptions enable row level security;
 
 -- Bestehende Policies zuerst entfernen, damit dieses Skript auf einem schon
 -- eingerichteten Projekt wiederholbar ist.
@@ -506,6 +673,9 @@ drop policy if exists vouchers_update_own      on public.vouchers;
 drop policy if exists stamps_insert_own        on public.stamps;
 drop policy if exists stamps_delete_own        on public.stamps;
 drop policy if exists vouchers_insert_own      on public.vouchers;
+
+drop policy if exists offer_redemptions_select_own  on public.offer_redemptions;
+drop policy if exists offer_redemptions_staff_read  on public.offer_redemptions;
 
 -- Betriebe und Angebote sind ein Katalog: lesbar fuer alle Angemeldeten,
 -- aus der App nicht schreibbar.
@@ -529,6 +699,23 @@ create policy offers_read on public.offers
         and (valid_to is null
              or valid_to >= (now() at time zone 'Europe/Berlin')::date)
     );
+
+/*
+ * Eingeloeste Coupons: lesen ja, schreiben nein.
+ *
+ * Der Kunde muss sehen, was er verbraucht hat - sonst koennte die App den
+ * Zustand nur raten. Schreiben darf nur `redeem_offer`; gaebe es hier eine
+ * insert- oder delete-Policy, koennte die App eine Einloesung auch wieder
+ * zuruecknehmen und der ganze Aufwand waere umsonst.
+ */
+create policy offer_redemptions_select_own on public.offer_redemptions
+    for select to authenticated using (auth.uid() = user_id);
+
+-- Das Personal sieht die Einloesungen seines Betriebs - fuer die Zahlen in
+-- der Verwaltung und damit an der Kasse nachvollziehbar ist, was ein Kunde
+-- gerade vorzeigt.
+create policy offer_redemptions_staff_read on public.offer_redemptions
+    for select to authenticated using (public.is_staff_of(tenant_id));
 
 -- Mitgliedschaften gehoeren dem Nutzer.
 create policy memberships_select_own on public.memberships
