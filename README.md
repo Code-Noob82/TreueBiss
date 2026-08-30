@@ -388,33 +388,36 @@ Der Service Worker hält nur die Hülle vor; beim Ändern der Dateien muss
 `VERSION` in `web/app/sw.js` hoch, sonst behalten bestehende Installationen
 den alten Stand.
 
-**Grenze der White-Label-Idee:** Das Manifest ist statisch, die installierte
-App heißt deshalb „TreueBiss" und nicht wie der Betrieb. Farbe, Logo und
-Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
-nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
-es ausliefert.
+#### Ein Manifest je Betrieb
 
-Dieselbe Grenze hatte eine Folge, die beim Test auf dem Gerät aufflog:
-`start_url` ist ebenfalls statisch (`./`). Wer die Seite auf den
-Startbildschirm legt, öffnet danach eine Adresse **ohne** `?b=` — der Betrieb
-ging verloren, und die App meldete, es fehle einer. Deshalb merkt sie sich den
-zuletzt benutzten Betrieb: Die Adresse hat Vorrang, der gemerkte Wert springt
-nur ein, wenn sie nichts sagt. Kam er aus dem Gedächtnis, wird er per
-`history.replaceState` in die Adresse zurückgeschrieben, damit auch ein
-später gesetztes Lesezeichen ihn trägt.
+`start_url` im Manifest ist statisch. Wer die Seite auf den Startbildschirm
+legt, startet danach genau diese Adresse — **ohne** `?b=`, also ohne Betrieb.
 
-Das Gedächtnis allein reichte nicht: Beim allerersten Start vom
-Startbildschirm ist es noch leer — genau der Fall, wenn das Symbol schon lag,
-bevor der Betrieb je geladen wurde. Deshalb fragt die Seite dann den Server:
-**Wo sammelt dieser Browser schon?** Die eigenen `memberships` sind die
-bessere Quelle — sie überleben gelöschte Browserdaten. Bei genau einem Betrieb
-wird er stillschweigend genommen, bei mehreren erscheint eine Auswahl.
+Auf iOS ist das eine Sackgasse: Eine Web-App auf dem Startbildschirm hat ihren
+**eigenen Speicher**, getrennt von Safari. Weder ein gemerkter Betrieb noch
+eine Mitgliedschaft steht dort zur Verfügung — die Seite kann sich nicht selbst
+behelfen, egal wie clever der Rückfall ist. Zwei Anläufe über `localStorage`
+und über die eigenen `memberships` scheiterten genau daran.
 
-Nachgeschlagen wird nur, wenn schon eine Sitzung besteht. Wer die nackte
-Adresse ohne Anmeldung öffnet, hat ohnehin nichts nachzuschlagen — und dafür
-eigens ein anonymes Konto anzulegen wäre Datensammeln ohne Zweck.
+Deshalb erzeugt `scripts/manifeste-bauen.mjs` beim Veröffentlichen **ein
+Manifest je Betrieb** unter `web/app/m/<slug>.webmanifest`, mit
+`start_url: "../?b=<slug>"`. Die Seite hängt es ein, sobald der Betrieb
+bekannt ist. Nebenbei löst das die White-Label-Lücke: Die installierte App
+trägt jetzt den **Namen des Betriebs** und seine Farbe statt „TreueBiss".
 
-Die Reihenfolge ist also: Adresse, dann Gedächtnis, dann Mitgliedschaft.
+Die Manifeste sind nicht eingecheckt — sie entstehen aus den Daten des
+Backends und wären sofort veraltet, sobald ein Betrieb dazukommt oder sich
+umbenennt.
+
+> **Ein bereits abgelegtes Symbol übernimmt das nicht.** Es wurde mit dem
+> alten Manifest erzeugt und zeigt weiter auf `./`. Einmal entfernen und neu
+> hinzufügen.
+
+Die beiden Rückfälle bleiben als Netz für Lesezeichen und geteilte Links:
+**Adresse, dann Gedächtnis, dann Mitgliedschaft.** Nachgeschlagen wird nur bei
+bestehender Sitzung — wer die nackte Adresse ohne Anmeldung öffnet, hat
+ohnehin nichts nachzuschlagen, und dafür eigens ein anonymes Konto anzulegen
+wäre Datensammeln ohne Zweck.
 
 **Gemeinsame Grundlage.** Tokens, Schriften, Abstands- und Schriftstufung,
 Knöpfe, Formularfelder und Meldungen liegen einmal in `web/gemeinsam/basis.css`,

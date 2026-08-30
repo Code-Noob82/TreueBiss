@@ -30,3 +30,8 @@ local.properties
 
 # Werkzeug-Konfiguration, gehoert nicht zum Projekt
 .claude/
+
+# Manifeste je Betrieb. Entstehen beim Veroeffentlichen aus den Daten des
+# Backends - eingecheckt waeren sie sofort veraltet, sobald ein Betrieb
+# dazukommt oder sich umbenennt.
+web/app/m/

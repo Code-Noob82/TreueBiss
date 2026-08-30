@@ -31,6 +31,13 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Manifest je Betrieb erzeugen
+        # `start_url` im Manifest ist statisch. Ohne einen Eintrag je Betrieb
+        # startet die Seite vom Startbildschirm ohne Betrieb - auf iOS eine
+        # Sackgasse, weil eine Web-App dort ihren eigenen Speicher hat.
+        run: node scripts/manifeste-bauen.mjs
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
