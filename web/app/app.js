@@ -175,17 +175,38 @@ function standLaden() {
  * Mitgliedschaft liegt. Das Manifest je Betrieb traegt den Betrieb in der
  * `start_url` - und nebenbei den Namen des Betriebs statt "TreueBiss".
  */
+/*
+ * Zurueck auf das allgemeine Manifest.
+ *
+ * Das Schnipsel im head setzt den Verweis blind aus der Adresse - es kann
+ * nicht wissen, ob es den Betrieb gibt. Laesst sich keiner laden, bliebe
+ * sonst ein Verweis ins Leere stehen, und die Seite haette gar kein
+ * Manifest mehr.
+ */
+function manifestZuruecksetzen() {
+  document.querySelector('link[rel="manifest"]')
+    ?.setAttribute('href', './manifest.webmanifest');
+}
+
 async function manifestSetzen() {
   const pfad = `./m/${betrieb.slug}.webmanifest`;
+  const verweis = document.querySelector('link[rel="manifest"]');
   try {
-    // Erst nachsehen: Ohne den Bauschritt gibt es den Ordner nicht, und ein
-    // Verweis ins Leere waere schlechter als das allgemeine Manifest.
+    // Der Verweis steht schon: Das Schnipsel im head hat ihn synchron aus der
+    // Adresse gesetzt, weil ein Tausch von hier aus zu spaet kaeme. Hier wird
+    // nur noch nachgesehen, ob es die Datei ueberhaupt gibt - ohne den
+    // Bauschritt waere ein Verweis ins Leere schlechter als das allgemeine
+    // Manifest.
     const da = await fetch(pfad, { method: 'HEAD' });
-    if (!da.ok) return;
+    if (!da.ok) {
+      verweis?.setAttribute('href', './manifest.webmanifest');
+      return;
+    }
   } catch {
+    verweis?.setAttribute('href', './manifest.webmanifest');
     return;
   }
-  document.querySelector('link[rel="manifest"]')?.setAttribute('href', pfad);
+  verweis?.setAttribute('href', pfad);
   // Aeltere iOS-Fassungen lesen kein Manifest, aber diesen Titel.
   let meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
   if (!meta) {
@@ -596,6 +617,7 @@ async function starten() {
   }
 
   if (!slug) {
+    manifestZuruecksetzen();
     // Fuer einen Baeckereikunden geschrieben, nicht fuer den Entwickler:
     // Was `?b=` bedeutet, hilft ihm nicht weiter.
     melden('Diese Seite gehört noch zu keinem Betrieb. Scanne den QR-Code '
@@ -629,6 +651,7 @@ async function starten() {
     const stand = await datenHolen();
     if (stand === 'ok') betriebMerken(slug);
     if (stand === 'unbekannt') {
+      manifestZuruecksetzen();
       melden('Diesen Betrieb gibt es hier nicht. Stimmt die Adresse?');
       return;
     }

@@ -5,6 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TreueBiss</title>
 <link rel="manifest" href="./manifest.webmanifest">
+<script>
+  /*
+    Muss synchron hier oben stehen, nicht in app.js.
+
+    Safari liest das Manifest beim Laden der Seite. Ein Tausch aus app.js
+    heraus kommt zu spät: Der läuft erst, wenn der Betrieb geladen ist, und
+    beim "Zum Home-Bildschirm hinzufügen" gilt dann noch das allgemeine
+    Manifest mit start_url "./" - also ohne Betrieb, und genau das war der
+    Fehler, den das Symbol hartnäckig weiterreichte.
+
+    Der Betrieb steht in der Adresse, mehr braucht es dafür nicht. Ergibt der
+    Verweis später ins Leere, nimmt app.js ihn zurück.
+  */
+  (function () {
+    var b = new URLSearchParams(location.search).get('b');
+    if (!b || !/^[a-z0-9-]+$/.test(b)) return;
+    var l = document.querySelector('link[rel="manifest"]');
+    if (l) l.setAttribute('href', './m/' + b + '.webmanifest');
+  })();
+</script>
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <meta name="theme-color" id="theme-farbe" content="#4CAF50">

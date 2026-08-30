@@ -381,6 +381,13 @@ einlösen — mit Code, wenn der Betrieb einen verlangt.
 nicht, und Safari ist der Grund für diese Seite. Die Eingabe der Belegnummer
 von Hand bleibt gleichwertig.
 
+**Der Service Worker holt Skripte und Stile zuerst aus dem Netz**, mit dem
+Speicher als Rückfall; alles Übrige umgekehrt. Vorher galt überall „erst aus
+dem Speicher, im Hintergrund erneuern" — das heißt aber, dass nach jeder
+Veröffentlichung noch einmal die alte Fassung läuft und ein gerade behobener
+Fehler beim Nachsehen weiterhin da ist. In der Entwicklung hat das dreimal zu
+einer falschen Diagnose geführt.
+
 **Offline** zeigt die Seite den letzten bekannten Stand aus `localStorage` und
 sagt es über ein Band. Gesammelt und eingelöst wird ausschließlich auf dem
 Server — offline gibt es beides nicht, und die Seite tut auch nicht so.
