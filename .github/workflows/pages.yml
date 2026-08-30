@@ -1,0 +1,39 @@
+# Veroeffentlicht den Ordner `web/` als statische Seite.
+#
+# Damit bekommen Kunden-App, Kasse und Verwaltung eine https-Adresse -
+# Voraussetzung fuer Kamera und Service Worker, die beide einen sicheren
+# Kontext verlangen. Zugleich ist es der Link, den ein Betrieb spaeter
+# seinen Kunden gibt: keine Installation, kein Store.
+name: Web-App veröffentlichen
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Ein Lauf nach dem anderen; angefangene nicht abbrechen, damit keine
+# halb veroeffentlichte Fassung stehen bleibt.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  veroeffentlichen:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: pages
+        uses: actions/deploy-pages@v4
