@@ -30,7 +30,33 @@ let sammelnLaeuft = false;
 /** Index des gerade gesetzten Stempels - nur der wird animiert. */
 let frischerIndex = -1;
 
-const slug = new URLSearchParams(location.search).get('b')?.trim() || null;
+/*
+ * Welcher Betrieb?
+ *
+ * Steht normalerweise in der Adresse (?b=slug). Beim Speichern auf dem
+ * Startbildschirm geht er aber verloren: Der Launcher oeffnet die `start_url`
+ * aus dem Manifest, und die ist statisch - eine Adresse je Betrieb liesse
+ * sich nur mit einem Server ausliefern, der das Manifest erzeugt.
+ *
+ * Deshalb merkt sich die Seite den zuletzt benutzten Betrieb. Die Adresse
+ * hat Vorrang; der gemerkte Wert springt nur ein, wenn sie nichts sagt.
+ */
+const LETZTER = 'treuebiss:letzter-betrieb';
+
+function betriebAusAdresse() {
+  return new URLSearchParams(location.search).get('b')?.trim() || null;
+}
+
+function betriebGemerkt() {
+  try { return localStorage.getItem(LETZTER); } catch { return null; }
+}
+
+function betriebMerken(wert) {
+  try { localStorage.setItem(LETZTER, wert); } catch { /* privater Modus */ }
+}
+
+const ausAdresse = betriebAusAdresse();
+const slug = ausAdresse || betriebGemerkt();
 
 // --------------------------------------------------------------- Meldungen
 
@@ -99,8 +125,11 @@ function fehlertext(fehler) {
   if (/already redeemed/i.test(t)) return 'Dieser Gutschein wurde bereits eingelöst.';
   if (/expired/i.test(t)) return 'Dieser Gutschein ist abgelaufen.';
   if (/not found/i.test(t)) return 'Diesen Gutschein gibt es nicht.';
-  if (/does not exist|schema cache/i.test(t)) {
-    return 'Die Datenbank ist nicht auf dem aktuellen Stand.';
+  if (fehler?.code === '42703' || fehler?.code === 'PGRST202'
+      || /column .* does not exist|schema cache/i.test(t)) {
+    // Dem Kunden nützt kein SQL-Befehl. Er soll nur wissen, dass es nicht
+    // an ihm liegt und dass Wiederholen nichts bringt.
+    return 'Hier ist gerade etwas nicht eingerichtet. Bitte sag dem Personal Bescheid.';
   }
   return 'Das hat nicht geklappt. Bitte noch einmal versuchen.';
 }
@@ -480,10 +509,19 @@ async function starten() {
   rechtlichesZeichnen();
 
   if (!slug) {
-    melden('In der Adresse fehlt der Betrieb. Sie muss auf '
-         + '<code>?b=name-des-betriebs</code> enden — der QR-Code am Tresen '
-         + 'führt direkt dorthin.');
+    // Fuer einen Baeckereikunden geschrieben, nicht fuer den Entwickler:
+    // Was `?b=` bedeutet, hilft ihm nicht weiter.
+    melden('Diese Seite gehört noch zu keinem Betrieb. Scanne den QR-Code '
+         + 'am Tresen oder öffne den Link, den dein Betrieb dir gegeben hat.');
     return;
+  }
+
+  // Kam der Betrieb aus dem Gedaechtnis, gehoert er zurueck in die Adresse -
+  // dann traegt ihn auch ein Lesezeichen, das jetzt gesetzt wird.
+  if (!ausAdresse) {
+    const u = new URL(location.href);
+    u.searchParams.set('b', slug);
+    history.replaceState(null, '', u);
   }
 
   db = createClient(konfig.SUPABASE_URL, konfig.SUPABASE_ANON_KEY,
@@ -507,6 +545,7 @@ async function starten() {
     if (!nutzerId) throw new Error('Keine Anmeldung zustande gekommen.');
 
     const stand = await datenHolen();
+    if (stand === 'ok') betriebMerken(slug);
     if (stand === 'unbekannt') {
       melden('Diesen Betrieb gibt es hier nicht. Stimmt die Adresse?');
       return;

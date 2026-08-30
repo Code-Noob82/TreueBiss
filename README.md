@@ -394,6 +394,19 @@ Bezeichnungen kommen zur Laufzeit vom Server, der Name im Startbildschirm
 nicht. Dafür bräuchte es ein Manifest je Betrieb und damit einen Server, der
 es ausliefert.
 
+Dieselbe Grenze hatte eine Folge, die beim Test auf dem Gerät aufflog:
+`start_url` ist ebenfalls statisch (`./`). Wer die Seite auf den
+Startbildschirm legt, öffnet danach eine Adresse **ohne** `?b=` — der Betrieb
+ging verloren, und die App meldete, es fehle einer. Deshalb merkt sie sich den
+zuletzt benutzten Betrieb: Die Adresse hat Vorrang, der gemerkte Wert springt
+nur ein, wenn sie nichts sagt. Kam er aus dem Gedächtnis, wird er per
+`history.replaceState` in die Adresse zurückgeschrieben, damit auch ein
+später gesetztes Lesezeichen ihn trägt.
+
+Offen bleibt dabei: Wer bei zwei Betrieben sammelt, landet über das Symbol auf
+dem Startbildschirm immer beim zuletzt besuchten. Das löst erst „Beitritt per
+Code" mit mehreren Betrieben in einer App.
+
 **Gemeinsame Grundlage.** Tokens, Schriften, Abstands- und Schriftstufung,
 Knöpfe, Formularfelder und Meldungen liegen einmal in `web/gemeinsam/basis.css`,
 die Palettenrechnung in `web/gemeinsam/palette.js`. Alle drei Oberflächen

@@ -415,9 +415,25 @@ function istNetzfehler(fehler) {
 function fehlertext(fehler) {
   if (istNetzfehler(fehler)) return 'Keine Verbindung zum Server.';
   const t = (fehler?.message ?? '') + (fehler?.details ?? '');
-  if (/does not exist|schema cache/i.test(t)) {
-    return 'Diese Funktionen fehlen in der Datenbank. Wurde '
-         + '<code>supabase/schema.sql</code> in der aktuellen Fassung eingespielt?';
+  /*
+   * Zwei Ursachen, zwei Handgriffe - und sie sehen fast gleich aus.
+   *
+   * Postgres meldet eine fehlende Spalte direkt (42703): Dann ist das Schema
+   * sicher nicht in der aktuellen Fassung eingespielt. PostgREST dagegen
+   * antwortet auf jede unbekannte Funktion mit "schema cache" (PGRST202) -
+   * auch dann, wenn es sie schlicht nicht gibt. Wer beides zusammenwirft,
+   * schickt jemanden zum falschen Handgriff.
+   */
+  if (fehler?.code === '42703' || /column .* does not exist/i.test(t)) {
+    return 'Der Datenbank fehlt eine Spalte. Führe '
+         + '<code>supabase/schema.sql</code> in der aktuellen Fassung im '
+         + 'SQL-Editor aus.';
+  }
+  if (fehler?.code === 'PGRST202' || /schema cache/i.test(t)) {
+    return 'Diese Funktion kennt die Schnittstelle nicht. Entweder ist '
+         + '<code>supabase/schema.sql</code> nicht in der aktuellen Fassung '
+         + 'eingespielt — oder PostgREST hat den Schema-Cache noch nicht neu '
+         + 'geladen; dann hilft <code>notify pgrst, \'reload schema\';</code>.';
   }
   if (t.includes('not owner')) return 'Dieser Zugang darf diesen Betrieb nicht verwalten.';
   if (t.includes('name and titles')) return 'Name und die drei Bezeichnungen dürfen nicht leer sein.';
