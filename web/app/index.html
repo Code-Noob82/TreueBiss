@@ -160,6 +160,16 @@
   .angebot b { display: block; font-family: var(--display); font-weight: 600; }
   .angebot span { font-size: var(--t-klein); color: var(--tinte-leise); }
   .angebot button { margin: var(--s3) 0 0; }
+
+  .umzug-text { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
+  #umzug-code { display: grid; justify-items: center; gap: var(--s3); margin-top: var(--s4); }
+  /* Die qrcode-Bibliothek schreibt eigene width/height ins Element; ohne das
+     hier sprengt die Leinwand ihre Spalte. */
+  #umzug-qr { width: 100% !important; height: auto !important; max-width: 15rem; border-radius: var(--s2); }
+  .umzug-warnung {
+    font-size: var(--t-mikro); color: var(--warn-text); background: var(--warn);
+    padding: var(--s2) var(--s3); border-radius: var(--s2); margin: 0; text-align: center;
+  }
   /* Eingeloest heisst nicht weg: Der Kunde soll sehen, dass er ihn hatte. */
   .angebot.verbraucht b, .angebot.verbraucht span { opacity: .55; }
   .angebot .vermerk {
@@ -223,6 +233,23 @@
   <section id="angebote-bereich" class="karte neben verborgen">
     <p class="marke" id="angebote-titel">Angebot des Tages</p>
     <div id="angebote"></div>
+  </section>
+
+  <!-- Karte mitnehmen -->
+  <section id="umzug-bereich" class="karte neben verborgen">
+    <p class="marke">Karte mitnehmen</p>
+    <p class="umzug-text">
+      Neues Handy, oder die Karte soll aufs Symbol am Startbildschirm?
+      Diesen Code dort scannen — die Stempel ziehen um.
+    </p>
+    <button id="umzug-zeigen" class="still">Code anzeigen</button>
+    <div id="umzug-code" class="verborgen">
+      <canvas id="umzug-qr" aria-label="Kartencode zum Mitnehmen"></canvas>
+      <p class="umzug-warnung">
+        Wer diesen Code scannt, bekommt die Karte — wie eine Papierkarte, die
+        man weitergibt. Auf dem alten Gerät ist sie danach leer.
+      </p>
+    </div>
   </section>
 </main>
 

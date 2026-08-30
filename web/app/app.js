@@ -26,6 +26,7 @@ let betrieb = null;          // Zeile aus tenants
 let stempel = 0;
 let gutscheine = [];
 let einloesungen = [];   // eingeloeste Coupons dieses Kunden
+let kartenSchluessel = null;  // identifiziert die Karte, nicht das Geraet
 let scanLaeuft = false;
 let sammelnLaeuft = false;
 /** Index des gerade gesetzten Stempels - nur der wird animiert. */
@@ -46,6 +47,12 @@ const LETZTER = 'treuebiss:letzter-betrieb';
 
 function betriebAusAdresse() {
   return new URLSearchParams(location.search).get('b')?.trim() || null;
+}
+
+/** Der Kartenschluessel aus einem Umzugslink oder einem Wallet-Pass. */
+function schluesselAusAdresse() {
+  const k = new URLSearchParams(location.search).get('karte')?.trim();
+  return /^[0-9a-f]{64}$/.test(k ?? '') ? k : null;
 }
 
 function betriebGemerkt() {
@@ -110,6 +117,12 @@ function fehlertext(fehler) {
   // deshalb hier auch kein Fehlerton.
   if (fehler?.code === '23505' || /duplicate key|stamp_proofs/i.test(t)) {
     return 'Dieser Beleg wurde schon gezählt.';
+  }
+  if (/card not found/i.test(t)) return 'Diesen Kartenschlüssel gibt es hier nicht.';
+  if (/invalid card token/i.test(t)) return 'Der Kartenschlüssel ist unvollständig.';
+  if (/device already has a card here/i.test(t)) {
+    return 'Auf diesem Gerät liegt hier schon eine Karte mit Stempeln. '
+         + 'Zwei Karten lassen sich nicht zusammenlegen.';
   }
   if (/offer not redeemable/i.test(t)) return 'Dieses Angebot lässt sich nicht einlösen.';
   if (/offer not valid today/i.test(t)) return 'Dieses Angebot gilt heute nicht.';
@@ -412,12 +425,18 @@ async function datenHolen() {
     db.from('offer_redemptions').select('offer_id, sperre').eq('tenant_id', betrieb.id),
   ]);
 
+  // Der eigene Kartenschluessel. Die Policy laesst nur die eigene Zeile durch.
+  const { data: mine } = await db.from('memberships')
+    .select('card_token').eq('tenant_id', betrieb.id).maybeSingle();
+  kartenSchluessel = mine?.card_token ?? null;
+
   stempel = count ?? 0;
   gutscheine = gs ?? [];
   einloesungen = el ?? [];
   standSichern();
   allesZeichnen();
   angeboteZeichnen(an);
+  $('umzug-bereich').classList.toggle('verborgen', !kartenSchluessel);
   return 'ok';
 }
 
@@ -532,6 +551,38 @@ async function angebotEinloesen(angebotId) {
   melden('Eingelöst. Guten Appetit!', true);
 }
 
+/*
+ * Den Umzugscode zeigen.
+ *
+ * Erst auf Knopfdruck: Ein dauerhaft sichtbarer Code waere ein Inhaberpapier,
+ * das bei jedem Blick aufs Handy mitgelesen werden koennte.
+ *
+ * Der Code traegt denselben Link, den spaeter ein Wallet-Pass tragen wird.
+ */
+async function umzugZeigen() {
+  if (!kartenSchluessel) { melden('Für diese Karte gibt es noch keinen Code.'); return; }
+  const huelle = $('umzug-code');
+  if (!huelle.classList.contains('verborgen')) { huelle.classList.add('verborgen'); return; }
+
+  const ziel = new URL(location.href);
+  ziel.search = '';
+  ziel.searchParams.set('b', slug);
+  ziel.searchParams.set('karte', kartenSchluessel);
+
+  const knopf = $('umzug-zeigen');
+  beschaeftigt(knopf, true, 'Wird erzeugt …');
+  try {
+    const { default: QRCode } = await import('https://esm.sh/qrcode@1.5.4');
+    await QRCode.toCanvas($('umzug-qr'), ziel.toString(), { width: 240, margin: 1 });
+    huelle.classList.remove('verborgen');
+  } catch (e) {
+    console.error('umzug-qr', e);
+    melden('Der Code liess sich nicht erzeugen. Gibt es gerade Verbindung?');
+  } finally {
+    beschaeftigt(knopf, false);
+  }
+}
+
 // ------------------------------------------------------------------ Scanner
 
 /*
@@ -632,6 +683,7 @@ $('sammeln').onclick = scannerOeffnen;
 $('scan-abbrechen').onclick = () => { scannerSchliessen(); melden(''); };
 $('beleg-senden').onclick = () => stempelHolen($('beleg').value);
 $('beleg').onkeydown = (e) => { if (e.key === 'Enter') stempelHolen($('beleg').value); };
+$('umzug-zeigen').onclick = umzugZeigen;
 
 function rechtlichesZeichnen() {
   const eintraege = [
@@ -758,6 +810,28 @@ async function starten() {
       nutzerId = neu.user?.id ?? null;
     }
     if (!nutzerId) throw new Error('Keine Anmeldung zustande gekommen.');
+
+    /*
+     * Traegt die Adresse einen Kartenschluessel, gehoert die Karte hierher
+     * geholt - noch vor dem ersten Laden, sonst zeigte die Seite kurz eine
+     * leere Karte und danach die volle.
+     *
+     * Fehler sind hier kein Abbruch: Der Link kann alt sein, und dann ist
+     * die eigene Karte immer noch die richtige Antwort.
+     */
+    const mitgebracht = schluesselAusAdresse();
+    if (mitgebracht) {
+      const { error: uFehler } = await db.rpc('adopt_card', { p_token: mitgebracht });
+      if (uFehler) {
+        console.warn('adopt_card', uFehler);
+        melden(fehlertext(uFehler));
+      }
+      // Den Schluessel aus der Adresse nehmen: Er gehoert nicht in den
+      // Verlauf und nicht in eine geteilte Adresszeile.
+      const u = new URL(location.href);
+      u.searchParams.delete('karte');
+      history.replaceState(null, '', u);
+    }
 
     const stand = await datenHolen();
     if (stand === 'ok') betriebMerken(slug);

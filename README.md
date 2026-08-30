@@ -529,6 +529,31 @@ update public.tenant_staff set role = 'owner'
 Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
 Betrieb, der sich selbst abschaltet, ist ein Supportfall.
 
+### Der Kartenschlüssel
+
+Bis hierher lebte eine Karte ausschließlich in der anonymen Sitzung im
+`localStorage`. Damit hängt sie an genau einem Speicher — und ein Symbol auf
+dem iOS-Startbildschirm hat einen **eigenen**. Wer die Seite dort ablegte, war
+ein zweiter Kunde mit leerer Karte; wer seine Browserdaten löschte, hatte seine
+Stempel verloren.
+
+`memberships.card_token` löst das: 32 zufällige Bytes, die **die Karte**
+identifizieren statt des Geräts. `adopt_card(token)` holt sie zum aufrufenden
+Gerät — Stempel, Gutscheine, Coupons und Nachweise wandern mit.
+
+**Es ist ein Umzug, kein Duplikat.** Zwei Geräte auf derselben Karte wären zwei
+Zähler auf denselben Bestand, und beim Einlösen entschiede das Timing. Nach dem
+Umzug zeigt das alte Gerät eine leere Karte — wie eine Papierkarte, die man
+weitergegeben hat. Ein Gerät, das selbst schon gesammelt hat, übernimmt nicht:
+Dann bräche der Umzug lieber ab, als still etwas zu löschen.
+
+Der Schlüssel ist ein **Inhaberpapier**: Wer ihn hat, hat die Karte. Deshalb
+zeigt die App ihn nur auf Knopfdruck, mit einem Warnhinweis, und nimmt ihn nach
+dem Einlösen sofort wieder aus der Adresszeile.
+
+Er überlebt den Umzug unverändert — sonst würde ein Wallet-Pass, der ihn trägt,
+beim ersten Gerätewechsel ungültig.
+
 ### Aufbewahrung der Kaufnachweise
 
 `stamp_proofs` speichert bei jedem Beleg-Stempel Kassennummer, Vorgangsnummer,

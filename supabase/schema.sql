@@ -296,6 +296,44 @@ create table if not exists public.memberships (
     primary key (user_id, tenant_id)
 );
 
+/*
+ * Der Kartenschluessel.
+ *
+ * Bisher lebte eine Karte ausschliesslich in der anonymen Sitzung im
+ * localStorage des Browsers. Damit ist sie an genau einen Speicher gebunden -
+ * und ein Symbol auf dem iOS-Startbildschirm hat einen eigenen. Wer die Seite
+ * dort ablegt, ist ein zweiter Kunde mit leerer Karte, und wer seine
+ * Browserdaten loescht, hat seine Stempel verloren.
+ *
+ * Der Schluessel loest das: Er identifiziert die Karte, nicht das Geraet.
+ * Damit laesst sie sich auf ein anderes Geraet holen - und er ist das, was
+ * ein Wallet-Pass spaeter traegt, denn ein Pass ist ein Gegenstand und kein
+ * Browserzustand.
+ *
+ * Er ist ein Inhaberpapier: Wer ihn hat, hat die Karte. Genau wie bei der
+ * Papierstempelkarte, die auch niemandem gehoert ausser dem, der sie in der
+ * Hand haelt. Deshalb 32 Byte aus dem Zufallsgenerator und nicht etwas
+ * Kuerzeres, das man abtippen koennte.
+ */
+alter table public.memberships
+    add column if not exists card_token text
+    default encode(extensions.gen_random_bytes(32), 'hex');
+
+update public.memberships
+   set card_token = encode(extensions.gen_random_bytes(32), 'hex')
+ where card_token is null;
+
+do $$
+begin
+    alter table public.memberships alter column card_token set not null;
+exception when others then
+    raise warning 'card_token konnte nicht auf not null gesetzt werden: %', sqlerrm;
+end
+$$;
+
+create unique index if not exists memberships_card_token_idx
+    on public.memberships (card_token);
+
 -- ==================================================== Personal des Betriebs
 
 -- Wer fuer einen Betrieb an der Kasse arbeitet. Getrennt von memberships:
@@ -1256,6 +1294,102 @@ where not exists (
     select 1 from public.offers
     where tenant_id = '00000000-0000-4000-8000-000000000001'
 );
+
+-- ============================================ Karte auf ein anderes Geraet holen
+
+/*
+ * Holt die Karte zum aufrufenden Geraet.
+ *
+ * Der Schluessel steht im Wallet-Pass beziehungsweise im QR-Code der eigenen
+ * Karte. Wer ihn vorzeigt, bekommt die Karte - Stempel, Gutscheine, eingeloeste
+ * Coupons und die Nachweise wandern mit.
+ *
+ * Es ist ein Umzug, kein Duplikat. Zwei Geraete, die dieselbe Karte fuehren,
+ * waeren zwei Zaehler auf denselben Bestand; beim Einloesen entschiede das
+ * Timing. Nach dem Umzug zeigt das alte Geraet eine leere Karte, genau wie
+ * eine Papierkarte, die man weitergegeben hat.
+ *
+ * Laeuft als security definer, weil die App auf stamps und vouchers kein
+ * Schreibrecht hat - und genau deshalb darf sie den Umzug auch nicht selbst
+ * zusammensetzen.
+ *
+ * Fehlercodes:
+ *   28000  nicht angemeldet
+ *   22023  Schluessel unbekannt oder unbrauchbar
+ *   42501  dieses Geraet hat hier schon eine Karte mit Inhalt
+ */
+create or replace function public.adopt_card(p_token text)
+returns table (tenant_slug text, tenant_name text, stamps int)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_neu    uuid := auth.uid();
+    v_alt    uuid;
+    v_tenant uuid;
+begin
+    if v_neu is null then
+        raise exception 'not signed in' using errcode = '28000';
+    end if;
+    -- 32 Byte hex sind 64 Zeichen. Kuerzeres ist kein Schluessel von uns.
+    if p_token is null or length(trim(p_token)) <> 64 then
+        raise exception 'invalid card token' using errcode = '22023';
+    end if;
+
+    select m.user_id, m.tenant_id into v_alt, v_tenant
+      from public.memberships m
+      join public.tenants t on t.id = m.tenant_id and t.is_active
+     where m.card_token = trim(p_token);
+
+    if v_alt is null then
+        raise exception 'card not found' using errcode = '22023';
+    end if;
+
+    /*
+     * Schon dieses Geraet: nichts tun, aber auch nicht scheitern. Der Aufruf
+     * passiert bei jedem Oeffnen eines Pass-Links, und ein Fehler waere dort
+     * eine Falschmeldung.
+     */
+    if v_alt <> v_neu then
+        /*
+         * Ein Geraet, das hier schon gesammelt hat, wuerde beim Umzug seinen
+         * eigenen Bestand verlieren. Lieber abbrechen und den Kunden fragen
+         * lassen, als still etwas zu loeschen.
+         */
+        if exists (select 1 from public.stamps s
+                    where s.user_id = v_neu and s.tenant_id = v_tenant)
+           or exists (select 1 from public.offer_redemptions r
+                       where r.user_id = v_neu and r.tenant_id = v_tenant) then
+            raise exception 'device already has a card here' using errcode = '42501';
+        end if;
+
+        -- Die leere Mitgliedschaft dieses Geraets weicht der uebernommenen.
+        delete from public.memberships
+         where user_id = v_neu and tenant_id = v_tenant;
+
+        update public.stamps            set user_id = v_neu
+         where user_id = v_alt and tenant_id = v_tenant;
+        update public.vouchers          set user_id = v_neu
+         where user_id = v_alt and tenant_id = v_tenant;
+        update public.stamp_proofs      set user_id = v_neu
+         where user_id = v_alt and tenant_id = v_tenant;
+        update public.offer_redemptions set user_id = v_neu
+         where user_id = v_alt and tenant_id = v_tenant;
+        update public.memberships       set user_id = v_neu
+         where user_id = v_alt and tenant_id = v_tenant;
+    end if;
+
+    return query
+        select t.slug, t.name,
+               (select count(*)::int from public.stamps s
+                 where s.user_id = v_neu and s.tenant_id = v_tenant)
+          from public.tenants t where t.id = v_tenant;
+end;
+$$;
+
+revoke all on function public.adopt_card(text) from public;
+grant execute on function public.adopt_card(text) to authenticated;
 
 -- ================================================== Aufbewahrung und Loeschung
 
