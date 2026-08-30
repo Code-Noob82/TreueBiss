@@ -206,16 +206,22 @@ Der Schlüssel in `stamp_proofs` trägt den Nutzer mit
 Kunde seinen Stempel, weil ein Nachweis je Betrieb nur einmal vorkommen darf.
 
 > **Ehrlich dazu:** Der Tresen-Code belegt **Anwesenheit am Tresen, nicht den
-> Kauf** — anders als der Kassenbon. Wer stehen bleibt, kann nach jedem
-> Wechsel erneut scannen; das Tageslimit ist dann die **einzige** Hürde, die
-> übrig bleibt. Die Vorgabe 25 ist ein Fangnetz für den Beleg-Weg, wo das
-> Zeitfenster die eigentliche Hürde ist — für den Tresen-QR ist sie viel zu
-> locker. Die Verwaltung weist darauf hin, sobald beides zusammenkommt, und
-> rechnet vor, wie viele volle Karten pro Tag daraus werden könnten. Das ist der Preis dafür, dass er ohne
-> mitspielende Kasse überhaupt funktioniert. Dagegen stehen die kurze
-> Gültigkeit (Vorgabe 60 Sekunden) und das Tageslimit: Wer den Code
-> abfotografiert, kann ihn Sekunden später noch benutzen und dann erst wieder
-> am nächsten Tag. Deshalb ist er standardmäßig aus und muss vom Betrieb
+> Kauf** — anders als der Kassenbon. Das ist der Preis dafür, dass er ohne
+> mitspielende Kasse überhaupt funktioniert. Dagegen stehen zwei Hürden, die
+> aber gegen verschiedene Dinge helfen.
+>
+> Gegen den **abfotografierten Code** hilft die kurze Gültigkeit (Vorgabe 60
+> Sekunden): Wer ihn mitnimmt, kann ihn Sekunden später noch benutzen und dann
+> erst wieder am nächsten Tag.
+>
+> Gegen den, der **stehen bleibt**, hilft sie nicht — er scannt nach jedem
+> Wechsel einfach erneut. Da bleibt allein das Tageslimit. Dessen Vorgabe 25
+> ist ein Fangnetz für den Beleg-Weg, wo das Zeitfenster von zwei Stunden die
+> eigentliche Hürde ist; für den Tresen-QR ist sie viel zu locker. Die
+> Verwaltung weist darauf hin, sobald beides zusammenkommt, und rechnet vor,
+> wie viele volle Karten pro Tag daraus werden könnten.
+>
+> Deshalb ist der Tresen-QR standardmäßig aus und muss vom Betrieb
 > ausdrücklich eingeschaltet werden.
 
 #### Signaturprüfung (Edge Function)
