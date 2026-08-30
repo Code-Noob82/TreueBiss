@@ -48,7 +48,8 @@ Das MVP demonstriert die Kernfunktionen: digitale Stempelkarte, Gutscheinlogik u
   ist über `TENANT_ID` einem Betrieb zugeordnet; Name, Bezeichnungen, Primärfarbe
   und die Kartenregeln (Stempel pro Karte, Gültigkeitsdauer) kommen von dort.
 - [x] **Angebote:** Werden vom Betrieb selbst gepflegt und auf dem HomeScreen
-  angezeigt.
+  angezeigt. Wahlweise als reiner Aushang oder als **einlösbarer Coupon** —
+  einmal je Kunde oder einmal pro Tag.
 - [x] **Web-App für Kunden:** `web/app/` als Progressive Web App — sammeln und
   einlösen im Browser, ohne Installation, auf iPhone wie Android. Der Betrieb
   steht als Slug in der Adresse.
@@ -541,6 +542,37 @@ zweite Policy `offers_owner_read` — zwei `select`-Policies auf derselben
 Tabelle werden mit ODER verknüpft. In der Verwaltung steht dann bei so einem
 Eintrag „für Kunden nicht mehr sichtbar", sonst sähe eine gepflegte Liste aus
 wie eine wirksame.
+
+### Coupons: ausgegeben statt erarbeitet
+
+Ein Gutschein entsteht aus einer vollen Karte und gehört genau einem Kunden.
+Ein **Coupon** wird vom Betrieb ausgegeben und steht allen offen — er ist der
+Grund, die App zu installieren, **bevor** man etwas gesammelt hat. Ein leeres
+Stempelfeld ist kein Anreiz.
+
+Jedes Angebot kann beides sein. `is_redeemable` steht mit Absicht auf `false`:
+Bestehende Angebote sind Aushänge und dürfen durch ein Schema-Update nicht
+plötzlich einlösbar werden.
+
+**Was beide teilen, ist die Stelle, an der über den Verbrauch entschieden
+wird** — auf dem Server, nie auf dem Gerät. `offer_redemptions` hält jede
+Einlösung fest, und die App hat dort kein Schreibrecht: Nur `redeem_offer()`
+trägt ein, es gibt weder `insert`- noch `delete`-Policy. Löscht ein Kunde die
+App und installiert sie neu, bleibt der Coupon verbraucht.
+
+**Die Einlösegrenze steht im Index, nicht in der Funktion.** Die Spalte
+`sperre` trägt bei `taeglich` den Tag der Einlösung in `Europe/Berlin`, bei
+`einmal` den Wert `-infinity` — der ist kein Tag und kann keiner werden. Mit
+`unique (offer_id, user_id, sperre)` erzwingt die Datenbank damit beide Regeln
+selbst, statt sich auf die Funktion zu verlassen, die sie füllt.
+
+Stellt ein Betrieb mitten im Zeitraum von `taeglich` auf `einmal` um, hat ein
+Kunde mit alten Tageszeilen noch eine Einlösung frei. Das ist gewollt: Eine
+geänderte Regel wirkt nach vorn, sie nimmt niemandem rückwirkend etwas weg.
+
+Verlangt der Betrieb einen Einlöse-Code, gilt er für Coupons genauso wie für
+Gutscheine. Ein Kunde soll nicht zwei verschiedene Regeln erleben, je nachdem
+was er gerade einlöst.
 
 **Warum Stammdaten über eine Funktion laufen und Angebote über Policies.**
 Angebote tragen nichts Schützenswertes, dort reichen Policies. Bei `tenants`
