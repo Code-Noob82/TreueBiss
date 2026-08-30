@@ -7,8 +7,8 @@
       erscheint dann gar nicht erst in den Einstellungen. Vor einem Pilotbetrieb
       mit echten Nutzern müssen Impressum und Datenschutzerklärung stehen.
     -->
-    <string name="legal_imprint_url" translatable="false"></string>
-    <string name="legal_privacy_url" translatable="false"></string>
+    <string name="legal_imprint_url" translatable="false">https://byteundhandwerk.de/impressum</string>
+    <string name="legal_privacy_url" translatable="false">https://byteundhandwerk.de/datenschutz</string>
     <string name="legal_app_privacy_url" translatable="false"></string>
     <string name="legal_terms_url" translatable="false"></string>
 </resources>
