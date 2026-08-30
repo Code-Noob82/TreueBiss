@@ -56,7 +56,7 @@ function betriebMerken(wert) {
 }
 
 const ausAdresse = betriebAusAdresse();
-const slug = ausAdresse || betriebGemerkt();
+let slug = ausAdresse || betriebGemerkt();
 
 // --------------------------------------------------------------- Meldungen
 
@@ -493,6 +493,33 @@ function rechtlichesZeichnen() {
  * plötzlich mit einer anonymen Sitzung da und meldet, der Zugang gehöre zu
  * keinem Betrieb.
  */
+/** Betriebe, bei denen dieser Browser schon sammelt. */
+async function betriebeDesBrowsers() {
+  const { data: m, error } = await db.from('memberships').select('tenant_id');
+  if (error || !m?.length) { if (error) console.error('memberships', error); return []; }
+  const { data: t } = await db.from('tenants')
+    .select('slug, name').in('id', m.map((x) => x.tenant_id)).order('name');
+  return t ?? [];
+}
+
+/** Mehr als einer: Der Kunde soll sagen, wo er gerade steht. */
+function betriebeZurWahl(liste) {
+  $('betrieb').textContent = 'Wo bist du gerade?';
+  $('kopf-zeile').textContent = 'Deine Stempelkarten';
+  $('meldung').innerHTML = `<div class="karte">
+      <p class="marke">Deine Betriebe</p>
+      ${liste.map((b) => `<button data-betrieb="${h(b.slug)}"
+         style="margin-bottom:var(--s2)">${h(b.name)}</button>`).join('')}
+    </div>`;
+  $('meldung').querySelectorAll('[data-betrieb]').forEach((k) => {
+    k.onclick = () => {
+      const u = new URL(location.href);
+      u.searchParams.set('b', k.dataset.betrieb);
+      location.replace(u);
+    };
+  });
+}
+
 async function starten() {
   try {
     konfig = await import('./config.js');
@@ -508,6 +535,34 @@ async function starten() {
   }
   rechtlichesZeichnen();
 
+  db = createClient(konfig.SUPABASE_URL, konfig.SUPABASE_ANON_KEY,
+    { auth: { storageKey: 'treuebiss-kunde' } });
+  $('fuss').textContent = 'Deine Karte liegt in diesem Browser. '
+    + 'Ohne Konto lässt sie sich nicht auf ein anderes Gerät mitnehmen.';
+
+  /*
+   * Steht in der Adresse und im Gedaechtnis nichts, fragen wir den Server:
+   * Wo sammelt dieser Browser schon? Das ist die bessere Quelle - sie
+   * ueberlebt geloeschte Browserdaten, und sie greift auch beim allerersten
+   * Start vom Startbildschirm, wo das Gedaechtnis noch leer ist.
+   *
+   * Nur mit vorhandener Sitzung: Wer die nackte Adresse ohne Anmeldung
+   * oeffnet, hat ohnehin nichts nachzuschlagen - und dafuer eigens ein
+   * anonymes Konto anzulegen waere Datensammeln ohne Zweck.
+   */
+  if (!slug) {
+    const { data } = await db.auth.getSession();
+    if (data.session) {
+      const gefunden = await betriebeDesBrowsers();
+      if (gefunden.length === 1) {
+        slug = gefunden[0].slug;
+      } else if (gefunden.length > 1) {
+        betriebeZurWahl(gefunden);
+        return;
+      }
+    }
+  }
+
   if (!slug) {
     // Fuer einen Baeckereikunden geschrieben, nicht fuer den Entwickler:
     // Was `?b=` bedeutet, hilft ihm nicht weiter.
@@ -516,18 +571,13 @@ async function starten() {
     return;
   }
 
-  // Kam der Betrieb aus dem Gedaechtnis, gehoert er zurueck in die Adresse -
-  // dann traegt ihn auch ein Lesezeichen, das jetzt gesetzt wird.
-  if (!ausAdresse) {
+  // Kam der Betrieb nicht aus der Adresse, gehoert er dort hinein - dann
+  // traegt ihn auch ein Lesezeichen, das jetzt gesetzt wird.
+  if (slug !== ausAdresse) {
     const u = new URL(location.href);
     u.searchParams.set('b', slug);
     history.replaceState(null, '', u);
   }
-
-  db = createClient(konfig.SUPABASE_URL, konfig.SUPABASE_ANON_KEY,
-    { auth: { storageKey: 'treuebiss-kunde' } });
-  $('fuss').textContent = 'Deine Karte liegt in diesem Browser. '
-    + 'Ohne Konto lässt sie sich nicht auf ein anderes Gerät mitnehmen.';
 
   // Erst den letzten bekannten Stand zeigen, dann nachladen. Ohne das
   // starrt der Kunde an der Kasse auf eine leere Seite.

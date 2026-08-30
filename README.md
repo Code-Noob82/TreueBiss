@@ -403,9 +403,18 @@ nur ein, wenn sie nichts sagt. Kam er aus dem Gedächtnis, wird er per
 `history.replaceState` in die Adresse zurückgeschrieben, damit auch ein
 später gesetztes Lesezeichen ihn trägt.
 
-Offen bleibt dabei: Wer bei zwei Betrieben sammelt, landet über das Symbol auf
-dem Startbildschirm immer beim zuletzt besuchten. Das löst erst „Beitritt per
-Code" mit mehreren Betrieben in einer App.
+Das Gedächtnis allein reichte nicht: Beim allerersten Start vom
+Startbildschirm ist es noch leer — genau der Fall, wenn das Symbol schon lag,
+bevor der Betrieb je geladen wurde. Deshalb fragt die Seite dann den Server:
+**Wo sammelt dieser Browser schon?** Die eigenen `memberships` sind die
+bessere Quelle — sie überleben gelöschte Browserdaten. Bei genau einem Betrieb
+wird er stillschweigend genommen, bei mehreren erscheint eine Auswahl.
+
+Nachgeschlagen wird nur, wenn schon eine Sitzung besteht. Wer die nackte
+Adresse ohne Anmeldung öffnet, hat ohnehin nichts nachzuschlagen — und dafür
+eigens ein anonymes Konto anzulegen wäre Datensammeln ohne Zweck.
+
+Die Reihenfolge ist also: Adresse, dann Gedächtnis, dann Mitgliedschaft.
 
 **Gemeinsame Grundlage.** Tokens, Schriften, Abstands- und Schriftstufung,
 Knöpfe, Formularfelder und Meldungen liegen einmal in `web/gemeinsam/basis.css`,
