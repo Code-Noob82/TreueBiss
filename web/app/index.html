@@ -164,6 +164,13 @@
   .umzug-text { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
   .umzug-knoepfe { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .umzug-knoepfe button { flex: 1 1 10rem; margin: 0; }
+  /* Nur mit ?diagnose=1 sichtbar. */
+  #plattform-diagnose {
+    margin: var(--s3) 0 0; padding: var(--s3);
+    background: var(--grund-leise); color: var(--tinte); border-radius: var(--s2);
+    font-size: var(--t-mikro); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-all;
+  }
   #umzug-code { display: grid; justify-items: center; gap: var(--s3); margin-top: var(--s4); }
   /* Die qrcode-Bibliothek schreibt eigene width/height ins Element; ohne das
      hier sprengt die Leinwand ihre Spalte. */
@@ -249,6 +256,7 @@
       <button id="wallet-google" class="still">Zu Google Wallet</button>
       <button id="wallet-apple" class="still">Zu Apple Wallet</button>
     </div>
+    <pre id="plattform-diagnose" class="verborgen"></pre>
     <div id="umzug-code" class="verborgen">
       <canvas id="umzug-qr" aria-label="Kartencode zum Mitnehmen"></canvas>
       <p class="umzug-warnung">

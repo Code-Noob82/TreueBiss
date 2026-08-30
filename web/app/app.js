@@ -609,8 +609,28 @@ function plattform() {
 /** Zeigt nur den Knopf, der auf diesem Geraet etwas bewirkt. */
 function walletKnoepfeZeigen() {
   const p = plattform();
-  $('wallet-google').classList.toggle('verborgen', p === 'ios');
-  $('wallet-apple').classList.toggle('verborgen', p === 'android');
+  const g = $('wallet-google');
+  const a = $('wallet-apple');
+  g.classList.toggle('verborgen', p === 'ios');
+  a.classList.toggle('verborgen', p === 'android');
+
+  /*
+   * Mit ?diagnose=1 steht das Ergebnis auf der Seite.
+   *
+   * Auf einem iPhone gibt es keine Entwicklerkonsole zur Hand, und die
+   * Emulation am Rechner beantwortet nicht, was das echte Geraet meldet.
+   * Ohne diese Anzeige bleibt nur Raten - und davon hatten wir genug.
+   */
+  if (new URLSearchParams(location.search).get('diagnose') !== '1') return;
+  const feld = $('plattform-diagnose');
+  if (!feld) return;
+  feld.textContent =
+      `erkannt: ${p}\n`
+    + `maxTouchPoints: ${navigator.maxTouchPoints ?? 'undefiniert'}\n`
+    + `Google verborgen: ${g.classList.contains('verborgen')} / sichtbar: ${g.offsetParent !== null}\n`
+    + `Apple verborgen: ${a.classList.contains('verborgen')} / sichtbar: ${a.offsetParent !== null}\n`
+    + `Kennung: ${navigator.userAgent}`;
+  feld.classList.remove('verborgen');
 }
 
 /*
