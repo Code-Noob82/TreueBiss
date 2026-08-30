@@ -76,6 +76,14 @@
   }
   .schalter input { width: auto; margin: 3px 0 0; accent-color: var(--marke); flex: none; }
 
+  /* Kein Fehler, sondern ein Hinweis - deshalb die Warnfarbe, nicht die rote. */
+  .warnung {
+    background: var(--warn); color: var(--warn-text);
+    border-radius: var(--s3); padding: var(--s3) var(--s4);
+    font-size: var(--t-klein); line-height: 1.5;
+    margin: calc(var(--s2) * -1) 0 var(--s4);
+  }
+
   .stand { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
   .stand.an { color: var(--gut-text); font-weight: 600; }
   .hinweis { margin: calc(var(--s2) * -1) 0 var(--s4); }
@@ -243,6 +251,7 @@
       </div>
       <label for="b-limit">Stempel je Kunde und Tag</label>
       <input id="b-limit" type="number" min="1" max="100" inputmode="numeric">
+      <p class="warnung verborgen" id="b-tresen-warnung"></p>
 
       <label class="schalter">
         <input id="b-nurkassen" type="checkbox">
@@ -537,6 +546,7 @@ function formularFuellen() {
   $('b-signatur').checked = !!aktiv.require_signed_proof;
   $('b-tresen').checked = !!aktiv.counter_qr_enabled;
   $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
+  tresenWarnungPruefen();
 }
 
 /** Farbwaehler und Textfeld zeigen denselben Wert. */
@@ -709,6 +719,38 @@ $('speichern').onclick = async () => {
 };
 
 $('zuruecksetzen').onclick = () => { formularFuellen(); melden(''); };
+
+/*
+ * Tresen-QR und ein hohes Tageslimit passen nicht zusammen.
+ *
+ * Die Vorgabe 25 ist ein Fangnetz fuer den Beleg-Weg - dort ist das
+ * Zeitfenster von zwei Stunden die eigentliche Huerde. Beim Tresen-Code gibt
+ * es die nicht: Er belegt Anwesenheit, nicht Kauf, und wer stehen bleibt,
+ * kann nach jedem Wechsel erneut scannen. Dann ist das Tageslimit die
+ * einzige Huerde, die uebrig bleibt.
+ *
+ * Ein Hinweis, keine Sperre - der Betrieb entscheidet weiter selbst.
+ */
+const LIMIT_EMPFEHLUNG = 3;
+
+function tresenWarnungPruefen() {
+  const feld = $('b-tresen-warnung');
+  const limit = Number($('b-limit').value);
+  const zeigen = $('b-tresen').checked && Number.isFinite(limit) && limit > LIMIT_EMPFEHLUNG;
+  feld.classList.toggle('verborgen', !zeigen);
+  if (!zeigen) return;
+  const proTag = aktiv?.stamps_per_card
+    ? ` Bei ${aktiv.stamps_per_card} Stempeln pro Karte sind das bis zu `
+      + `${(limit / aktiv.stamps_per_card).toFixed(1).replace('.', ',')} volle Karten am Tag.`
+    : '';
+  feld.textContent = `Der Tresen-Code belegt Anwesenheit, nicht den Kauf — wer `
+    + `stehen bleibt, kann nach jedem Wechsel erneut scannen. Das Tageslimit `
+    + `ist dann die einzige Hürde, und ${limit} ist dafür hoch.${proTag} `
+    + `Empfohlen sind 2 bis ${LIMIT_EMPFEHLUNG}.`;
+}
+
+$('b-tresen').onchange = tresenWarnungPruefen;
+$('b-limit').oninput = tresenWarnungPruefen;
 
 $('b-speichern').onclick = async () => {
   melden('');
