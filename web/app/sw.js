@@ -10,7 +10,7 @@
  * bestehende Installationen den alten Stand, bis der Speicher von selbst
  * ablaeuft - der klassische "beim Kunden ist es noch die alte Fassung".
  */
-const VERSION = 'treuebiss-app-v11';
+const VERSION = 'treuebiss-app-v12';
 
 const HUELLE = [
   './',
@@ -70,7 +70,35 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Alles andere aus dem Speicher, im Hintergrund erneuern.
+  /*
+   * Skripte und Stile zuerst aus dem Netz, mit dem Speicher als Rueckfall.
+   *
+   * Vorher galt auch fuer sie "erst aus dem Speicher, im Hintergrund
+   * erneuern". Das heisst aber: Nach jeder Veroeffentlichung laeuft beim
+   * Kunden noch einmal die alte Fassung, und der Fehler, den man gerade
+   * behoben hat, ist beim Nachsehen immer noch da. Genau das hat in der
+   * Entwicklung dreimal zu einer falschen Diagnose gefuehrt.
+   *
+   * Der Preis ist ein Netzaufruf beim Start - den braucht die Seite fuer die
+   * Daten ohnehin. Offline traegt weiterhin der Speicher.
+   */
+  const istCode = /\.(js|css)$/.test(new URL(anfrage.url).pathname);
+  if (istCode) {
+    e.respondWith((async () => {
+      const speicher = await caches.open(VERSION);
+      try {
+        const antwort = await fetch(anfrage);
+        if (antwort.ok) speicher.put(anfrage, antwort.clone());
+        return antwort;
+      } catch {
+        return (await speicher.match(anfrage)) ?? Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Alles Uebrige - Schriften, Bilder, Manifeste - aus dem Speicher und im
+  // Hintergrund erneuern. Es aendert sich selten und ist gross.
   e.respondWith((async () => {
     const speicher = await caches.open(VERSION);
     const gespeichert = await speicher.match(anfrage);
