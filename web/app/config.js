@@ -5,7 +5,12 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // solange die Seite nicht existiert - der Eintrag erscheint dann gar nicht.
 // Dieselben Adressen stehen fuer die Android-App in
 // app/src/main/res/values/legal.xml; beide muessen zusammenpassen.
-export const IMPRESSUM_URL = '';
-export const DATENSCHUTZ_URL = '';
+export const IMPRESSUM_URL = 'https://byteundhandwerk.de/impressum';
+export const DATENSCHUTZ_URL = 'https://byteundhandwerk.de/datenschutz';
+// Kommt ueber die IT-Recht Kanzlei. Huelle liegt in rechtstexte/.
 export const APP_DATENSCHUTZ_URL = '';
+// Ungeprueft, ob die bestehenden AGB den Betrieb einer Stempelkarte gegenueber
+// Verbrauchern abdecken oder die Leistungen gegenueber Geschaeftskunden. Zwei
+// verschiedene Vertraege - bis das geklaert ist, ist kein Link besser als der
+// falsche.
 export const AGB_URL = '';
