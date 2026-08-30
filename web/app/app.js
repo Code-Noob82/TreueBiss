@@ -207,19 +207,30 @@ async function manifestSetzen() {
     return;
   }
   verweis?.setAttribute('href', pfad);
-  // Aeltere iOS-Fassungen lesen kein Manifest, aber diesen Titel.
+}
+
+/*
+ * Aeltere iOS-Fassungen lesen kein Manifest, aber diesen Titel - und manche
+ * Browser nehmen ihn auch fuer die Verknuepfung, die sie beim Teilen anlegen.
+ *
+ * Bewusst nicht in manifestSetzen(): Der Titel haengt nicht davon ab, ob es
+ * die Manifest-Datei gibt. Dort stand er vorher und wurde dadurch in Faellen
+ * gar nicht gesetzt, in denen er haette gesetzt werden muessen.
+ */
+function appleTitelSetzen(name) {
   let meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
   if (!meta) {
     meta = document.createElement('meta');
     meta.setAttribute('name', 'apple-mobile-web-app-title');
     document.head.appendChild(meta);
   }
-  meta.setAttribute('content', betrieb.name);
+  meta.setAttribute('content', name);
 }
 
 function allesZeichnen() {
   $('betrieb').textContent = betrieb.name;
   document.title = betrieb.name + ' – TreueBiss';
+  appleTitelSetzen(betrieb.name);
   manifestSetzen();
   $('theme-farbe').setAttribute('content', paletteSetzen(betrieb.primary_color));
 

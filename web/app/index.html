@@ -4,25 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>TreueBiss</title>
-<link rel="manifest" href="./manifest.webmanifest">
 <script>
   /*
-    Muss synchron hier oben stehen, nicht in app.js.
+    Erzeugt den Manifest-Verweis, statt einen vorhandenen zu ändern.
 
-    Safari liest das Manifest beim Laden der Seite. Ein Tausch aus app.js
-    heraus kommt zu spät: Der läuft erst, wenn der Betrieb geladen ist, und
-    beim "Zum Home-Bildschirm hinzufügen" gilt dann noch das allgemeine
-    Manifest mit start_url "./" - also ohne Betrieb, und genau das war der
-    Fehler, den das Symbol hartnäckig weiterreichte.
+    Vorher stand hier ein festes <link rel="manifest"> und darunter ein
+    Skript, das es umgehängt hat. Das war zu spät: Der Browser beginnt das
+    Manifest zu verarbeiten, sobald er das Link-Tag sieht - also bevor das
+    Skript darunter läuft. Beim "Zum Home-Bildschirm hinzufügen" galt deshalb
+    weiter das allgemeine Manifest mit start_url "./", und das Symbol landete
+    auf einer Seite ohne Betrieb.
 
-    Der Betrieb steht in der Adresse, mehr braucht es dafür nicht. Ergibt der
-    Verweis später ins Leere, nimmt app.js ihn zurück.
+    Jetzt gibt es nur einen einzigen Verweis, und der ist von Anfang an der
+    richtige. Der Betrieb steht in der Adresse, mehr braucht es dafür nicht.
+    Ergibt er später ins Leere, nimmt app.js ihn zurück.
   */
   (function () {
     var b = new URLSearchParams(location.search).get('b');
-    if (!b || !/^[a-z0-9-]+$/.test(b)) return;
-    var l = document.querySelector('link[rel="manifest"]');
-    if (l) l.setAttribute('href', './m/' + b + '.webmanifest');
+    var ziel = (b && /^[a-z0-9-]+$/.test(b))
+      ? './m/' + b + '.webmanifest'
+      : './manifest.webmanifest';
+    var l = document.createElement('link');
+    l.setAttribute('rel', 'manifest');
+    l.setAttribute('href', ziel);
+    document.head.appendChild(l);
   })();
 </script>
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
