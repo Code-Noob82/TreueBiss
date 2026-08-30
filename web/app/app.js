@@ -437,6 +437,7 @@ async function datenHolen() {
   allesZeichnen();
   angeboteZeichnen(an);
   $('umzug-bereich').classList.toggle('verborgen', !kartenSchluessel);
+  walletKnoepfeZeigen();
   return 'ok';
 }
 
@@ -581,6 +582,35 @@ async function umzugZeigen() {
   } finally {
     beschaeftigt(knopf, false);
   }
+}
+
+/*
+ * Welche Wallet gehoert auf dieses Geraet?
+ *
+ * Beide Knoepfe ueberall zu zeigen ist bestenfalls verwirrend: Ein
+ * Google-Pass nuetzt auf dem iPhone wenig, ein .pkpass auf Android gar nichts.
+ *
+ * iPadOS gibt sich seit Version 13 als Macintosh aus - das ist der Grund fuer
+ * die zweite Bedingung. Ein Mac mit Mausbedienung hat keine Beruehrungspunkte,
+ * ein iPad schon.
+ *
+ * Am Rechner bleiben beide stehen: Dort ist keines der beiden falsch. Ein
+ * .pkpass laesst sich in der Vorschau oeffnen und per AirDrop aufs iPhone
+ * schicken, ein Google-Pass landet im Konto und damit auf dem Telefon.
+ */
+function plattform() {
+  const ua = navigator.userAgent || '';
+  if (/Android/i.test(ua)) return 'android';
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+  if (/Macintosh/.test(ua) && (navigator.maxTouchPoints ?? 0) > 1) return 'ios';
+  return 'sonst';
+}
+
+/** Zeigt nur den Knopf, der auf diesem Geraet etwas bewirkt. */
+function walletKnoepfeZeigen() {
+  const p = plattform();
+  $('wallet-google').classList.toggle('verborgen', p === 'ios');
+  $('wallet-apple').classList.toggle('verborgen', p === 'android');
 }
 
 /*
