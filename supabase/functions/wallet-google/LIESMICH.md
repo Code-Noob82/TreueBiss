@@ -3,6 +3,39 @@
 Der Code steht vollständig. Was fehlt, sind Zugangsdaten — die kann nur der
 Anbieter beschaffen.
 
+## Die vier Schritte, die wirklich nötig sind
+
+Beim ersten Einrichten am 30.08.2026 hat jeder einzelne davon gefehlt, und
+jeder äußerte sich anders. In dieser Reihenfolge abarbeiten:
+
+| # | Schritt | Fehlt er, meldet Google |
+|---|---|---|
+| 1 | Issuer-Konto anlegen, Aussteller-ID notieren | — |
+| 2 | **Wallet API im Cloud-Projekt aktivieren** | `403 accessNotConfigured` |
+| 3 | **Dienstkonto in der Wallet Console unter *Users* einladen** (Developer) | `403 Permission denied` |
+| 4 | Secrets setzen, Funktion ausrollen | `503 noch nicht eingerichtet` |
+
+Schritt 2 wird leicht übersehen: Das Signieren des Save-JWT braucht die API
+nicht — es passiert lokal. Google braucht sie aber, sobald Klasse oder Objekt
+entstehen sollen.
+
+Prüfen lässt sich alles auf einmal, ohne Gerät:
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/wallet-google" \
+  -H "Authorization: Bearer <nutzer-jwt>" -H "Content-Type: application/json" \
+  -d '{"tenant_id":"...","pruefen":true}'
+```
+
+Die Antwort enthält eine Spur mit jedem REST-Aufruf und Googles Fehlertext im
+Klartext.
+
+> **Und eine Falle, die nichts mit der Einrichtung zu tun hat:** Wird der
+> Save-Link unvollständig in die Adresszeile eingefügt — abgeschnitten, mit
+> Zeilenumbruch, aus einem Codeblock kopiert — meldet Google „Ein Problem ist
+> aufgetreten". Dieselbe Meldung wie bei jedem echten Fehler. Deshalb gehört
+> der Link hinter einen Knopf und nie in die Zwischenablage.
+
 ## 1. Issuer-Konto
 
 In der [Google Pay & Wallet Console](https://pay.google.com/business/console)
@@ -77,9 +110,29 @@ Schlüssel selbst: Sie taucht in Google-Konten und Protokollen auf. Sie ist
 stabil, damit ein zweiter Klick denselben Pass aktualisiert statt einen zweiten
 anzulegen.
 
+## Wie der Pass entsteht
+
+Klasse und Objekt werden **serverseitig über die REST-API** angelegt, das JWT
+verweist nur noch darauf:
+
+```json
+{"loyaltyObjects": [{"id": "<issuer>.<slug>-<hash>"}]}
+```
+
+Drei Gründe, statt beides ins JWT zu packen:
+
+1. Google antwortet über die REST-API **im Klartext**. Beim Speichern sieht
+   der Kunde nur „Ein Problem ist aufgetreten" — das ist zum Suchen unbrauchbar.
+2. Das JWT schrumpft von rund 1600 auf **700 Zeichen**, weit unter der
+   dokumentierten Grenze von 1800.
+3. Das Objekt wird bei jedem Aufruf **aktualisiert**. Der Pass trägt damit den
+   aktuellen Stempelstand, sobald der Kunde ihn neu holt.
+
+Schlägt das Anlegen fehl, antwortet die Funktion mit **502 und der Spur** —
+statt einen Link zu liefern, der beim Kunden ins Leere läuft.
+
 ## Noch nicht gebaut
 
-Der Pass wird beim Hinzufügen mit dem damaligen Stempelstand erzeugt. Er
-**aktualisiert sich nicht von selbst**, wenn ein Stempel dazukommt — dafür
-bräuchte es die REST-API mit einem Zugriffstoken des Dienstkontos. Bis dahin
-zeigt der Pass den Stand vom Hinzufügen; die Karte in der App ist die Wahrheit.
+Der Pass aktualisiert sich, wenn der Kunde ihn erneut anfordert — aber **nicht
+von selbst**, wenn ein Stempel dazukommt. Dafür müsste `issue_stamp` das
+Wallet-Objekt nachziehen. Bis dahin ist die Karte in der App die Wahrheit.

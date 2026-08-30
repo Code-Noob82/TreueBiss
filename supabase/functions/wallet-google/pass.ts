@@ -100,7 +100,7 @@ export function objektBauen(
  */
 export function claimsBauen(
   dienstkontoEmail: string,
-  klasse: unknown,
+  klasse: unknown | null,
   objekt: unknown,
   origins: string[],
 ) {
@@ -110,7 +110,11 @@ export function claimsBauen(
     typ: "savetowallet",
     iat: Math.floor(Date.now() / 1000),
     origins,
-    payload: { loyaltyClasses: [klasse], loyaltyObjects: [objekt] },
+    // Ist die Klasse null, steht sie schon bei Google und gehoert nicht ins
+    // JWT - jedes Feld weniger ist Laenge, die der Browser nicht abschneidet.
+    payload: klasse === null
+      ? { loyaltyObjects: [objekt] }
+      : { loyaltyClasses: [klasse], loyaltyObjects: [objekt] },
   };
 }
 
