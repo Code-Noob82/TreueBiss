@@ -66,6 +66,8 @@
   .eintrag .text { flex: 1 1 16rem; min-width: 0; }
   .eintrag b { display: block; font-family: var(--display); font-weight: 600; }
   .eintrag small { color: var(--tinte-leise); }
+  /* Angebot ausserhalb seines Zeitraums - beim Kunden unsichtbar, hier nicht. */
+  .eintrag .ruht { color: var(--warn-text); font-weight: 600; }
   .eintrag .reihe { flex: 0 0 auto; }
 
   .schalter {
@@ -75,6 +77,14 @@
     cursor: pointer;
   }
   .schalter input { width: auto; margin: 3px 0 0; accent-color: var(--marke); flex: none; }
+
+  /* Kein Fehler, sondern ein Hinweis - deshalb die Warnfarbe, nicht die rote. */
+  .warnung {
+    background: var(--warn); color: var(--warn-text);
+    border-radius: var(--s3); padding: var(--s3) var(--s4);
+    font-size: var(--t-klein); line-height: 1.5;
+    margin: calc(var(--s2) * -1) 0 var(--s4);
+  }
 
   .stand { font-size: var(--t-klein); color: var(--tinte-leise); margin: 0 0 var(--s3); }
   .stand.an { color: var(--gut-text); font-weight: 600; }
@@ -243,6 +253,7 @@
       </div>
       <label for="b-limit">Stempel je Kunde und Tag</label>
       <input id="b-limit" type="number" min="1" max="100" inputmode="numeric">
+      <p class="warnung verborgen" id="b-tresen-warnung"></p>
 
       <label class="schalter">
         <input id="b-nurkassen" type="checkbox">
@@ -537,6 +548,7 @@ function formularFuellen() {
   $('b-signatur').checked = !!aktiv.require_signed_proof;
   $('b-tresen').checked = !!aktiv.counter_qr_enabled;
   $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
+  tresenWarnungPruefen();
 }
 
 /** Farbwaehler und Textfeld zeigen denselben Wert. */
@@ -578,6 +590,10 @@ async function angeboteLaden() {
     .from('offers').select('*').eq('tenant_id', aktiv.id).order('created_at');
   if (error) { melden(fehlertext(error)); return; }
   const liste = data ?? [];
+  // Heute in Europe/Berlin als YYYY-MM-DD, damit der Vergleich mit den
+  // Datumsfeldern derselbe ist wie in der Policy. 'sv-SE' liefert genau
+  // dieses Format; das Land spielt dabei keine Rolle.
+  const tag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
   if (!liste.length) {
     $('angebote').innerHTML = '<p class="leer-text">Noch kein Angebot angelegt.</p>';
     return;
@@ -587,8 +603,18 @@ async function angeboteLaden() {
       ? `${a.valid_from ? datum(a.valid_from) : '…'} – ${a.valid_to ? datum(a.valid_to) : '…'}`
       : '';
     const unten = [a.description, zeitraum].filter(Boolean).map(h).join(' · ');
+    /*
+     * Ob das Angebot gerade beim Kunden steht, entscheidet die Policy
+     * `offers_read`. Der Betrieb liest ueber `offers_owner_read` auch das
+     * Abgelaufene - dann muss hier aber stehen, dass es ruht. Sonst sieht
+     * eine gepflegte Liste aus wie eine wirksame.
+     */
+    const ruht = a.valid_to && a.valid_to < tag ? 'für Kunden nicht mehr sichtbar'
+      : a.valid_from && a.valid_from > tag ? 'für Kunden noch nicht sichtbar'
+      : '';
+    const zeile = unten + (ruht ? `${unten ? ' · ' : ''}<span class="ruht">${ruht}</span>` : '');
     return `<div class="eintrag">
-      <div class="text"><b>${h(a.title)}</b>${unten ? `<small>${unten}</small>` : ''}</div>
+      <div class="text"><b>${h(a.title)}</b>${zeile ? `<small>${zeile}</small>` : ''}</div>
       <div class="reihe">
         <button class="still schmal" data-bearbeiten="${h(a.id)}">Bearbeiten</button>
         <button class="gefahr schmal" data-loeschen="${h(a.id)}">Löschen</button>
@@ -709,6 +735,38 @@ $('speichern').onclick = async () => {
 };
 
 $('zuruecksetzen').onclick = () => { formularFuellen(); melden(''); };
+
+/*
+ * Tresen-QR und ein hohes Tageslimit passen nicht zusammen.
+ *
+ * Die Vorgabe 25 ist ein Fangnetz fuer den Beleg-Weg - dort ist das
+ * Zeitfenster von zwei Stunden die eigentliche Huerde. Beim Tresen-Code gibt
+ * es die nicht: Er belegt Anwesenheit, nicht Kauf, und wer stehen bleibt,
+ * kann nach jedem Wechsel erneut scannen. Dann ist das Tageslimit die
+ * einzige Huerde, die uebrig bleibt.
+ *
+ * Ein Hinweis, keine Sperre - der Betrieb entscheidet weiter selbst.
+ */
+const LIMIT_EMPFEHLUNG = 3;
+
+function tresenWarnungPruefen() {
+  const feld = $('b-tresen-warnung');
+  const limit = Number($('b-limit').value);
+  const zeigen = $('b-tresen').checked && Number.isFinite(limit) && limit > LIMIT_EMPFEHLUNG;
+  feld.classList.toggle('verborgen', !zeigen);
+  if (!zeigen) return;
+  const proTag = aktiv?.stamps_per_card
+    ? ` Bei ${aktiv.stamps_per_card} Stempeln pro Karte sind das bis zu `
+      + `${(limit / aktiv.stamps_per_card).toFixed(1).replace('.', ',')} volle Karten am Tag.`
+    : '';
+  feld.textContent = `Der Tresen-Code belegt Anwesenheit, nicht den Kauf — wer `
+    + `stehen bleibt, kann nach jedem Wechsel erneut scannen. Das Tageslimit `
+    + `ist dann die einzige Hürde, und ${limit} ist dafür hoch.${proTag} `
+    + `Empfohlen sind 2 bis ${LIMIT_EMPFEHLUNG}.`;
+}
+
+$('b-tresen').onchange = tresenWarnungPruefen;
+$('b-limit').oninput = tresenWarnungPruefen;
 
 $('b-speichern').onclick = async () => {
   melden('');

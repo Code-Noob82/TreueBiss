@@ -309,7 +309,27 @@ function gutscheineZeichnen() {
   });
 }
 
+/*
+ * Heute in Europe/Berlin als YYYY-MM-DD, damit sich die Datumsfelder aus der
+ * Datenbank direkt vergleichen lassen - ISO-Datumstexte sind zeichenweise in
+ * derselben Reihenfolge wie zeitlich. 'sv-SE' ist der kuerzeste Weg zu diesem
+ * Format, das Land spielt dabei keine Rolle.
+ */
+const heute = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+
+/*
+ * Den Zeitraum prueft eigentlich die Policy `offers_read`. Hier steht er ein
+ * zweites Mal, weil der Betriebsinhaber ueber `offers_owner_read` auch
+ * abgelaufene Angebote lesen darf: Ohne diesen Filter saehe ausgerechnet er
+ * in der Kundenansicht etwas anderes als seine Kunden - und wuerde beim
+ * Nachsehen glauben, alles sei in Ordnung.
+ */
+function laeuft(a, tag = heute()) {
+  return (!a.valid_from || a.valid_from <= tag) && (!a.valid_to || a.valid_to >= tag);
+}
+
 function angeboteZeichnen(liste) {
+  liste = liste?.filter((a) => laeuft(a));
   if (!liste?.length) { $('angebote-bereich').classList.add('verborgen'); return; }
   $('angebote').innerHTML = liste.map((a) => `<div class="angebot">
       <b>${h(a.title)}</b>
