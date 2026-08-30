@@ -408,8 +408,15 @@ und über die eigenen `memberships` scheiterten genau daran.
 
 Deshalb erzeugt `scripts/manifeste-bauen.mjs` beim Veröffentlichen **ein
 Manifest je Betrieb** unter `web/app/m/<slug>.webmanifest`, mit
-`start_url: "../?b=<slug>"`. Die Seite hängt es ein, sobald der Betrieb
-bekannt ist. Nebenbei löst das die White-Label-Lücke: Die installierte App
+`start_url: "../?b=<slug>"`.
+
+**Der Verweis darauf wird erzeugt, nicht geändert.** Ein festes
+`<link rel="manifest">` im HTML und ein Skript darunter, das es umhängt, reicht
+nicht: Der Browser beginnt das Manifest zu verarbeiten, sobald er das Link-Tag
+sieht — also bevor das Skript darunter läuft. Beim „Zum Home-Bildschirm
+hinzufügen" galt dann weiter das allgemeine mit `start_url: "./"`. Es gibt
+deshalb überhaupt kein festes Link-Tag mehr; ein Schnipsel ganz oben im `head`
+legt den einen richtigen an, aus der Adresse. Nebenbei löst das die White-Label-Lücke: Die installierte App
 trägt jetzt den **Namen des Betriebs** und seine Farbe statt „TreueBiss".
 
 Die Manifeste sind nicht eingecheckt — sie entstehen aus den Daten des
