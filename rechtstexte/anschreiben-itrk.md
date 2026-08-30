@@ -16,6 +16,18 @@ nicht ergänzen konnte.
 Ich schildere Ihnen nachstehend, was die App tatsächlich tut, welche Passagen
 zu streichen sind und was aufzunehmen wäre.
 
+**Vorab die Frage, die möglicherweise alles Weitere erklärt:** Ich habe als
+Geschäftsmodell „Apps (Datenschutzerklärung)" gewählt, weil ich in der Liste
+nichts Passenderes gefunden habe. Tatsächlich betreibe ich kein
+Handelsgeschäft und vertreibe keine App über einen Store, sondern stelle
+Betrieben eine **gehostete Software gegen Entgelt zur Nutzung bereit**
+(Software-as-a-Service). Die App ist lediglich die Oberfläche, die deren
+Endkunden sehen.
+
+Ist „Apps" hierfür der falsche Anwendungsbereich? Ich habe auf Ihrer Seite ein
+eigenes Paket „Rechtssichere AGB für Software-as-a-Service" gefunden. Meine
+Fragen dazu stehen am Ende unter Punkt 4.
+
 ## Was die App ist
 
 **TreueBiss** ist eine digitale Stempelkarte für Bäckereien, Metzgereien und
@@ -203,11 +215,27 @@ ihn durch eine Handlung in der App ein.
 Davon hängt ab, ob sich die Verarbeitung von Karte, Stempeln und Gutscheinen
 auf Art. 6 Abs. 1 lit. b DSGVO stützen lässt oder auf lit. f auszuweichen ist.
 
-## 4. Weiterer Bedarf
+## 4. Fragen zum Paket und zum Anwendungsbereich
 
-Für den Vertrieb an Betriebe benötige ich zusätzlich einen
-**Auftragsverarbeitungsvertrag** beziehungsweise eine **Art.-26-Vereinbarung**
-sowie eine Darstellung der **technischen und organisatorischen Maßnahmen**.
-Ich bin für einen Hinweis dankbar, ob Sie hierfür Muster bereitstellen.
+**4.1 Welcher Anwendungsbereich ist der richtige?** Ich stelle Betrieben eine
+gehostete Software zur Nutzung bereit, verkaufe keine Waren und vertreibe
+nichts über einen App-Store. In der Liste der Geschäftsmodelle fand ich dafür
+keinen Eintrag und habe „Apps" gewählt. Ist das die Ursache der oben
+genannten Fehler?
+
+**4.2 Ist das SaaS-Paket in meinem Tarif enthalten?** Ich nutze das
+**Premium-Paket**. Lässt sich „Rechtssichere AGB für Software-as-a-Service"
+als einer meiner Anwendungsbereiche wählen, oder ist es separat zu buchen?
+
+**4.3 Ist Premium für meinen Fall die passende Stufe?** Das Paket richtet sich
+laut Beschreibung an Händler, die auf verschiedenen Plattformen verkaufen. Ich
+verkaufe auf keiner Plattform und nutze weder ShopVote noch das enthaltene
+Cookie-Consent-Tool — letzteres habe ich separat gebucht und auf meiner
+Website im Einsatz. Von den fünf Präsenzen nutze ich derzeit zwei.
+
+**4.4 Weiterer Bedarf.** Für den Vertrieb an Betriebe benötige ich zusätzlich
+einen **Auftragsverarbeitungsvertrag** beziehungsweise eine
+**Art.-26-Vereinbarung** sowie eine Darstellung der **technischen und
+organisatorischen Maßnahmen**. Stellen Sie hierfür Muster bereit?
 
 Mit freundlichen Grüßen
