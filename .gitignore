@@ -35,3 +35,19 @@ local.properties
 # Backends - eingecheckt waeren sie sofort veraltet, sobald ein Betrieb
 # dazukommt oder sich umbenennt.
 web/app/m/
+
+# Zugangsdaten. Dieses Repository ist oeffentlich - ein hier abgelegter
+# Dienstkonto-Schluessel waere binnen Minuten von Scannern gefunden, und ein
+# Commit laesst sich nicht wirklich zuruecknehmen. Die Schluessel gehoeren in
+# `supabase secrets`, nie in den Quelltext.
+*service-account*.json
+*service_account*.json
+*-key.json
+*_key.json
+schluessel*.json
+credentials*.json
+# So benennt Google den heruntergeladenen Dienstkonto-Schluessel:
+# <projekt-id>-<12 Hexzeichen>.json
+*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].json
+*.p12
+*.pem
