@@ -761,6 +761,23 @@ async function starten() {
 
     const stand = await datenHolen();
     if (stand === 'ok') betriebMerken(slug);
+
+    /*
+     * Nachladen, wenn die App wieder in den Vordergrund kommt.
+     *
+     * Ein Symbol auf dem Startbildschirm wird selten neu gestartet - es
+     * bleibt im Hintergrund liegen und zeigt beim naechsten Blick den Stand
+     * von gestern. Aendert der Betrieb ein Angebot, kam das bisher erst mit
+     * dem naechsten Kaltstart an.
+     *
+     * Nur bei sichtbarer Seite und ohne laufende Aktion: Waehrend gesammelt
+     * oder eingeloest wird, holt der Vorgang selbst nach.
+     */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (scanLaeuft || sammelnLaeuft) return;
+      datenHolen().catch((e) => console.warn('Nachladen fehlgeschlagen', e));
+    });
     if (stand === 'unbekannt') {
       manifestZuruecksetzen();
       melden('Diesen Betrieb gibt es hier nicht. Stimmt die Adresse?');
