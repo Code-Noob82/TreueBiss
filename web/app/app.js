@@ -99,8 +99,11 @@ function fehlertext(fehler) {
   if (/already redeemed/i.test(t)) return 'Dieser Gutschein wurde bereits eingelöst.';
   if (/expired/i.test(t)) return 'Dieser Gutschein ist abgelaufen.';
   if (/not found/i.test(t)) return 'Diesen Gutschein gibt es nicht.';
-  if (/does not exist|schema cache/i.test(t)) {
-    return 'Die Datenbank ist nicht auf dem aktuellen Stand.';
+  if (fehler?.code === '42703' || fehler?.code === 'PGRST202'
+      || /column .* does not exist|schema cache/i.test(t)) {
+    // Dem Kunden nützt kein SQL-Befehl. Er soll nur wissen, dass es nicht
+    // an ihm liegt und dass Wiederholen nichts bringt.
+    return 'Hier ist gerade etwas nicht eingerichtet. Bitte sag dem Personal Bescheid.';
   }
   return 'Das hat nicht geklappt. Bitte noch einmal versuchen.';
 }

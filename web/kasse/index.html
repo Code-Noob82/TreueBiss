@@ -303,9 +303,19 @@ async function zahlenLaden() {
   const { data, error } = await db.rpc('staff_pilot_summary');
   if (error) {
     if (istNetzfehler(error)) return { fehler: 'Keine Verbindung zum Server.' };
-    if (/does not exist|schema cache/i.test(error.message ?? '')) {
-      return { fehler: 'Die Kassenfunktionen fehlen in der Datenbank. '
-                     + 'Wurde <code>supabase/schema.sql</code> eingespielt?' };
+    if (error.code === '42703' || /column .* does not exist/i.test(error.message ?? '')) {
+      return { fehler: 'Der Datenbank fehlt eine Spalte. Führe '
+                     + '<code>supabase/schema.sql</code> in der aktuellen '
+                     + 'Fassung im SQL-Editor aus.' };
+    }
+    // PostgREST sagt bei jeder unbekannten Funktion "schema cache", auch wenn
+    // es sie gar nicht gibt. Beide Handgriffe nennen, statt zu raten.
+    if (error.code === 'PGRST202' || /schema cache/i.test(error.message ?? '')) {
+      return { fehler: 'Diese Funktion kennt die Schnittstelle nicht. Entweder '
+                     + 'ist <code>supabase/schema.sql</code> nicht in der '
+                     + 'aktuellen Fassung eingespielt — oder PostgREST hat den '
+                     + 'Schema-Cache noch nicht neu geladen; dann hilft '
+                     + '<code>notify pgrst, \'reload schema\';</code>.' };
     }
     return { fehler: 'Die Zahlen konnten nicht geladen werden: ' + error.message };
   }
