@@ -100,24 +100,55 @@ die anonyme Anmeldung weg und die Karte nicht mehr erreichbar.
 > sind Datenflüsse an Dritte. Für Supabase ist ein AVV nötig; die
 > Rechtsgrundlage für die Drittlandsübermittlung ist zu klären.
 
-## 5. Löschung — offener Punkt
+## 5. Löschung der Kaufnachweise
 
-**Es gibt derzeit keine automatische Löschung.** Weder für `stamps` noch für
-`stamp_proofs`, `vouchers` oder `offer_redemptions`. Es gibt auch keine
-Funktion, mit der ein Kunde seine Daten selbst löscht.
+**Zwei Fristen, weil zwei Zwecke zu verschiedenen Zeiten enden.** Beide sind je
+Betrieb einstellbar; die Zahlen unten sind die Vorgaben.
 
-Technisch räumt `on delete cascade` alles ab, sobald die Zeile in `auth.users`
-verschwindet — es löscht sie nur niemand.
+| Stufe | Vorgabe | Was passiert |
+|---|---|---|
+| `proof_detail_days` | 30 Tage | **Betrag und Kassennummer werden geleert.** Die Zeile bleibt. |
+| `proof_retention_days` | 90 Tage | Der Nachweis wird gelöscht. |
 
-Vor dem Pilotbetrieb zu entscheiden:
+Nach Stufe 1 ist die Einkaufshistorie weg, während der Nachweis weiter
+verhindert, dass derselbe Bon zweimal zählt.
 
-1. **Aufbewahrungsdauer** für `stamp_proofs`. Fachlich nötig ist der Eintrag
-   nur, damit derselbe Bon nicht zweimal zählt. Nach Ablauf der Kartenlaufzeit
-   hat er keinen Zweck mehr.
-2. **Löschweg für den Kunden.** Ohne Konto gibt es niemanden, der einen Antrag
-   stellen kann — außer über die App selbst, solange sie installiert ist.
-3. **Automatische Bereinigung durch Supabase.** Anonyme Nutzer werden nicht von
-   selbst entfernt; das ist Absicht, weil sonst Karten verschwänden.
+**Für die Erklärung ist die Frist des jeweiligen Betriebs maßgeblich, nicht die
+Vorgabe.** Art. 13 Abs. 2 lit. a DSGVO erlaubt ausdrücklich, statt einer festen
+Dauer die Kriterien zu nennen — hier also: *bis der Nachweis für die Prüfung
+auf Mehrfachnutzung nicht mehr gebraucht wird.*
+
+### Warum diese Fristen und keine gesetzlichen
+
+Es gibt für diese Daten **keine gesetzliche Aufbewahrungspflicht.** § 147 AO
+verpflichtet den Steuerpflichtigen zu seinen eigenen Buchungsbelegen — das ist
+der Betrieb mit seiner Kasse und seiner TSE, nicht diese App mit ihrem Verweis
+darauf. Damit greift ungebremst Art. 5 Abs. 1 lit. e DSGVO: nur so lange wie
+nötig.
+
+### Die Untergrenze ist abgeleitet, nicht gewählt
+
+Die Aufbewahrung kann nicht beliebig kurz sein. Ein Beleg wird abgelehnt,
+sobald er älter ist als `proof_max_age_minutes` — diese Prüfung steht **vor**
+dem Eindeutigkeitsschlüssel. Innerhalb dieses Fensters hält allein der
+gespeicherte Nachweis den zweiten Stempel ab. Die Datenbank erzwingt deshalb:
+
+    proof_retention_days * 1440 >= proof_max_age_minutes
+
+Ebenso zählt das Tageslimit die Nachweise des laufenden Tages; ein Tag ist das
+Minimum.
+
+### Was noch offen ist
+
+1. **`stamps`, `vouchers`, `memberships`** werden nicht gelöscht. Das ist die
+   Leistung selbst — wer sie löscht, nimmt dem Kunden seine Karte. Wann das
+   geschehen soll, ist eine Entscheidung des Betriebs.
+2. **Löschweg für den Kunden** (Art. 17). Ohne Konto gibt es niemanden, der
+   einen Antrag stellen kann — außer über die App selbst, solange sie
+   installiert ist. Eine Funktion „Karte löschen" fehlt.
+3. **Der Zeitplan.** `cleanup_expired_proofs()` läuft nicht von selbst; es
+   braucht einen Auslöser (pg_cron oder ein geplanter Aufruf). Ohne den
+   bleiben die Fristen Papier.
 
 ## 6. Rechtsgrundlagen — Vorschlag zur Prüfung
 

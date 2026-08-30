@@ -529,6 +529,40 @@ update public.tenant_staff set role = 'owner'
 Zuordnung von Personal. Der Build der App hängt an den ersten beiden; ein
 Betrieb, der sich selbst abschaltet, ist ein Supportfall.
 
+### Aufbewahrung der Kaufnachweise
+
+`stamp_proofs` speichert bei jedem Beleg-Stempel Kassennummer, Vorgangsnummer,
+**Betrag** und Zeitpunkt. Über die Nutzerkennung entsteht damit eine Historie
+von Einkaufsbeträgen — pseudonym, aber Kaufverhalten. Das braucht eine Frist.
+
+Eine gesetzliche Aufbewahrungspflicht gibt es dafür nicht: § 147 AO trifft den
+Steuerpflichtigen und dessen eigene Buchungsbelege, also den Betrieb mit seiner
+Kasse — nicht diese App mit ihrem Verweis darauf. Damit gilt Art. 5 Abs. 1
+lit. e DSGVO ungebremst, und Art. 17 Abs. 1 lit. a macht daraus eine
+Löschpflicht, sobald der Zweck entfällt.
+
+Zwei Zwecke enden zu verschiedenen Zeiten, also zwei Fristen je Betrieb:
+
+| Spalte | Vorgabe | Wirkung |
+|---|---|---|
+| `proof_detail_days` | 30 | Betrag und Kassennummer werden geleert, die Zeile bleibt |
+| `proof_retention_days` | 90 | Der Nachweis wird gelöscht |
+
+`cleanup_expired_proofs()` erledigt beides, ist nur für `service_role`
+freigegeben und folgenlos wiederholbar. **Sie läuft nicht von selbst** — es
+braucht einen Zeitplan (pg_cron oder ein geplanter Aufruf), sonst bleiben die
+Fristen Papier.
+
+**Die Untergrenze ist abgeleitet, nicht gewählt.** Ein Beleg wird abgelehnt,
+sobald er älter ist als `proof_max_age_minutes` — diese Prüfung steht vor dem
+Eindeutigkeitsschlüssel. Innerhalb des Fensters hält allein der gespeicherte
+Nachweis den zweiten Stempel ab. Die Datenbank erzwingt deshalb
+`proof_retention_days * 1440 >= proof_max_age_minutes`; die Verwaltung sagt es
+vorher, damit niemand erst beim Speichern gegen eine Wand läuft.
+
+Was **nicht** gelöscht wird: `stamps`, `vouchers` und `memberships`. Das ist die
+Leistung selbst — wer sie löscht, nimmt dem Kunden seine Karte.
+
 **Der Zeitraum eines Angebots wird serverseitig durchgesetzt.** `offers_read`
 zeigt nur, was gerade läuft; leere Felder heißen offen, und Anfangs- wie
 Endtag zählen mit — ein Angebot „bis 31.08." steht am 31.08. noch da. Die

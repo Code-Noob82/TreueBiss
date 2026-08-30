@@ -89,6 +89,46 @@ update public.tenant_secrets set redeem_code_hash = null where redeem_code_hash 
 alter table public.tenants
     add column if not exists requires_redeem_code boolean not null default false;
 
+/*
+ * Aufbewahrung der Kaufnachweise.
+ *
+ * Art. 5 Abs. 1 lit. e DSGVO laesst eine Speicherung nur so lange zu, wie sie
+ * fuer den Zweck erforderlich ist; Art. 17 Abs. 1 lit. a macht daraus eine
+ * Loeschpflicht, sobald der Zweck entfaellt. Eine gesetzliche Aufbewahrungs-
+ * pflicht steht dem nicht entgegen: § 147 AO verpflichtet den Steuer-
+ * pflichtigen zu seinen eigenen Buchungsbelegen - das ist der Betrieb mit
+ * seiner Kasse, nicht diese App mit ihrem Verweis darauf.
+ *
+ * Zwei Fristen, weil zwei verschiedene Zwecke ablaufen:
+ *
+ *   proof_detail_days     Wie lange Betrag und Kassennummer stehen bleiben.
+ *                         Sie werden beim Stempeln geprueft und danach nur
+ *                         noch gebraucht, um einen strittigen Stempel zu
+ *                         erklaeren. Danach werden sie geleert, die Zeile
+ *                         bleibt.
+ *   proof_retention_days  Wie lange der Nachweis selbst steht. Er verhindert,
+ *                         dass derselbe Beleg zweimal zaehlt.
+ *
+ * Die Vorgaben sind eine Abwaegung und keine Rechtsauskunft - deshalb stehen
+ * sie als Spalte da und nicht als Konstante im Code. Was sich dagegen ableiten
+ * laesst, ist die Untergrenze, und die steht als Bedingung darunter.
+ */
+alter table public.tenants
+    add column if not exists proof_detail_days int not null default 30
+        check (proof_detail_days between 1 and 365);
+alter table public.tenants
+    add column if not exists proof_retention_days int not null default 90
+        check (proof_retention_days between 1 and 3650);
+
+do $$
+begin
+    -- Erst leeren, dann loeschen. Andersherum ergaebe die kuerzere Frist keinen Sinn.
+    alter table public.tenants add constraint tenants_detail_vor_retention
+        check (proof_detail_days <= proof_retention_days);
+exception when duplicate_object then null;
+end
+$$;
+
 -- Regeln fuer die Pruefung des Kaufnachweises. Die Vorgaben sind bewusst
 -- milde: Ein bestehendes Projekt darf durch das Einspielen nicht ploetzlich
 -- Stempel ablehnen. Scharf stellt der Betrieb selbst in der Verwaltung.
@@ -125,6 +165,24 @@ alter table public.tenants
     -- Code nichts nuetzt; lang genug, dass eine Warteschlange durchkommt.
     add column if not exists counter_qr_seconds int not null default 60
         check (counter_qr_seconds between 15 and 900);
+
+do $$
+begin
+    /*
+     * Die harte Untergrenze, und sie ist abgeleitet, nicht gewaehlt:
+     *
+     * Ein Beleg wird abgelehnt, sobald er aelter ist als
+     * proof_max_age_minutes - die Pruefung steht vor dem Eindeutigkeits-
+     * schluessel. Wird der Nachweis frueher geloescht als dieses Fenster
+     * reicht, laesst sich derselbe Beleg innerhalb seiner Gueltigkeit erneut
+     * einreichen. Ausserdem zaehlt das Tageslimit die Nachweise des laufenden
+     * Tages; ein Tag ist deshalb das Minimum.
+     */
+    alter table public.tenants add constraint tenants_retention_deckt_pruefzeitfenster
+        check (proof_retention_days * 1440 >= proof_max_age_minutes);
+exception when duplicate_object then null;
+end
+$$;
 
 -- Umzug des Einloese-Codes aus tenants. Laeuft nur, wo die alte Spalte noch
 -- steht; auf einer frischen Datenbank passiert nichts.
@@ -1199,6 +1257,80 @@ where not exists (
     where tenant_id = '00000000-0000-4000-8000-000000000001'
 );
 
+-- ================================================== Aufbewahrung und Loeschung
+
+/*
+ * Raeumt abgelaufene Kaufnachweise ab.
+ *
+ * Rechtlicher Anlass: Art. 5 Abs. 1 lit. e DSGVO erlaubt eine Speicherung nur
+ * so lange, wie der Zweck sie erfordert; Art. 17 Abs. 1 lit. a macht daraus
+ * eine Loeschpflicht, sobald er entfaellt. Eine gesetzliche Aufbewahrungs-
+ * pflicht steht nicht entgegen - § 147 AO trifft den Steuerpflichtigen und
+ * seine eigenen Buchungsbelege, also den Betrieb mit seiner Kasse. Der
+ * Verweis darauf in dieser Tabelle ist kein Buchungsbeleg.
+ *
+ * Zwei Stufen, weil zwei Zwecke zu verschiedenen Zeiten enden:
+ *
+ *   1. Betrag und Kassennummer werden geleert. Beide werden beim Stempeln
+ *      geprueft und danach nur noch gebraucht, um einen strittigen Stempel zu
+ *      erklaeren. Damit verschwindet die Einkaufshistorie, waehrend der
+ *      Nachweis selbst weiterarbeitet.
+ *   2. Der Nachweis wird geloescht. Er verhindert, dass derselbe Beleg
+ *      zweimal zaehlt - dieser Zweck endet mit der Aufbewahrungsfrist des
+ *      Betriebs, die nie kuerzer sein kann als sein Pruefzeitfenster.
+ *
+ * Warum nicht auch stamps, vouchers und memberships: Das ist die Leistung
+ * selbst. Wer sie loescht, nimmt dem Kunden seine Karte. Wann das passieren
+ * soll, ist eine Entscheidung des Betriebs und keine, die hier stillschweigend
+ * getroffen wird.
+ *
+ * Laeuft als security definer und ist nur fuer service_role freigegeben:
+ * Ein Aufruf aus der App koennte sonst fremde Nachweise abraeumen und damit
+ * die Mehrfachnutzung wieder oeffnen.
+ */
+create or replace function public.cleanup_expired_proofs()
+returns table (details_geleert bigint, nachweise_geloescht bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_geleert  bigint := 0;
+    v_geloescht bigint := 0;
+begin
+    with betroffen as (
+        update public.stamp_proofs p
+           set register_serial = null, amount_cents = null
+          from public.tenants t
+         where t.id = p.tenant_id
+           and (p.register_serial is not null or p.amount_cents is not null)
+           and p.created_at < now() - make_interval(days => t.proof_detail_days)
+        returning 1
+    )
+    select count(*) into v_geleert from betroffen;
+
+    with betroffen as (
+        delete from public.stamp_proofs p
+         using public.tenants t
+         where t.id = p.tenant_id
+           and p.created_at < now() - make_interval(days => t.proof_retention_days)
+        returning 1
+    )
+    select count(*) into v_geloescht from betroffen;
+
+    return query select v_geleert, v_geloescht;
+end;
+$$;
+
+revoke all on function public.cleanup_expired_proofs() from public;
+do $$
+begin
+    if exists (select 1 from pg_roles where rolname = 'service_role') then
+        execute 'grant execute on function public.cleanup_expired_proofs() to service_role';
+    end if;
+end
+$$;
+
 -- ================================================ Auswertung fuer den Piloten
 --
 -- Die Zahlen stammen aus den Tabellen, die ohnehin gefuehrt werden - es gibt
@@ -1478,6 +1610,7 @@ grant execute on function public.owner_update_tenant(
 -- die alte sechsstellige Fassung daneben, und der Aufruf waere mehrdeutig.
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean);
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int);
 
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
@@ -1488,7 +1621,11 @@ create or replace function public.owner_update_proof_rules(
     p_allow_opaque    boolean,
     p_require_signed  boolean default false,
     p_counter_enabled boolean default false,
-    p_counter_seconds int default 60
+    p_counter_seconds int default 60,
+    -- Aufbewahrung. Vorgaben wie in der Tabelle, damit ein bestehender
+    -- Aufruf ohne diese beiden Werte nichts verstellt.
+    p_detail_days     int default 30,
+    p_retention_days  int default 90
 )
 returns setof public.tenants
 language plpgsql
@@ -1529,12 +1666,26 @@ begin
            allow_opaque_proofs    = coalesce(p_allow_opaque, true),
            require_signed_proof   = coalesce(p_require_signed, false),
            counter_qr_enabled     = coalesce(p_counter_enabled, false),
-           counter_qr_seconds     = p_counter_seconds
+           counter_qr_seconds     = p_counter_seconds,
+           proof_detail_days      = p_detail_days,
+           proof_retention_days   = p_retention_days
      where id = p_tenant_id;
 
     -- Beim Einschalten einen Schluessel anlegen, falls noch keiner da ist.
     -- Ohne ihn liefert counter_token null und der Betrieb stuende vor einem
     -- Schalter, der nichts tut.
+    /*
+     * Die Untergrenze faengt zwar die Bedingung an der Tabelle ab, aber ein
+     * check_violation ist fuer die Verwaltung eine unlesbare Meldung. Hier
+     * steht, was der Betrieb tun kann.
+     */
+    if p_retention_days * 1440 < p_max_age_minutes then
+        raise exception 'retention shorter than proof window' using errcode = '22023';
+    end if;
+    if p_detail_days > p_retention_days then
+        raise exception 'detail period longer than retention' using errcode = '22023';
+    end if;
+
     if coalesce(p_counter_enabled, false) then
         insert into public.tenant_secrets (tenant_id, redeem_code_hash, counter_secret)
         values (p_tenant_id, null, encode(extensions.gen_random_bytes(32), 'hex'))
@@ -1547,8 +1698,8 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int) from public;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) from public;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*
