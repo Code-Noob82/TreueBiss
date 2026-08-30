@@ -557,8 +557,22 @@ Aufräumlauf ohne Belang.
 
 Der Zeitplan wird beim Einspielen des Schemas gesetzt und vorher abgeräumt —
 was pg_cron bei einem schon vergebenen Jobnamen tut, ist nicht dokumentiert.
-Fehlt die Erweiterung, meldet das Schema es und läuft weiter; im lokalen
-Testpostgres gibt es sie nicht.
+
+**pg_cron muss einmal aktiv sein.** Das Schema versucht es selbst, kann daran
+aber scheitern; dann steht eine Warnung im Ergebnis. Einschalten im Dashboard
+unter **Database → Extensions**, `pg_cron` suchen, aktivieren — danach das
+Schema noch einmal einspielen. Ob es geklappt hat:
+
+```sql
+select
+  (select count(*) from pg_available_extensions where name = 'pg_cron') as verfuegbar,
+  (select count(*) from pg_extension          where extname = 'pg_cron') as aktiv,
+  (select count(*) from pg_namespace          where nspname = 'cron')    as schema_da;
+```
+
+Steht `aktiv` auf 0, greifen die Löschfristen nicht — sie sind dann nur
+konfiguriert, nicht durchgesetzt. Im lokalen Testpostgres gibt es die
+Erweiterung nicht; dort läuft das Schema mit einer Warnung weiter.
 
 Nachsehen, ob er lief:
 

@@ -1357,8 +1357,14 @@ begin
     begin
         create extension if not exists pg_cron;
     exception when others then
-        -- Fehlende Rechte oder Erweiterung: kein Grund, das Schema abzubrechen.
-        raise notice 'pg_cron nicht verfuegbar (%). Zeitplan wird uebersprungen.', sqlerrm;
+        /*
+         * Kein Grund, das Schema abzubrechen - aber ein Grund, laut zu sein.
+         * `notice` zeigt der SQL-Editor von Supabase meist nicht an; der
+         * Fehlschlag blieb dadurch unsichtbar, und der Zeitplan fehlte,
+         * ohne dass es jemandem auffiel.
+         */
+        raise warning 'pg_cron liess sich nicht aktivieren: %', sqlerrm;
+        raise warning 'Im Dashboard unter Database -> Extensions einschalten, dann dieses Skript erneut ausfuehren.';
     end;
 end
 $$;
@@ -1368,7 +1374,8 @@ declare
     v_name text := 'treuebiss-nachweise-aufraeumen';
 begin
     if not exists (select 1 from pg_extension where extname = 'pg_cron') then
-        raise notice 'Ohne pg_cron laeuft cleanup_expired_proofs() nicht von selbst.';
+        raise warning 'KEIN ZEITPLAN: cleanup_expired_proofs() laeuft nicht von selbst.';
+        raise warning 'Die Loeschfristen greifen erst, wenn pg_cron aktiv ist.';
         return;
     end if;
 
