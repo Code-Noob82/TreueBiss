@@ -16,6 +16,7 @@ also nicht versehentlich unter der TreueBiss-Adresse online.
 | `datenschutz-app.html` | Fertig angepasst für `/datenschutz-app`. |
 | `verarbeitungsuebersicht.md` | Was die App wirklich verarbeitet — Zuarbeit für den ITRK-Konfigurator. Kein Rechtstext. |
 | `konfigurator-luecken.md` | Was der Konfigurator **nicht** abfragt und deshalb gesondert an die Kanzlei muss. |
+| `anschreiben-itrk.md` | Fertiges Anschreiben an die Kanzlei: falsche Passagen wörtlich zitiert, Fehlendes ergänzt. |
 
 ## Eine neue Seite anlegen
 
