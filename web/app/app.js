@@ -622,6 +622,58 @@ async function zuGoogleWallet() {
   }
 }
 
+/*
+ * "Zu Apple Wallet hinzufuegen".
+ *
+ * Anders als bei Google gibt es keinen Link, den Apple aufloest: Der Pass ist
+ * eine Datei. Die Funktion liefert sie, und das Geraet oeffnet sie - unter iOS
+ * uebernimmt Wallet dann selbst.
+ *
+ * Deshalb hier kein window.open, sondern ein Objekt-URL: Ein neues Fenster
+ * mit einem Dateidownload bleibt sonst leer stehen.
+ */
+async function zuAppleWallet() {
+  if (!betrieb?.id) return;
+  const knopf = $('wallet-apple');
+  beschaeftigt(knopf, true, 'Wird erzeugt …');
+  try {
+    const { data: sitzung } = await db.auth.getSession();
+    const antwort = await fetch(`${konfig.SUPABASE_URL}/functions/v1/wallet-apple`, {
+      method: 'POST',
+      headers: {
+        apikey: konfig.SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${sitzung.session?.access_token ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tenant_id: betrieb.id }),
+    });
+    if (!antwort.ok) {
+      const grund = await antwort.json().catch(() => ({}));
+      melden(/eingerichtet/i.test(grund?.fehler ?? '')
+        ? 'Apple Wallet ist für TreueBiss noch nicht eingerichtet.'
+        : 'Der Wallet-Pass liess sich nicht erzeugen.');
+      console.error('wallet-apple', grund);
+      return;
+    }
+    const paket = await antwort.blob();
+    const ziel = URL.createObjectURL(paket);
+    // Ein Anker statt location: Safari behandelt den Pass sonst als
+    // Seitenwechsel und zeigt eine leere Seite.
+    const a = document.createElement('a');
+    a.href = ziel;
+    a.download = `${slug}.pkpass`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(ziel), 30000);
+  } catch (e) {
+    console.error('wallet-apple', e);
+    melden(istNetzfehler(e) ? 'Gerade keine Verbindung.' : 'Der Wallet-Pass liess sich nicht erzeugen.');
+  } finally {
+    beschaeftigt(knopf, false);
+  }
+}
+
 // ------------------------------------------------------------------ Scanner
 
 /*
@@ -724,6 +776,7 @@ $('beleg-senden').onclick = () => stempelHolen($('beleg').value);
 $('beleg').onkeydown = (e) => { if (e.key === 'Enter') stempelHolen($('beleg').value); };
 $('umzug-zeigen').onclick = umzugZeigen;
 $('wallet-google').onclick = zuGoogleWallet;
+$('wallet-apple').onclick = zuAppleWallet;
 
 function rechtlichesZeichnen() {
   const eintraege = [

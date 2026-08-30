@@ -10,7 +10,7 @@
  * bestehende Installationen den alten Stand, bis der Speicher von selbst
  * ablaeuft - der klassische "beim Kunden ist es noch die alte Fassung".
  */
-const VERSION = 'treuebiss-app-v16';
+const VERSION = 'treuebiss-app-v17';
 
 const HUELLE = [
   './',
