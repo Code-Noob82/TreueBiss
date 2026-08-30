@@ -4,7 +4,8 @@ Zuarbeit für die Konfiguration der Datenschutzerklärung bei der IT-Recht
 Kanzlei. **Kein Rechtstext** — eine Bestandsaufnahme aus dem Quellcode, damit
 die Angaben im Konfigurator stimmen.
 
-Stand: 30.08.2026, geprüft gegen `supabase/schema.sql` und `web/app/app.js`.
+Stand: 31.08.2026, geprüft gegen `supabase/schema.sql`, `web/app/app.js` und
+die beiden Wallet-Funktionen.
 
 ---
 
@@ -32,6 +33,14 @@ Stand: 30.08.2026, geprüft gegen `supabase/schema.sql` und `web/app/app.js`.
 | Gutscheine: Ausstellung, Ablauf, Einlösung | `vouchers` | bei voller Karte |
 | Eingelöste Coupons: Angebot, Zeitpunkt | `offer_redemptions` | beim Einlösen |
 | **Kaufnachweise** | `stamp_proofs` | bei jedem Stempel |
+| **Kartenschlüssel** (32 zufällige Bytes) | `memberships.card_token` | beim Öffnen der Karte |
+
+### Der Kartenschlüssel
+
+Er identifiziert **die Karte**, nicht das Gerät, und macht sie damit auf ein
+anderes Gerät übertragbar. Er enthält keine Personendaten — es sind zufällige
+Bytes — ist aber ein **Inhaberpapier**: Wer ihn hat, hat die Karte. Er steckt
+im QR-Code der App und in beiden Wallet-Pässen.
 
 ### Was genau im Kaufnachweis steht
 
@@ -93,6 +102,34 @@ die anonyme Anmeldung weg und die Karte nicht mehr erreichbar.
 | **Supabase** | Datenbank, Anmeldung, Serverfunktionen | Projekt in `eu-central-1` (Frankfurt) |
 | **GitHub Pages** | Auslieferung der Web-App | GitHub Inc., USA |
 | **esm.sh** | CDN, liefert die Supabase-Bibliothek | Drittanbieter-CDN |
+| **Google** | speichert den Wallet-Pass — **nur wenn der Kunde ihn hinzufügt** | Google LLC, USA |
+| **Apple** | Wallet-Pass auf dem Gerät, Abgleich über iCloud | Apple Inc., USA |
+
+### Was die Wallet-Pässe übertragen
+
+Das ist neu und im Konfigurator leicht zu übersehen — **es ist freiwillig**:
+Ohne Tippen auf „Zu Google Wallet" oder „Zu Apple Wallet" fließt dorthin
+nichts.
+
+**Google** bekommt und *speichert auf seinen Servern* ein Objekt je Karte:
+
+| Feld | Inhalt |
+|---|---|
+| Objektkennung | gekürzter SHA-256 des Kartenschlüssels — **nicht** der Schlüssel |
+| Stempelstand | etwa `3/10` |
+| Strichcode | die Adresse der Karte — **darin steht der Kartenschlüssel im Klartext** |
+| Klasse | Name und Farbe des Betriebs |
+
+**Apple** bekommt nichts von uns: Der Pass ist eine Datei, die das Gerät
+erhält. Was danach passiert — Anzeige, Abgleich über iCloud zwischen den
+Geräten des Kunden — liegt bei Apple und dem Kunden.
+
+> **Der Punkt, der in die Erklärung gehört:** Wer den Google-Pass hinzufügt,
+> hinterlegt bei Google seinen Stempelstand und die Karten-Adresse. Ein
+> Personenbezug entsteht dort über das Google-Konto, mit dem gespeichert wird
+> — für TreueBiss bleibt der Kunde anonym, für Google nicht. Rechtsgrundlage
+> ist die Handlung des Kunden selbst; ob lit. b oder lit. a trägt, gehört
+> geprüft.
 
 > **Zwei Punkte, die in der Erklärung stehen müssen und leicht übersehen
 > werden:** GitHub Pages und esm.sh bekommen bei jedem Aufruf die IP-Adresse
@@ -159,6 +196,7 @@ Minimum.
 | Kaufnachweis gegen Mehrfachnutzung | Art. 6 Abs. 1 lit. f — Schutz vor Missbrauch |
 | Betrag und Kassennummer aufbewahren | **zu klären**, ob lit. b trägt oder lit. f |
 | Speicherung auf dem Gerät | § 25 Abs. 2 Nr. 2 TDDDG — für den Dienst erforderlich |
+| Wallet-Pass erzeugen und übertragen | **zu klären** — der Kunde stößt es an, aber es fließt an einen Dritten |
 
 *Das ist eine Einschätzung aus der Technik, keine Rechtsberatung. Die Zeile mit
 dem Betrag ist die, die geprüft gehört.*
