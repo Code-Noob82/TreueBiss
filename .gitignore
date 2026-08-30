@@ -21,9 +21,12 @@ local.properties
 *_rows.sql
 
 # Konfiguration der Kassenseite - pro Installation, nicht im Quelltext.
-web/kasse/config.js
-web/verwaltung/config.js
-web/app/config.js
+# Frueher ignoriert. Seit die Seiten ueber GitHub Pages ausgeliefert werden,
+# muss die Konfiguration mit - und sie enthaelt nichts Geheimes: Der
+# Supabase-Anon-Key steckt ohnehin in jeder ausgelieferten APK, die
+# Sicherheit haengt an den RLS-Policies. Wer eine eigene Umgebung fahren
+# will, ersetzt die Dateien im Build.
+# web/*/config.js
 
 # Werkzeug-Konfiguration, gehoert nicht zum Projekt
 .claude/

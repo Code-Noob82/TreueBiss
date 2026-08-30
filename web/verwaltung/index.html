@@ -269,6 +269,24 @@
         schickt.
       </p>
 
+      <label class="schalter">
+        <input id="b-tresen" type="checkbox">
+        <span>Stempel-QR am Tresen anbieten</span>
+      </label>
+      <div class="paar">
+        <div>
+          <label for="b-tresen-sek">Der Tresen-Code wechselt alle (Sekunden)</label>
+          <input id="b-tresen-sek" type="number" min="15" max="900" inputmode="numeric">
+        </div>
+      </div>
+      <p class="hinweis">
+        Der zweite Weg zum Stempel, für Kassen ohne QR-Druck. Die Kassenseite
+        zeigt dann einen Code, den der Kunde scannt. <strong>Er belegt
+        Anwesenheit am Tresen, nicht den Kauf</strong> — anders als der
+        Kassenbon. Dagegen stehen die kurze Gültigkeit und das Tageslimit;
+        wer ihn abfotografiert, kann ihn nur Sekunden später noch benutzen.
+      </p>
+
       <div class="reihe">
         <button id="b-speichern">Regeln speichern</button>
       </div>
@@ -414,6 +432,7 @@ function fehlertext(fehler) {
   if (t.includes('max age out of range')) return 'Das Zeitfenster muss zwischen 1 Minute und 30 Tagen liegen.';
   if (t.includes('min amount out of range')) return 'Der Mindestbetrag darf nicht negativ sein.';
   if (t.includes('daily limit out of range')) return 'Das Tageslimit muss zwischen 1 und 100 liegen.';
+  if (t.includes('counter seconds out of range')) return 'Der Tresen-Code muss zwischen 15 und 900 Sekunden gelten.';
   if (fehler?.code === '23505') return 'Diese Kasse ist schon eingetragen.';
   // Verletzte Policy: PostgREST meldet das, wenn gar keine Zeile passt.
   if (fehler?.code === '42501') return 'Dafür fehlt diesem Zugang die Berechtigung.';
@@ -500,6 +519,8 @@ function formularFuellen() {
   $('b-nurkassen').checked = !!aktiv.require_known_register;
   $('b-frei').checked = aktiv.allow_opaque_proofs !== false;
   $('b-signatur').checked = !!aktiv.require_signed_proof;
+  $('b-tresen').checked = !!aktiv.counter_qr_enabled;
+  $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
 }
 
 /** Farbwaehler und Textfeld zeigen denselben Wert. */
@@ -687,6 +708,8 @@ $('b-speichern').onclick = async () => {
     p_require_known: $('b-nurkassen').checked,
     p_allow_opaque: $('b-frei').checked,
     p_require_signed: $('b-signatur').checked,
+    p_counter_enabled: $('b-tresen').checked,
+    p_counter_seconds: Number($('b-tresen-sek').value),
   });
   beschaeftigt($('b-speichern'), false);
   if (error) { console.error('owner_update_proof_rules', error); melden(fehlertext(error)); return; }
