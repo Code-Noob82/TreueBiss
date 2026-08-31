@@ -1644,6 +1644,119 @@ $$;
 revoke all on function public.staff_pilot_summary() from public;
 grant execute on function public.staff_pilot_summary() to authenticated;
 
+-- --------------------------------------------------------- Kohortenzahlen
+/*
+ * Die Frage, die ein Betrieb tatsaechlich stellt, ist nicht "wie viele
+ * Stempel", sondern "lohnt sich meine Karte". Sie laesst sich beantworten,
+ * ohne einen einzigen Kunden zu kennen: Jede Zahl hier ist ein Aggregat ueber
+ * Karten, keine ueber Menschen.
+ *
+ * Damit ist das kein Widerspruch zur anonymen Anmeldung, sondern genau das,
+ * was ohne sie noch geht - und es gilt fuer alle Karten, nicht nur fuer die,
+ * die sich spaeter einmal verknuepfen.
+ *
+ * Zwei Fallstricke stecken in den Quellen:
+ *
+ *   `stamps` haelt nur die *laufende* Karte. Ist sie voll, wird sie zum
+ *   Gutschein und die Stempel werden geloescht (siehe issue_stamp). Fuer den
+ *   Fuellstand ist das richtig, fuer jede Historie waere es falsch.
+ *
+ *   `stamp_proofs` haelt die Historie - aber nur so weit zurueck, wie
+ *   `proof_retention_days` des Betriebs reicht. Wiederkehr und Aktivitaet
+ *   beziehen sich deshalb auf dieses Fenster, nicht auf alle Zeiten. Die
+ *   Spalte `history_days` faehrt die Fensterbreite mit, damit die Anzeige
+ *   sie danebenschreiben kann statt eine Genauigkeit vorzutaeuschen.
+ */
+create or replace view public.pilot_cohorts as
+select
+    t.id                   as tenant_id,
+    t.stamps_per_card,
+    t.proof_retention_days as history_days,
+
+    k.cards,
+    k.fill_none,
+    k.fill_low,
+    k.fill_mid,
+    k.fill_high,
+
+    -- Karten, die im Nachweisfenster ueberhaupt einen Stempel bekommen haben.
+    h.cards_with_stamp,
+    -- Karten mit Stempeln an mindestens zwei verschiedenen Tagen. Das ist die
+    -- eigentliche Bindungszahl: einmal kommen kann jeder.
+    h.cards_returning,
+    round(100.0 * h.cards_returning / nullif(h.cards_with_stamp, 0), 1)
+        as return_rate_percent,
+    h.cards_active_30d,
+
+    -- Karten, die je eine Praemie erreicht haben. Aus vouchers, also dauerhaft
+    -- und unabhaengig vom Nachweisfenster.
+    (select count(distinct v.user_id) from public.vouchers v where v.tenant_id = t.id)
+        as cards_completed,
+    round(100.0 * (select count(distinct v.user_id) from public.vouchers v
+                    where v.tenant_id = t.id)
+          / nullif(k.cards, 0), 1)
+        as completion_rate_percent,
+
+    -- Die Gegenzahl zur Einloesequote: ausgegeben, nie geholt, inzwischen
+    -- abgelaufen. `expires_at` steht in Millisekunden, wie in der App.
+    (select count(*) from public.vouchers v
+      where v.tenant_id = t.id and not v.is_redeemed
+        and v.expires_at < (extract(epoch from now()) * 1000)::int8)
+        as vouchers_expired,
+    (select count(*) from public.vouchers v
+      where v.tenant_id = t.id and not v.is_redeemed
+        and v.expires_at >= (extract(epoch from now()) * 1000)::int8)
+        as vouchers_open
+from public.tenants t
+cross join lateral (
+    select
+        count(*)                                                       as cards,
+        count(*) filter (where st.n = 0)                               as fill_none,
+        count(*) filter (where st.n > 0
+                           and st.n < t.stamps_per_card / 3.0)         as fill_low,
+        count(*) filter (where st.n >= t.stamps_per_card / 3.0
+                           and st.n < t.stamps_per_card * 2 / 3.0)     as fill_mid,
+        count(*) filter (where st.n >= t.stamps_per_card * 2 / 3.0)    as fill_high
+    from public.memberships m
+    cross join lateral (
+        select count(*) as n from public.stamps s
+         where s.tenant_id = m.tenant_id and s.user_id = m.user_id
+    ) st
+    where m.tenant_id = t.id
+) k
+cross join lateral (
+    select
+        count(*)                                    as cards_with_stamp,
+        count(*) filter (where g.tage >= 2)         as cards_returning,
+        count(*) filter (where g.zuletzt >= now() - interval '30 days')
+                                                    as cards_active_30d
+    from (
+        select p.user_id,
+               count(distinct (p.created_at at time zone 'Europe/Berlin')::date) as tage,
+               max(p.created_at)                                                 as zuletzt
+          from public.stamp_proofs p
+         where p.tenant_id = t.id
+         group by p.user_id
+    ) g
+) h;
+
+-- Wie pilot_summary: gehoert dem Betreiber, nicht der App.
+revoke all on public.pilot_cohorts from anon, authenticated;
+
+create or replace function public.staff_pilot_cohorts()
+returns setof public.pilot_cohorts
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select * from public.pilot_cohorts
+     where public.is_staff_of(tenant_id);
+$$;
+
+revoke all on function public.staff_pilot_cohorts() from public;
+grant execute on function public.staff_pilot_cohorts() to authenticated;
+
 -- ============================================ Verwaltung durch den Betrieb
 -- Bis hierher pflegt der Anbieter jeden Betrieb von Hand per SQL. Das
 -- skaliert nicht und laesst sich nicht verkaufen: Jede Farbaenderung waere

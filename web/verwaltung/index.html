@@ -50,6 +50,37 @@
   }
   .zahl span { font-size: var(--t-mikro); color: var(--tinte-leise); }
 
+  /* Fuellstand als ein Balken, nicht als vier Zahlen: Wo die Karten haengen
+     bleiben, ist eine Verteilung. Vier Zahlen nebeneinander zwingen zum
+     Kopfrechnen, ein Balken zeigt es. */
+  .fuellstand {
+    display: flex; height: .8rem; margin-top: var(--s4);
+    border-radius: 99px; overflow: hidden; background: var(--leer);
+  }
+  .fuellstand i, .legende i { display: block; min-width: 0; }
+  /* Haarlinie zwischen den Segmenten. Zwei benachbarte Stufen der Rampe
+     unterscheiden sich in der Helligkeit kaum - ohne Trennung liest sich der
+     Balken als eine Flaeche. box-shadow statt border: kostet keine Breite. */
+  .fuellstand i + i { box-shadow: -1px 0 0 var(--karte); }
+
+  /* Eine Rampe aus der Markenfarbe statt vier gegriffener Toene: Die
+     Reihenfolge ist dann auch dann noch ablesbar, wenn die Farbe des
+     Betriebs eine andere ist - und sie kippt nicht, wenn das Geraet auf
+     Dunkel steht. Feste Helligkeiten taten beides nicht: im hellen Modus
+     lagen die ersten beiden Stufen bei Kontrast 1,14 uebereinander. */
+  .stufe-0 { background: var(--leer); }
+  .stufe-1 { background: var(--marke); opacity: .3; }
+  .stufe-2 { background: var(--marke); opacity: .6; }
+  .stufe-3 { background: var(--marke); }
+
+  .legende {
+    display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4);
+    margin-top: var(--s3); font-size: var(--t-mikro); color: var(--tinte-leise);
+  }
+  .legende span { display: inline-flex; align-items: center; gap: .45rem; }
+  .legende i { width: .6rem; height: .6rem; border-radius: 2px; flex: none; }
+  .fussnote { margin: var(--s4) 0 0; font-size: var(--t-mikro); color: var(--tinte-leise); }
+
   .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s4); }
   @media (max-width: 560px) { .paar { grid-template-columns: 1fr; } }
 
@@ -129,6 +160,13 @@
     <section class="karte neben">
       <p class="marke">Zahlen</p>
       <div class="zahlen" id="zahlen"></div>
+
+      <div class="gruppe">
+        <p class="marke">Lohnt sich die Karte?</p>
+        <div class="zahlen" id="quoten"></div>
+        <div id="fuellstand"></div>
+        <p class="fussnote" id="kohorten-fussnote"></p>
+      </div>
     </section>
 
     <!-- Stammdaten und Kartenregeln werden zusammen gespeichert -->
@@ -616,8 +654,19 @@ function codeStandZeigen() {
   $('code-loeschen').disabled = !an;
 }
 
+const zahl = (wert, was) =>
+  `<div class="zahl"><b>${h(wert)}</b><span>${h(was)}</span></div>`;
+
+/** Prozent mit Komma, oder ein Strich, solange nichts zu rechnen ist. */
+const quote = (v) => (v === null || v === undefined ? '–' : String(v).replace('.', ',') + ' %');
+
 async function zahlenLaden() {
-  const { data, error } = await db.rpc('staff_pilot_summary');
+  // Beide Abfragen zusammen: Die Kohortenzahlen ohne die Grundzahlen daneben
+  // sind schwer einzuordnen, und umgekehrt.
+  const [{ data, error }, { data: kdaten, error: kfehler }] = await Promise.all([
+    db.rpc('staff_pilot_summary'),
+    db.rpc('staff_pilot_cohorts'),
+  ]);
   if (error) { $('zahlen').innerHTML = ''; melden(fehlertext(error)); return; }
   const z = (data ?? []).find((r) => r.tenant_id === aktiv.id);
   if (!z) { $('zahlen').innerHTML = '<p class="leer-text">Noch keine Zahlen.</p>'; return; }
@@ -626,7 +675,60 @@ async function zahlenLaden() {
     [z.stamps_issued, 'Stempel gesamt'],
     [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
     [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
-  ].map(([wert, was]) => `<div class="zahl"><b>${h(wert)}</b><span>${h(was)}</span></div>`).join('');
+  ].map(([wert, was]) => zahl(wert, was)).join('');
+
+  if (kfehler) { melden(fehlertext(kfehler)); return; }
+  kohortenZeigen((kdaten ?? []).find((r) => r.tenant_id === aktiv.id), z);
+}
+
+/*
+ * Die vier Zahlen, die "lohnt sich die Karte" beantworten - und keine davon
+ * kennt einen Kunden. Wiederkehr und Aktivität reichen nur so weit zurück wie
+ * die Aufbewahrung der Nachweise; das steht in der Fußnote, damit die Anzeige
+ * keine Genauigkeit vortäuscht, die sie nicht hat.
+ */
+function kohortenZeigen(k, z) {
+  const quoten = $('quoten'), balken = $('fuellstand'), fuss = $('kohorten-fussnote');
+  if (!k || !k.cards) {
+    quoten.innerHTML = '<p class="leer-text">Noch keine Karten im Umlauf.</p>';
+    balken.innerHTML = ''; fuss.textContent = '';
+    return;
+  }
+
+  quoten.innerHTML = [
+    [quote(k.return_rate_percent), 'kommen wieder'],
+    [quote(k.completion_rate_percent), 'erreichen die Prämie'],
+    [quote(z.redemption_rate_percent), 'Prämien eingelöst'],
+    [k.cards_active_30d, 'Karten aktiv, 30 Tage'],
+  ].map(([wert, was]) => zahl(wert, was)).join('');
+
+  // flex-grow statt fester Breite: Der Balken bleibt so bei jeder
+  // Containerbreite vollständig und braucht keine Prozentrechnung.
+  const teile = [
+    [k.fill_none, 'ohne Stempel'],
+    [k.fill_low,  'unteres Drittel'],
+    [k.fill_mid,  'mittleres Drittel'],
+    [k.fill_high, 'oberes Drittel'],
+  ];
+  // Balken und Legende teilen sich dieselben Stufenklassen. Die Farbe aus
+  // dem Balken in die Legende zu kopieren wäre eine Momentaufnahme gewesen -
+  // sie hätte beim Wechsel zwischen hellem und dunklem Modus nicht
+  // mitgewechselt.
+  balken.innerHTML =
+    '<div class="fuellstand" role="img" aria-label="Füllstand der laufenden Karten: '
+    + h(teile.map(([n, was]) => n + ' ' + was).join(', ')) + '">'
+    + teile.map(([n], i) => `<i class="stufe-${i}" style="flex:${Number(n)}"></i>`).join('')
+    + '</div><div class="legende">'
+    + teile.map(([n, was], i) =>
+        `<span><i class="stufe-${i}"></i>${h(n)} ${h(was)}</span>`).join('')
+    + '</div>';
+
+  const offen = k.vouchers_open, verfallen = k.vouchers_expired;
+  fuss.textContent =
+    offen + ' Prämie' + (offen === 1 ? '' : 'n') + ' offen, ' + verfallen + ' verfallen. '
+    + 'Wiederkehr und Aktivität beziehen sich auf die letzten ' + k.history_days + ' Tage — '
+    + 'so weit reicht die Aufbewahrung der Nachweise zurück. '
+    + 'Alle Angaben sind Summen über Karten, nicht über Personen.';
 }
 
 async function angeboteLaden() {
