@@ -1,0 +1,52 @@
+# Die SQL-Testsuite im Pull Request.
+#
+# Sie prueft ueber 400 Zusicherungen gegen ein temporaeres Postgres - und lief
+# bis hierher ausschliesslich auf dem Rechner, auf dem gerade entwickelt wurde.
+# Ob ein Merge nach main sie bestanden hatte, hing damit an Disziplin, nicht an
+# einer Pruefung.
+#
+# Der Auslieferungs-Workflow (pages.yml) laeuft weiterhin nur auf main. Dieser
+# hier veroeffentlicht nichts; er sagt nur, ob der Stand traegt.
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sql:
+    name: Schema und Datenbankfunktionen
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Ein Szenario der Suite spielt das zuletzt auf main gemergte Schema
+          # ein und laesst schema.sql darauf laufen. Genau dort sind bisher
+          # zweimal fehlende Spalten aufgefallen. Ohne Historie und ohne
+          # origin/main ueberspringt run.sh dieses Szenario stillschweigend.
+          fetch-depth: 0
+
+      - name: main als Vergleichsstand holen
+        run: git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+
+      - name: PostgreSQL 16 bereitstellen
+        run: |
+          if [ ! -x /usr/lib/postgresql/16/bin/initdb ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-16
+          fi
+          /usr/lib/postgresql/16/bin/postgres --version
+
+      - name: Testsuite
+        env:
+          # run.sh sucht die Binaerdateien sonst unter dem Homebrew-Pfad.
+          PGBIN: /usr/lib/postgresql/16/bin
+        run: supabase/test/run.sh
