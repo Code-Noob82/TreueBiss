@@ -28,12 +28,30 @@ begin
     if not exists (select 1 from pg_roles where rolname = 'authenticated') then
         create role authenticated nologin;
     end if;
+end
+$$;
+
+do $$
+begin
     -- Die Rolle, unter der die Edge Function arbeitet.
     if not exists (select 1 from pg_roles where rolname = 'service_role') then
         create role service_role nologin;
     end if;
 end
 $$;
+
+/*
+ * Supabase vergibt EXECUTE auf neue Funktionen im Schema public ausdruecklich
+ * an anon, authenticated und service_role. Ohne diese Zeilen ist die lokale
+ * Datenbank *grosszuegiger geschuetzt* als das echte Projekt: `revoke ... from
+ * public` genuegt hier, dort nicht.
+ *
+ * Genau diese Luecke hat am 31.08.2026 dafuer gesorgt, dass 413 gruene
+ * Pruefungen einen anon-aufrufbaren counter_token nicht bemerkt haben. Die
+ * Testdatenbank muss die Bedingung herstellen, unter der der Fehler entsteht.
+ */
+alter default privileges in schema public
+    grant execute on functions to anon, authenticated, service_role;
 
 grant usage on schema public to anon, authenticated, service_role;
 

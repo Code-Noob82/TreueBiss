@@ -466,7 +466,24 @@ begin
 end;
 $$;
 
-revoke all on function public.redeem_voucher(uuid, text) from public;
+/*
+ * Warum hier `anon, authenticated` und nicht nur `public` steht.
+ *
+ * `revoke ... from public` nimmt nur das implizite Recht weg, das jede
+ * Funktion bei ihrer Erstellung hat. Supabase vergibt EXECUTE zusaetzlich
+ * *ausdruecklich* an anon und authenticated (alter default privileges) - und
+ * eine ausdrueckliche Vergabe ueberlebt den Entzug von public.
+ *
+ * Am 31.08.2026 war deshalb jede Funktion dieses Schemas fuer anon
+ * aufrufbar. Die meisten pruefen im Rumpf und liefern einem anonymen
+ * Aufrufer nichts; counter_token, service_issue_stamp und
+ * cleanup_expired_proofs pruefen nicht - counter_token hat im laufenden
+ * Projekt HTTP 200 geliefert.
+ *
+ * Bei den Sichten stand es von Anfang an richtig (`from anon,
+ * authenticated`). Nur die Funktionen sind durchgerutscht.
+ */
+revoke all on function public.redeem_voucher(uuid, text) from public, anon, authenticated;
 grant execute on function public.redeem_voucher(uuid, text) to authenticated;
 
 /*
@@ -572,7 +589,7 @@ begin
 end;
 $$;
 
-revoke all on function public.redeem_offer(uuid, text) from public;
+revoke all on function public.redeem_offer(uuid, text) from public, anon, authenticated;
 grant execute on function public.redeem_offer(uuid, text) to authenticated;
 
 -- ================================================ Kassenseite des Betriebs
@@ -636,7 +653,7 @@ begin
 end;
 $$;
 
-revoke all on function public.staff_redeem_voucher(uuid) from public;
+revoke all on function public.staff_redeem_voucher(uuid) from public, anon, authenticated;
 grant execute on function public.staff_redeem_voucher(uuid) to authenticated;
 
 -- ==================================================== Beispiel-Betrieb (Demo)
@@ -947,7 +964,7 @@ begin
 end;
 $$;
 
-revoke all on function public.parse_receipt_qr(text) from public;
+revoke all on function public.parse_receipt_qr(text) from public, anon, authenticated;
 
 /*
  * Vergibt einen Stempel gegen einen Kaufnachweis.
@@ -1131,7 +1148,7 @@ begin
 end;
 $$;
 
-revoke all on function public.issue_stamp_intern(uuid, uuid, text, text, boolean) from public;
+revoke all on function public.issue_stamp_intern(uuid, uuid, text, text, boolean) from public, anon, authenticated;
 
 /*
  * Der rotierende Code fuer den Tresen.
@@ -1171,7 +1188,7 @@ begin
 end;
 $$;
 
-revoke all on function public.counter_token(uuid, int) from public;
+revoke all on function public.counter_token(uuid, int) from public, anon, authenticated;
 
 /*
  * Liefert dem Personal den aktuellen Tresen-Code samt Restlaufzeit.
@@ -1207,7 +1224,7 @@ begin
 end;
 $$;
 
-revoke all on function public.staff_counter_token(uuid) from public;
+revoke all on function public.staff_counter_token(uuid) from public, anon, authenticated;
 grant execute on function public.staff_counter_token(uuid) to authenticated;
 
 /*
@@ -1239,7 +1256,7 @@ begin
 end;
 $$;
 
-revoke all on function public.issue_stamp(uuid, text, text) from public;
+revoke all on function public.issue_stamp(uuid, text, text) from public, anon, authenticated;
 grant execute on function public.issue_stamp(uuid, text, text) to authenticated;
 
 /*
@@ -1276,7 +1293,7 @@ begin
 end;
 $$;
 
-revoke all on function public.service_issue_stamp(uuid, uuid, text, text) from public;
+revoke all on function public.service_issue_stamp(uuid, uuid, text, text) from public, anon, authenticated;
 do $$
 begin
     if exists (select 1 from pg_roles where rolname = 'service_role') then
@@ -1388,7 +1405,7 @@ begin
 end;
 $$;
 
-revoke all on function public.adopt_card(text) from public;
+revoke all on function public.adopt_card(text) from public, anon, authenticated;
 grant execute on function public.adopt_card(text) to authenticated;
 
 -- ================================================== Aufbewahrung und Loeschung
@@ -1456,7 +1473,7 @@ begin
 end;
 $$;
 
-revoke all on function public.cleanup_expired_proofs() from public;
+revoke all on function public.cleanup_expired_proofs() from public, anon, authenticated;
 do $$
 begin
     if exists (select 1 from pg_roles where rolname = 'service_role') then
@@ -1641,7 +1658,7 @@ as $$
      where public.is_staff_of(tenant_id);
 $$;
 
-revoke all on function public.staff_pilot_summary() from public;
+revoke all on function public.staff_pilot_summary() from public, anon, authenticated;
 grant execute on function public.staff_pilot_summary() to authenticated;
 
 -- --------------------------------------------------------- Kohortenzahlen
@@ -1754,7 +1771,7 @@ as $$
      where public.is_staff_of(tenant_id);
 $$;
 
-revoke all on function public.staff_pilot_cohorts() from public;
+revoke all on function public.staff_pilot_cohorts() from public, anon, authenticated;
 grant execute on function public.staff_pilot_cohorts() to authenticated;
 
 -- ============================================ Verwaltung durch den Betrieb
@@ -1910,7 +1927,7 @@ end;
 $$;
 
 revoke all on function public.owner_update_tenant(
-    uuid, text, text, text, text, text, text, int, int) from public;
+    uuid, text, text, text, text, text, text, int, int) from public, anon, authenticated;
 grant execute on function public.owner_update_tenant(
     uuid, text, text, text, text, text, text, int, int) to authenticated;
 
@@ -2014,7 +2031,7 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) from public;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) from public, anon, authenticated;
 grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
@@ -2052,7 +2069,7 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_set_redeem_code(uuid, text) from public;
+revoke all on function public.owner_set_redeem_code(uuid, text) from public, anon, authenticated;
 grant execute on function public.owner_set_redeem_code(uuid, text) to authenticated;
 
 /*
@@ -2086,5 +2103,5 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_clear_redeem_code(uuid) from public;
+revoke all on function public.owner_clear_redeem_code(uuid) from public, anon, authenticated;
 grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;
