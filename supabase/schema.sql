@@ -2196,3 +2196,104 @@ $$;
 
 revoke all on function public.owner_clear_redeem_code(uuid) from public, anon, authenticated;
 grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;
+
+
+-- ---------------------------------------------------------------- Loeschen
+
+/*
+ * Karte loeschen - Art. 17 DSGVO fuer eine Kartschaft ohne Konto.
+ *
+ * Ohne Konto gibt es niemanden, an den sich ein Loeschantrag richten liesse.
+ * Es gibt keine Adresse, unter der ein Kunde sich melden koennte, und der
+ * Betrieb kann ihn nicht heraussuchen: Er sieht Zahlen, keine Personen.
+ * Damit ist das Geraet selbst der einzige Weg, auf dem jemand seine Daten
+ * wieder loswird - und diese Funktion der einzige Hebel dahinter.
+ *
+ * Geloescht wird genau die Menge, die adopt_card umzieht. Was eine Karte
+ * ausmacht, steht in fuenf Tabellen; weicht die eine Liste von der anderen
+ * ab, bleibt beim Loeschen etwas liegen. Deshalb stehen sie hier in
+ * derselben Reihenfolge wie dort, damit ein Abgleich mit blossem Auge geht.
+ *
+ * Nicht geloescht wird das anonyme Konto. Es haengt an auth.users, das
+ * dieser Rolle nicht gehoert. Es bleibt eine Kennung ohne eine einzige
+ * Zeile daran - alle sechs Tabellen haengen mit `on delete cascade` an ihm,
+ * und keine davon hat danach noch einen Eintrag fuer diesen Betrieb.
+ */
+create or replace function public.delete_card(p_slug text)
+returns table (
+    tenant_name      text,
+    stamps_deleted   int,
+    proofs_deleted   int,
+    vouchers_deleted int,
+    offers_deleted   int,
+    cards_left       int
+)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_user   uuid := auth.uid();
+    v_tenant uuid;
+    v_name   text;
+    v_stamps int;
+    v_proofs int;
+    v_gutsch int;
+    v_angeb  int;
+begin
+    if v_user is null then
+        raise exception 'not signed in' using errcode = '28000';
+    end if;
+
+    select t.id, t.name into v_tenant, v_name
+      from public.tenants t
+     where t.slug = trim(coalesce(p_slug, ''));
+
+    if v_tenant is null then
+        raise exception 'tenant not found' using errcode = '22023';
+    end if;
+
+    -- Der Demozugang darf ansehen und nichts aendern. Loeschen ist die
+    -- endgueltigste Aenderung von allen.
+    if public.is_demo_of(v_tenant) then
+        raise exception 'demo access is read only' using errcode = '42501';
+    end if;
+
+    /*
+     * Ohne Karte kein Loeschen. Der Fehler ist Absicht: Die App zeigt den
+     * Knopf nur, wenn es eine Karte gibt - kommt der Aufruf trotzdem, stimmt
+     * etwas nicht, und das soll auffallen statt still zu verpuffen.
+     */
+    if not exists (select 1 from public.memberships m
+                    where m.user_id = v_user and m.tenant_id = v_tenant) then
+        raise exception 'no card for this tenant' using errcode = '22023';
+    end if;
+
+    delete from public.stamps
+     where user_id = v_user and tenant_id = v_tenant;
+    get diagnostics v_stamps = row_count;
+
+    delete from public.vouchers
+     where user_id = v_user and tenant_id = v_tenant;
+    get diagnostics v_gutsch = row_count;
+
+    delete from public.stamp_proofs
+     where user_id = v_user and tenant_id = v_tenant;
+    get diagnostics v_proofs = row_count;
+
+    delete from public.offer_redemptions
+     where user_id = v_user and tenant_id = v_tenant;
+    get diagnostics v_angeb = row_count;
+
+    delete from public.memberships
+     where user_id = v_user and tenant_id = v_tenant;
+
+    return query
+        select v_name, v_stamps, v_proofs, v_gutsch, v_angeb,
+               (select count(*)::int from public.memberships m
+                 where m.user_id = v_user);
+end;
+$$;
+
+revoke all on function public.delete_card(text) from public, anon, authenticated;
+grant execute on function public.delete_card(text) to authenticated;

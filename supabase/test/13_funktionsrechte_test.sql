@@ -23,6 +23,7 @@ declare
         array['public.staff_counter_token(uuid)',                   'n', 'j', 'j'],
         array['public.issue_stamp(uuid, text, text)',               'n', 'j', 'j'],
         array['public.adopt_card(text)',                            'n', 'j', 'j'],
+        array['public.delete_card(text)',                           'n', 'j', 'j'],
         array['public.staff_pilot_summary()',                       'n', 'j', 'j'],
         array['public.staff_pilot_cohorts()',                       'n', 'j', 'j'],
         array['public.owner_set_redeem_code(uuid, text)',           'n', 'j', 'j'],
