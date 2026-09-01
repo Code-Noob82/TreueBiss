@@ -437,6 +437,7 @@ async function datenHolen() {
   allesZeichnen();
   angeboteZeichnen(an);
   $('umzug-bereich').classList.toggle('verborgen', !kartenSchluessel);
+  $('loeschen-bereich').classList.toggle('verborgen', !kartenSchluessel);
   walletKnoepfeZeigen();
   return 'ok';
 }
@@ -579,6 +580,57 @@ async function umzugZeigen() {
   } catch (e) {
     console.error('umzug-qr', e);
     melden('Der Code liess sich nicht erzeugen. Gibt es gerade Verbindung?');
+  } finally {
+    beschaeftigt(knopf, false);
+  }
+}
+
+/*
+ * Karte loeschen - der einzige Weg, auf dem ein Kunde ohne Konto seine Daten
+ * wieder loswird. Es gibt keine Adresse, unter der er einen Loeschantrag
+ * stellen koennte, und der Betrieb kann ihn nicht heraussuchen.
+ *
+ * Danach wird nicht neu geladen. datenHolen() legt bei jedem Start eine
+ * Mitgliedschaft an - ein Neuladen erzeugte also sofort wieder eine leere
+ * Karte, und der Kunde saehe aus wie eine fehlgeschlagene Loeschung.
+ */
+async function karteLoeschen() {
+  const knopf = $('loeschen-ja');
+  beschaeftigt(knopf, true, 'Wird gelöscht …');
+  try {
+    const { data, error } = await db.rpc('delete_card', { p_slug: slug });
+    if (error) throw error;
+    const erg = Array.isArray(data) ? data[0] : data;
+
+    try {
+      localStorage.removeItem(schluessel());
+      if (betriebGemerkt() === slug) localStorage.removeItem(LETZTER);
+    } catch { /* privater Modus: dann bleibt nur der Server-Stand, und der ist weg */ }
+
+    /*
+     * Bleibt keine Karte, ist das anonyme Konto eine Kennung ohne eine
+     * einzige Zeile daran. Abmelden gibt sie endgueltig auf - beim naechsten
+     * Start entsteht eine neue. Mit weiteren Karten waere das ein Verlust:
+     * Wer sich abmeldet, kommt an eine anonyme Sitzung nie wieder heran.
+     */
+    if ((erg?.cards_left ?? 0) === 0) await db.auth.signOut();
+
+    for (const id of ['karte-bereich', 'gutscheine-bereich', 'angebote-bereich',
+                      'umzug-bereich', 'loeschen-bereich']) {
+      $(id).classList.add('verborgen');
+    }
+    band('');
+    $('betrieb').textContent = erg?.tenant_name ?? 'Karte gelöscht';
+    $('kopf-zeile').textContent = 'Karte gelöscht';
+    melden('Deine Karte ist weg — mit allen Stempeln, Gutscheinen und '
+         + 'Kaufnachweisen. Ein Pass in deiner Wallet bleibt auf dem Handy '
+         + 'stehen; den entfernst du dort selbst.'
+         + ((erg?.cards_left ?? 0) > 0
+            ? ' Deine Karten in anderen Betrieben sind unberührt.'
+            : ''), true);
+  } catch (e) {
+    console.error('delete_card', e);
+    melden(fehlertext(e));
   } finally {
     beschaeftigt(knopf, false);
   }
@@ -827,6 +879,11 @@ $('beleg').onkeydown = (e) => { if (e.key === 'Enter') stempelHolen($('beleg').v
 $('umzug-zeigen').onclick = umzugZeigen;
 $('wallet-google').onclick = zuGoogleWallet;
 $('wallet-apple').onclick = zuAppleWallet;
+$('loeschen-fragen').onclick = () =>
+  $('loeschen-nachfrage').classList.toggle('verborgen');
+$('loeschen-nein').onclick = () =>
+  $('loeschen-nachfrage').classList.add('verborgen');
+$('loeschen-ja').onclick = karteLoeschen;
 
 function rechtlichesZeichnen() {
   const eintraege = [
