@@ -34,6 +34,7 @@ declare
     v_tage     int;
     v_letzter  int;
     v_weg      int;
+    v_leer     int;
     i          int;
     j          int;
     v_modern   boolean;
@@ -62,6 +63,30 @@ begin
     delete from auth.users
      where raw_user_meta_data ->> 'treuebiss_demo' = c_slug;
     get diagnostics v_weg = row_count;
+
+    /*
+     * Nie benutzte Karten aus Tests wegraeumen.
+     *
+     * Beim Erproben entstehen anonyme Karten, die nie einen Stempel bekommen
+     * haben. In der Demo zaehlen sie als Teilnehmer mit und druecken die
+     * Durchlaufquote - der Betrieb saehe eine Zahl, die nichts bedeutet.
+     *
+     * Entfernt wird nur die *Mitgliedschaft* und nur bei diesem Betrieb, und
+     * nur wenn an ihr nachweislich nichts haengt: kein Stempel, kein
+     * Nachweis, kein Gutschein, keine Coupon-Einloesung. Das Konto selbst
+     * bleibt - es koennte an einem anderen Betrieb eine echte Karte haben.
+     */
+    delete from public.memberships m
+     where m.tenant_id = v_tenant
+       and not exists (select 1 from public.stamps s
+                        where s.user_id = m.user_id and s.tenant_id = m.tenant_id)
+       and not exists (select 1 from public.stamp_proofs p
+                        where p.user_id = m.user_id and p.tenant_id = m.tenant_id)
+       and not exists (select 1 from public.vouchers v
+                        where v.user_id = m.user_id and v.tenant_id = m.tenant_id)
+       and not exists (select 1 from public.offer_redemptions o
+                        where o.user_id = m.user_id and o.tenant_id = m.tenant_id);
+    get diagnostics v_leer = row_count;
 
     -- Supabase fuehrt in auth.users mehr Spalten als die lokale Testablage.
     -- Beide Wege stehen hier, damit sich das Skript auch gegen die Suite
@@ -134,8 +159,8 @@ begin
         end if;
     end loop;
 
-    raise notice 'Demo eingerichtet: % Karten angelegt, % aus dem vorigen Lauf entfernt.',
-        c_karten, v_weg;
+    raise notice 'Demo eingerichtet: % Karten angelegt, % aus dem vorigen Lauf entfernt,
+        % nie benutzte Karte(n) aufgeraeumt.', c_karten, v_weg, v_leer;
     raise notice 'Zugang: % mit der Rolle demo auf %.', c_mail, c_slug;
 end;
 $$;
