@@ -13,6 +13,7 @@ import {
   nachrichtBauen, objektBauen, objektId, SPEICHERN_URL, type Betrieb,
 } from "./pass.ts";
 import { b64url, jwtBauen, pemZuBytes, sha256Hex } from "./signieren.ts";
+import { objektStilllegen } from "./google.ts";
 
 let fehler = 0;
 function pruefe(bedingung: boolean, text: string) {
@@ -153,6 +154,52 @@ for (const [titel, text, was] of [
   let abgewiesen = false;
   try { nachrichtBauen(titel, text); } catch { abgewiesen = true; }
   pruefe(abgewiesen, `Eine Nachricht ${was} wird abgewiesen`);
+}
+
+/*
+ * Stilllegen: Was geht wirklich an Google?
+ *
+ * fetch wird ersetzt statt aufgerufen - der Test soll ohne Dienstkonto und
+ * ohne Netz laufen. Geprueft wird das, was sonst niemand sieht: Methode,
+ * Adresse und Rumpf. Ein PUT statt PATCH ueberschriebe den ganzen Pass, und
+ * ein falsch geschriebenes `state` liefe stillschweigend ins Leere.
+ */
+{
+  const echtesFetch = globalThis.fetch;
+  let gesehen: { url: string; init: RequestInit } | null = null;
+  globalThis.fetch = ((url: string, init: RequestInit) => {
+    gesehen = { url: String(url), init };
+    return Promise.resolve(new Response(JSON.stringify({ id: "x" }), { status: 200 }));
+  }) as typeof fetch;
+
+  const kennung = objektId(ISSUER, BETRIEB, "a".repeat(64));
+  const spur = await objektStilllegen("dienst-token", kennung);
+  globalThis.fetch = echtesFetch;
+
+  const g = gesehen as unknown as { url: string; init: RequestInit };
+  pruefe(g.init.method === "PATCH", "Stilllegen geht per PATCH, nicht per PUT");
+  pruefe(g.url.endsWith("/loyaltyObject/" + encodeURIComponent(kennung)),
+    "Und zwar auf das Objekt dieses Kunden");
+  pruefe(JSON.parse(String(g.init.body)).state === "EXPIRED",
+    "Gesetzt wird genau state=EXPIRED");
+  pruefe(Object.keys(JSON.parse(String(g.init.body))).length === 1,
+    "Und sonst nichts - ein PATCH mit mehr Feldern schriebe den Pass um");
+  pruefe(String((g.init.headers as Record<string, string>).Authorization)
+           === "Bearer dienst-token",
+    "Mit dem Dienst-Token im Kopf");
+  pruefe(spur.length === 1 && spur[0].status === 200 && spur[0].schritt === "objekt stilllegen",
+    "Die Spur haelt Schritt und Status fest");
+}
+
+/* Ein nie gespeicherter Pass ist der Normalfall, kein Fehler. */
+{
+  const echtesFetch = globalThis.fetch;
+  globalThis.fetch = (() =>
+    Promise.resolve(new Response(JSON.stringify({ error: { code: 404 } }), { status: 404 })
+  )) as typeof fetch;
+  const spur = await objektStilllegen("t", objektId(ISSUER, BETRIEB, "b".repeat(64)));
+  globalThis.fetch = echtesFetch;
+  pruefe(spur[0].status === 404, "Ein 404 kommt als 404 zurueck statt zu werfen");
 }
 
 console.log(fehler === 0
