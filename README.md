@@ -531,7 +531,7 @@ Betrieb, der sich selbst abschaltet, ist ein Supportfall.
 
 ### Zugangsdaten und dieses öffentliche Repository
 
-`Code-Noob82/TreueBiss` ist öffentlich. Ein hier abgelegter Dienstkonto-Schlüssel
+`byte-und-handwerk/TreueBiss` ist öffentlich. Ein hier abgelegter Dienstkonto-Schlüssel
 wäre binnen Minuten von Scannern gefunden, und ein Commit lässt sich nicht
 wirklich zurücknehmen. Schlüssel gehören nach `supabase secrets set`.
 
