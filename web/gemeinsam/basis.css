@@ -231,3 +231,28 @@ input[type="color"] { padding: var(--s1); height: 46px; cursor: pointer; }
   background: hsl(var(--h) 10% 100% / .18); color: var(--grund-text);
 }
 .wechsel a:focus-visible { outline: 2px solid var(--grund-text); outline-offset: 2px; }
+
+/* ------------------------------------------------------------- Demozugang
+   Sehen ja, anfassen nein. Als Klasse am Container statt einzeln je Element:
+   Angebots- und Kassenlisten zeichnen ihre Knoepfe selbst nach, und ein
+   Aufruf, den man dort vergisst, faellt niemandem auf.
+
+   Abgesichert ist es in der Datenbank - `is_demo_of` weist Einloesen und
+   Tresen-Token ab, alles Uebrige haengt an `is_owner_of`. Das hier verhindert
+   nur, dass die Oberflaeche etwas verspricht, was der Server ablehnt. */
+.nur-ansehen input, .nur-ansehen textarea, .nur-ansehen select,
+.nur-ansehen button:not(#abmelden) {
+  pointer-events: none;
+  opacity: .5;
+}
+
+.demo-schild {
+  border: 1px solid var(--marke);
+  border-radius: var(--s3);
+  padding: var(--s3) var(--s4);
+  margin-bottom: var(--s5);
+  background: var(--gut);
+  color: var(--gut-text);
+}
+
+.demo-schild b { display: block; margin-bottom: var(--s1); }

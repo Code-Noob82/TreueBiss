@@ -81,6 +81,7 @@
   .legende i { width: .6rem; height: .6rem; border-radius: 2px; flex: none; }
   .fussnote { margin: var(--s4) 0 0; font-size: var(--t-mikro); color: var(--tinte-leise); }
 
+
   .paar { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s4); }
   @media (max-width: 560px) { .paar { grid-template-columns: 1fr; } }
 
@@ -156,6 +157,12 @@
   </section>
 
   <div id="verwaltung" class="verborgen">
+
+    <div id="demo-schild" class="demo-schild verborgen">
+      <b>Demozugang — nur zum Ansehen</b>
+      Alle Zahlen und Einstellungen sind echt, Änderungen sind abgeschaltet.
+      So sieht die Verwaltung aus, wenn Sie TreueBiss betreiben.
+    </div>
 
     <section class="karte neben">
       <p class="marke">Zahlen</p>
@@ -493,6 +500,7 @@ const $ = (id) => document.getElementById(id);
 let betriebe = [];
 /** Der gerade gewählte Betrieb, so wie er zuletzt vom Server kam. */
 let aktiv = null;
+let rolleJeBetrieb = new Map();
 /** Angebot, das gerade bearbeitet wird - null heisst "neu anlegen". */
 let bearbeitet = null;
 
@@ -620,7 +628,12 @@ async function betriebeLaden() {
   if (error) return { fehler: fehlertext(error) };
   if (!rollen?.length) return 'keine-zuordnung';
 
-  const ids = rollen.filter((r) => r.role === 'owner').map((r) => r.tenant_id);
+  // Ein Demozugang darf die Verwaltung sehen, aber nichts aendern. Die
+  // Rolle wird mitgefuehrt, damit betriebWaehlen sie anwenden kann.
+  rolleJeBetrieb = new Map(rollen.map((r) => [r.tenant_id, r.role]));
+  const ids = rollen
+    .filter((r) => r.role === 'owner' || r.role === 'demo')
+    .map((r) => r.tenant_id);
   if (!ids.length) return 'nur-kasse';
 
   const { data, error: fehler2 } = await db
@@ -637,9 +650,21 @@ async function betriebeLaden() {
   return 'ok';
 }
 
+/*
+ * Schaltet die Oberfläche auf „nur ansehen", wenn die Rolle `demo` ist.
+ * Die eigentliche Absicherung steht in der Datenbank — `is_demo_of` weist
+ * Einlösen und Tresen-Token ab, alles Übrige hängt ohnehin an `is_owner_of`.
+ */
+function nurAnsehenAnwenden() {
+  const an = rolleJeBetrieb.get(aktiv?.id) === 'demo';
+  $('verwaltung').classList.toggle('nur-ansehen', an);
+  $('demo-schild').classList.toggle('verborgen', !an);
+}
+
 function betriebWaehlen(id) {
   aktiv = betriebe.find((b) => b.id === id) ?? betriebe[0];
   $('betrieb').textContent = aktiv.name;
+  nurAnsehenAnwenden();
   formularFuellen();
   codeStandZeigen();
   angeboteLaden();
