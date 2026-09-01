@@ -79,3 +79,67 @@ jobs:
           deno test --no-check
           --allow-net --allow-read --allow-env --allow-write --allow-run
           supabase/functions/
+
+  # Edge Functions rollt kein Workflow aus - `pages.yml` veroeffentlicht nur
+  # `web/`. Automatisieren liesse sich das nur mit einem persoenlichen
+  # Zugangstoken im Repository, und das ist kontoweit: Dasselbe Token sieht
+  # jedes Projekt des Kontos, nicht nur dieses. In einem oeffentlichen
+  # Repository waere es der erste und zugleich groesste Schluessel.
+  #
+  # Das eigentliche Problem war ohnehin nicht der Aufwand - ein Befehl - ,
+  # sondern dass nach dem Merge nichts daran erinnert hat. Am 01.09.2026 stand
+  # deshalb ein Bedienfeld live, dessen Gegenstelle noch die Fassung von zwei
+  # Tagen davor war.
+  #
+  # Dieser Job aendert nichts und schlaegt nie fehl. Er schreibt nur auf, was
+  # nach dem Merge noch zu tun ist - dort, wo man nach dem Mergen hinsieht.
+  ausrollen:
+    name: Nach dem Merge ausrollen?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Beruehrte Edge Functions ermitteln
+        run: |
+          set -euo pipefail
+          basis="${{ github.base_ref }}"
+          git fetch --no-tags --quiet origin "+refs/heads/$basis:refs/remotes/origin/$basis"
+
+          geaendert="$(git diff --name-only "origin/$basis...HEAD" -- supabase/functions || true)"
+          # `|| true` ist noetig, nicht bequem: Bei leerer Eingabe findet
+          # `grep -v` nichts und liefert Ausgang 1 - unter `set -euo pipefail`
+          # bricht der Job dann ab, obwohl "keine Function beruehrt" der
+          # Normalfall ist. Genau daran ist der erste Lauf gescheitert.
+          slugs="$(printf '%s\n' "$geaendert" \
+            | sed -n 's|^supabase/functions/\([^/]*\)/.*|\1|p' \
+            | grep -v '^_' | sort -u || true)"
+
+          if [ -z "$slugs" ]; then
+            echo "Keine Edge Function beruehrt - nichts auszurollen." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Die Projektkennung steht in der ausgelieferten Konfiguration; so
+          # muss sie nicht im Workflow stehen und ist trotzdem immer richtig.
+          ref="$(sed -n "s|.*https://\([a-z0-9]*\)\.supabase\.co.*|\1|p" \
+                 web/app/config.js | head -1)"
+
+          {
+            echo "## Nach dem Merge von Hand ausrollen"
+            echo
+            echo "\`pages.yml\` veroeffentlicht nur \`web/\`. Diese Functions sind"
+            echo "geaendert und laufen bis zum Ausrollen in der alten Fassung:"
+            echo
+            echo '```bash'
+            for s in $slugs; do
+              echo "supabase functions deploy $s${ref:+ --project-ref $ref}"
+            done
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for s in $slugs; do
+            echo "::notice title=Nach dem Merge ausrollen::supabase functions deploy $s${ref:+ --project-ref $ref}"
+          done
