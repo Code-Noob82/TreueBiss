@@ -109,9 +109,13 @@ jobs:
           git fetch --no-tags --quiet origin "+refs/heads/$basis:refs/remotes/origin/$basis"
 
           geaendert="$(git diff --name-only "origin/$basis...HEAD" -- supabase/functions || true)"
+          # `|| true` ist noetig, nicht bequem: Bei leerer Eingabe findet
+          # `grep -v` nichts und liefert Ausgang 1 - unter `set -euo pipefail`
+          # bricht der Job dann ab, obwohl "keine Function beruehrt" der
+          # Normalfall ist. Genau daran ist der erste Lauf gescheitert.
           slugs="$(printf '%s\n' "$geaendert" \
             | sed -n 's|^supabase/functions/\([^/]*\)/.*|\1|p' \
-            | grep -v '^_' | sort -u)"
+            | grep -v '^_' | sort -u || true)"
 
           if [ -z "$slugs" ]; then
             echo "Keine Edge Function beruehrt - nichts auszurollen." >> "$GITHUB_STEP_SUMMARY"
