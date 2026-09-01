@@ -251,6 +251,40 @@ end
 $$;
 
 /*
+ * Angebote nach Kartenstand.
+ *
+ * Der Betrieb kann ein Angebot auf einen Fuellstand einschraenken: "nur fuer
+ * Karten ab sieben Stempeln" oder "nur fuer Karten unter drei". Das ist
+ * Segmentierung, aber sie kommt ohne Person aus - der Server kennt den Stand
+ * der Karte, nicht den Menschen dahinter. Damit laesst sich leisten, wofuer
+ * die Wettbewerber ein Kundenkonto brauchen: der Anstoss kurz vor der vollen
+ * Karte, und die Begruessung fuer die, die gerade erst angefangen haben.
+ *
+ * Die Vorgaben sind absichtlich durchlaessig - 0 und ohne Obergrenze -, damit
+ * bestehende Angebote unveraendert weiterlaufen.
+ *
+ * Obergrenze 50 wie bei stamps_per_card. Eine volle Karte wird sofort zum
+ * Gutschein und ihre Stempel werden geloescht; der Stand liegt also immer
+ * zwischen 0 und stamps_per_card - 1. Ein min_stamps in Hoehe der
+ * Kartengroesse traefe nie zu - deshalb begrenzt die Verwaltung das Feld.
+ */
+alter table public.offers
+    add column if not exists min_stamps int not null default 0,
+    add column if not exists max_stamps int;
+
+-- Dieselbe Form wie beim Limit darueber: `add constraint if not exists` gibt
+-- es nicht, und ein zweiter Lauf des Skripts darf nicht auflaufen.
+do $$
+begin
+    alter table public.offers add constraint offers_stamps_range_check
+        check (min_stamps between 0 and 50
+               and (max_stamps is null
+                    or (max_stamps >= min_stamps and max_stamps <= 50)));
+exception when duplicate_object then null;
+end
+$$;
+
+/*
  * Verbrauchte Coupons. Eine Zeile je Einloesung.
  *
  * Warum ueberhaupt eine eigene Tabelle: Der Anspruch aus einem Coupon
@@ -521,6 +555,9 @@ declare
     v_heute    date := (now() at time zone 'Europe/Berlin')::date;
     v_requires boolean;
     v_hash     text;
+    v_min      int;
+    v_max      int;
+    v_stand    int;
     v_sperre   date;
     v_id       uuid;
     v_zeit     timestamptz := now();
@@ -532,8 +569,9 @@ begin
     -- Der Betrieb muss aktiv sein, das Angebot einloesbar. Beides in einem
     -- Zug, damit ein abgeschalteter Betrieb nicht ueber seine alten Coupons
     -- weiterlaeuft.
-    select o.tenant_id, o.redeem_limit, o.valid_from, o.valid_to
-      into v_tenant, v_limit, v_von, v_bis
+    select o.tenant_id, o.redeem_limit, o.valid_from, o.valid_to,
+           o.min_stamps, o.max_stamps
+      into v_tenant, v_limit, v_von, v_bis, v_min, v_max
       from public.offers o
       join public.tenants t on t.id = o.tenant_id
      where o.id = p_offer_id and o.is_redeemable and t.is_active;
@@ -548,6 +586,18 @@ begin
     if (v_von is not null and v_von > v_heute)
        or (v_bis is not null and v_bis < v_heute) then
         raise exception 'offer not valid today' using errcode = '22023';
+    end if;
+
+    -- Der Kartenstand, wie in der Lese-Policy. Auch das steht hier ein
+    -- zweites Mal, weil security definer an der Policy vorbeilaeuft: Wer die
+    -- Angebots-ID einmal gesehen hat, koennte den Coupon sonst spaeter mit
+    -- leerer Karte einloesen.
+    select count(*) into v_stand
+      from public.stamps
+     where user_id = v_user and tenant_id = v_tenant;
+
+    if v_stand < v_min or (v_max is not null and v_stand > v_max) then
+        raise exception 'card outside offer range' using errcode = '22023';
     end if;
 
     -- Nur wer zu diesem Betrieb gehoert. Sonst sammelte ein Fremder Coupons
@@ -811,6 +861,14 @@ create policy offers_read on public.offers
              or valid_from <= (now() at time zone 'Europe/Berlin')::date)
         and (valid_to is null
              or valid_to >= (now() at time zone 'Europe/Berlin')::date)
+        -- Der Kartenstand entscheidet mit. Das gehoert in die Policy und nicht
+        -- in die App: Sonst stuende das Angebot in der Antwort und waere nur
+        -- ausgeblendet - ein Aufruf der Schnittstelle saehe es trotzdem.
+        --
+        -- Eine Unterabfrage, nicht zwei: stamps_user_tenant_idx traegt sie.
+        and (select count(*) from public.stamps s
+              where s.user_id = auth.uid() and s.tenant_id = offers.tenant_id)
+            between offers.min_stamps and coalesce(offers.max_stamps, 2147483647)
     );
 
 /*
