@@ -1,0 +1,9 @@
+# Alles darf indexiert werden, auch die Kunden-App.
+#
+# Ohne Betrieb in der Adresse zeigt sie keine Stempel - trotzdem gehoert sie
+# in den Index: Wer den Namen im Laden gelesen hat und abends danach sucht,
+# soll ankommen. Der Weg zur eigenen Karte fuehrt ueber den Aufsteller.
+User-agent: *
+Allow: /
+
+Sitemap: https://byte-und-handwerk.github.io/TreueBiss/sitemap.xml
