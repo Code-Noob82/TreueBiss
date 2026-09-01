@@ -9,6 +9,14 @@ create table if not exists auth.users (
     id uuid primary key default gen_random_uuid()
 );
 
+-- Naeher an Supabase: Dort traegt auth.users eine Adresse und Metadaten.
+-- Ohne sie liesse sich das Demodaten-Skript hier nicht pruefen - und eine
+-- Ablage, die weniger kann als die Produktion, ist genau die Sorte Luecke,
+-- die am 31.08. einen anon-aufrufbaren counter_token verdeckt hat.
+alter table auth.users add column if not exists email text;
+alter table auth.users add column if not exists raw_user_meta_data jsonb
+    not null default '{}'::jsonb;
+
 -- Supabase liest die User-ID aus den JWT-Claims der aktuellen Anfrage.
 -- Lokal setzen wir denselben Parameter direkt.
 create or replace function auth.uid()
