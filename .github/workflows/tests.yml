@@ -62,21 +62,20 @@ jobs:
         with:
           deno-version: v2.x
 
-      # --no-check ist Absicht, kein Uebergehen von Fehlern.
+      # Mit Typpruefung. Bis zum 01.09.2026 lief hier --no-check, begruendet
+      # damit, der Pruefer sei strenger als die Laufzeit und ein "Beheben"
+      # baue gegen die falsche Umgebung. Das war bequem und falsch: Alle
+      # Meldungen kamen aus einer einzigen Quelle - `new Uint8Array(n)` gibt
+      # seit TypeScript 5.7 `Uint8Array<ArrayBufferLike>`, und darin steckt
+      # SharedArrayBuffer, den WebCrypto und fetch nicht annehmen. Den Puffer
+      # ausdruecklich anzulegen aendert den Typ und zur Laufzeit nichts.
       #
-      # Der Typpruefer aktueller Deno-Fassungen ist strenger als die Laufzeit,
-      # unter der Supabase die Functions ausfuehrt: Er beanstandet
-      # `Uint8Array<ArrayBufferLike>` gegen `ArrayBuffer` in crypto.subtle -
-      # Code, der in der Produktion nachweislich laeuft und die Wallet-Paesse
-      # ausliefert. Wer diese Meldungen "behebt", baut gegen eine andere
-      # Laufzeit als die, in der das Ergebnis landet.
-      #
-      # Die Pruefungen selbst laufen vollstaendig: 89 Zusicherungen ueber
-      # Beleg-Signaturen, Apple-Paket und Google-Pass, alle ohne Netz und ohne
-      # Zugangsdaten.
+      # Eine Testsuite, die ihre eigenen Typen nicht prueft, ist die
+      # freundlichere Umgebung, an der dieses Projekt schon zweimal grün
+      # angelogen wurde.
       - name: Tests
         run: >
-          deno test --no-check
+          deno test
           --allow-net --allow-read --allow-env --allow-write --allow-run
           supabase/functions/
 

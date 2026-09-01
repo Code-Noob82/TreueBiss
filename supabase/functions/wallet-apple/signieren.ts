@@ -75,7 +75,7 @@ export function manifestSignieren(manifestJson: string, z: Zertifikate): Uint8Ar
   p7.sign({ detached: true });
 
   const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
-  const bytes = new Uint8Array(der.length);
+  const bytes = new Uint8Array(new ArrayBuffer(der.length));
   for (let i = 0; i < der.length; i++) bytes[i] = der.charCodeAt(i) & 0xFF;
   return bytes;
 }

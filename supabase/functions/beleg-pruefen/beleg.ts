@@ -139,15 +139,28 @@ export function schluesselLesen(roh: Uint8Array): Schluessel | null {
   }
 }
 
-export function ausBase64(s: string): Uint8Array {
+/*
+ * `new ArrayBuffer(n)` statt `new Uint8Array(n)`.
+ *
+ * Seit TypeScript 5.7 ist Uint8Array ueber seinen Puffer parametrisiert. Wer
+ * eine Laenge uebergibt, bekommt `Uint8Array<ArrayBufferLike>` - und das
+ * schliesst SharedArrayBuffer ein, den WebCrypto und fetch nicht annehmen.
+ * Der Puffer ausdruecklich angelegt, ist der Typ `Uint8Array<ArrayBuffer>`
+ * und passt. Zur Laufzeit aendert sich nichts.
+ */
+export function ausBase64(s: string): Uint8Array<ArrayBuffer> {
   const roh = atob(s);
-  const b = new Uint8Array(roh.length);
+  const b = new Uint8Array(new ArrayBuffer(roh.length));
   for (let i = 0; i < roh.length; i++) b[i] = roh.charCodeAt(i);
   return b;
 }
 
 /** Baut die Bytefolge, über die die TSE signiert hat. */
-export function signierteDaten(f: string[], schluessel: Uint8Array, hashDesSchluessels: Uint8Array): Uint8Array {
+export function signierteDaten(
+  f: string[],
+  schluessel: Uint8Array<ArrayBuffer>,
+  hashDesSchluessels: Uint8Array<ArrayBuffer>,
+): Uint8Array<ArrayBuffer> {
   const zeit = Math.floor(Date.parse(f[7]) / 1000);
   if (!Number.isFinite(zeit)) throw new Error("log-time unlesbar");
   if (f[9] !== "unixTime") {
@@ -158,7 +171,7 @@ export function signierteDaten(f: string[], schluessel: Uint8Array, hashDesSchlu
   const oid = OID_VERFAHREN[f[8]];
   if (!oid) throw new Error(`Verfahren ${f[8]} unbekannt`);
 
-  return new Uint8Array([
+  return Uint8Array.from([
     ...derGanzzahl(2),                                   // version
     ...derOid(OID_ZERTIFIZIERTE_DATEN),
     ...tlv(0x80, text("FinishTransaction")),             // [0] operationType
@@ -185,7 +198,7 @@ export async function belegPruefen(qr: string): Promise<Ergebnis> {
   if (f.length < 12) return { gueltig: false, grund: "Kein Beleg-QR: zu wenige Felder" };
   if (f[0].trim() !== "V0") return { gueltig: false, grund: "Fremde QR-Version" };
 
-  let schluessel: Uint8Array, signatur: Uint8Array;
+  let schluessel: Uint8Array<ArrayBuffer>, signatur: Uint8Array<ArrayBuffer>;
   try {
     schluessel = ausBase64(f[11]);
     signatur = ausBase64(f[10]);
@@ -208,7 +221,7 @@ export async function belegPruefen(qr: string): Promise<Ergebnis> {
   const hashName = HASH_NAME[f[8]];
   if (!hashName) return { gueltig: false, grund: `Verfahren ${f[8]} unbekannt` };
 
-  let daten: Uint8Array;
+  let daten: Uint8Array<ArrayBuffer>;
   try {
     const keyHash = new Uint8Array(await crypto.subtle.digest("SHA-256", schluessel));
     daten = signierteDaten(f, schluessel, keyHash);

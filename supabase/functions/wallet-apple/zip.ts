@@ -27,10 +27,19 @@ export function crc32(daten: Uint8Array): number {
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
-function zahlen(werte: [number, number][]): Uint8Array {
+/*
+ * `new ArrayBuffer(n)` statt `new Uint8Array(n)`.
+ *
+ * Seit TypeScript 5.7 ist Uint8Array ueber seinen Puffer parametrisiert. Wer
+ * eine Laenge uebergibt, bekommt `Uint8Array<ArrayBufferLike>` - und das
+ * schliesst SharedArrayBuffer ein, den WebCrypto und fetch nicht annehmen.
+ * Der Puffer ausdruecklich angelegt, ist der Typ `Uint8Array<ArrayBuffer>`
+ * und passt. Zur Laufzeit aendert sich nichts.
+ */
+function zahlen(werte: [number, number][]): Uint8Array<ArrayBuffer> {
   // [Wert, Breite in Bytes] - alles little endian, wie im Format vorgesehen.
   const gesamt = werte.reduce((n, [, b]) => n + b, 0);
-  const aus = new Uint8Array(gesamt);
+  const aus = new Uint8Array(new ArrayBuffer(gesamt));
   let i = 0;
   for (const [wert, breite] of werte) {
     for (let b = 0; b < breite; b++) aus[i++] = (wert >>> (b * 8)) & 0xFF;
@@ -38,16 +47,16 @@ function zahlen(werte: [number, number][]): Uint8Array {
   return aus;
 }
 
-function verketten(teile: Uint8Array[]): Uint8Array {
+function verketten(teile: Uint8Array[]): Uint8Array<ArrayBuffer> {
   const gesamt = teile.reduce((n, t) => n + t.length, 0);
-  const aus = new Uint8Array(gesamt);
+  const aus = new Uint8Array(new ArrayBuffer(gesamt));
   let i = 0;
   for (const t of teile) { aus.set(t, i); i += t.length; }
   return aus;
 }
 
 /** Packt die Dateien in ein ZIP. Reihenfolge bleibt wie uebergeben. */
-export function zipBauen(dateien: Record<string, Uint8Array>): Uint8Array {
+export function zipBauen(dateien: Record<string, Uint8Array>): Uint8Array<ArrayBuffer> {
   const koder = new TextEncoder();
   const stuecke: Uint8Array[] = [];
   const verzeichnis: Uint8Array[] = [];
