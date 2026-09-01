@@ -164,7 +164,20 @@ alter table public.tenants
     -- Wie lange ein Tresen-Code gilt. Kurz genug, dass ein abfotografierter
     -- Code nichts nuetzt; lang genug, dass eine Warteschlange durchkommt.
     add column if not exists counter_qr_seconds int not null default 60
-        check (counter_qr_seconds between 15 and 900);
+        check (counter_qr_seconds between 15 and 900),
+    /*
+     * Ein Stempel fuers Mitmachen, beim Anlegen der Karte.
+     *
+     * Er setzt keinen Kauf voraus - genau wie der Tresen-Code, und aus
+     * demselben Grund abschaltbar: Was ohne Gegenleistung vergeben wird,
+     * entscheidet der Betrieb, nicht die Software. Vorgabe ist aus.
+     *
+     * Farmen laesst er sich nicht. Stempel wandern nie zwischen Karten -
+     * adopt_card uebertraegt, es fuehrt nicht zusammen. Wer sich zehn Karten
+     * anlegt, hat zehnmal eine von zehn und keine Praemie. Der Aufwand dafuer
+     * ist hoeher als der eine Stempel wert ist.
+     */
+    add column if not exists welcome_stamp_enabled boolean not null default false;
 
 do $$
 begin
@@ -1723,7 +1736,22 @@ select
     -- laesst sie sich nicht: Wann eingeloest wurde, weiss niemand mehr.
     (select count(*) from public.vouchers v
       where v.tenant_id = t.id and v.is_redeemed and v.redeemed_at is null)
-        as redemptions_without_timestamp
+        as redemptions_without_timestamp,
+
+    /*
+     * Willkommensstempel, getrennt ausgewiesen. Sie setzen keinen Kauf
+     * voraus; ohne diese Spalte stiege "Stempel pro Tag" mit jedem neuen
+     * Kunden, ohne dass jemand etwas gekauft haette - und niemand saehe,
+     * warum. stamps_issued minus dieser Wert ist die ehrliche Zahl.
+     *
+     * Steht am Ende, nicht bei stamps_issued, wo sie inhaltlich hingehoerte:
+     * `create or replace view` kann Spalten nur anhaengen. In der Mitte
+     * eingefuegt scheitert das Einspielen in jedem bestehenden Projekt mit
+     * "cannot change name of view column".
+     */
+    (select count(*) from public.stamp_proofs s
+      where s.tenant_id = t.id and s.source = 'aktivierung')
+        as welcome_stamps
 from public.tenants t;
 
 -- Die Views gehoeren dem Betreiber, nicht der App. Ohne diesen Entzug waeren
@@ -2107,6 +2135,7 @@ grant execute on function public.owner_update_tenant(
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int);
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int);
 
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
@@ -2121,7 +2150,10 @@ create or replace function public.owner_update_proof_rules(
     -- Aufbewahrung. Vorgaben wie in der Tabelle, damit ein bestehender
     -- Aufruf ohne diese beiden Werte nichts verstellt.
     p_detail_days     int default 30,
-    p_retention_days  int default 90
+    p_retention_days  int default 90,
+    -- Vorgabe false: Ein bestehender Aufruf ohne diesen Wert schaltet den
+    -- Willkommensstempel nicht versehentlich ein.
+    p_welcome_stamp   boolean default false
 )
 returns setof public.tenants
 language plpgsql
@@ -2164,7 +2196,8 @@ begin
            counter_qr_enabled     = coalesce(p_counter_enabled, false),
            counter_qr_seconds     = p_counter_seconds,
            proof_detail_days      = p_detail_days,
-           proof_retention_days   = p_retention_days
+           proof_retention_days   = p_retention_days,
+           welcome_stamp_enabled  = coalesce(p_welcome_stamp, false)
      where id = p_tenant_id;
 
     -- Beim Einschalten einen Schluessel anlegen, falls noch keiner da ist.
@@ -2194,8 +2227,8 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) from public, anon, authenticated;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean) from public, anon, authenticated;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*
@@ -2268,6 +2301,93 @@ $$;
 
 revoke all on function public.owner_clear_redeem_code(uuid) from public, anon, authenticated;
 grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;
+
+
+-- ------------------------------------------------------------ Aktivierung
+
+/*
+ * Karte anlegen - und, wenn der Betrieb es will, gleich den ersten Stempel.
+ *
+ * Bisher legte die App die Mitgliedschaft selbst an, mit einem upsert. Das
+ * ging, solange dabei nichts zu entscheiden war. Ein Stempel ist eine
+ * Entscheidung: Er haengt an einem Schalter des Betriebs und darf genau
+ * einmal je Karte fallen. Beides gehoert in die Datenbank, nicht in den
+ * Browser - im Browser waere es eine Bitte, hier ist es eine Regel.
+ *
+ * Der Stempel setzt keinen Kauf voraus. Das ist kein Bruch mit dem Grundsatz
+ * dieses Produkts, sondern derselbe Fall wie der Tresen-Code: Er belegt, dass
+ * jemand im Laden stand, nicht dass er etwas gekauft hat. Deshalb steht er
+ * unter demselben Vorbehalt - der Betrieb schaltet ihn ein, oder eben nicht.
+ *
+ * `source` traegt ihn getrennt aus: Wer spaeter fragt, wie viele Stempel auf
+ * Kaeufe zurueckgehen, bekommt eine ehrliche Antwort statt einer
+ * geschoenten. Ohne diese Trennung wuerde die Zahl "Stempel pro Tag" mit
+ * jedem neuen Kunden steigen, ohne dass jemand etwas gekauft haette.
+ *
+ * `proof_ref` traegt die Kennung der Karte. Zusammen mit der Bedingung
+ * unique (tenant_id, proof_ref) ist der Stempel damit genau einmal je Karte
+ * moeglich - nicht durch eine Abfrage, die man vergessen kann, sondern durch
+ * den Index.
+ */
+create or replace function public.activate_card(p_tenant_id uuid)
+returns table (stamps int, welcome_stamp boolean)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_user    uuid := auth.uid();
+    v_an      boolean;
+    v_aktiv   boolean;
+    v_neu     boolean := false;
+    v_gesamt  int;
+begin
+    if v_user is null then
+        raise exception 'not signed in' using errcode = '28000';
+    end if;
+
+    select t.welcome_stamp_enabled, t.is_active into v_an, v_aktiv
+      from public.tenants t where t.id = p_tenant_id;
+    if v_aktiv is null then
+        raise exception 'tenant not found' using errcode = '22023';
+    end if;
+    if not v_aktiv then
+        raise exception 'tenant is not active' using errcode = '22023';
+    end if;
+
+    insert into public.memberships (user_id, tenant_id)
+         values (v_user, p_tenant_id)
+    on conflict (user_id, tenant_id) do nothing;
+
+    if v_an then
+        /*
+         * Der Einfuegeversuch ist die Pruefung. Ein vorheriges `if exists`
+         * waere ein zweiter Weg zur selben Frage - und zwei Wege driften
+         * auseinander, sobald zwei Anfragen gleichzeitig ankommen.
+         */
+        begin
+            insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
+                 values (p_tenant_id, v_user, 'aktivierung:' || v_user::text,
+                         'aktivierung');
+            insert into public.stamps (id, user_id, tenant_id)
+                 values (gen_random_uuid(), v_user, p_tenant_id);
+            v_neu := true;
+        exception when unique_violation then
+            -- Diese Karte hatte ihren Willkommensstempel schon.
+            v_neu := false;
+        end;
+    end if;
+
+    select count(*)::int into v_gesamt
+      from public.stamps s
+     where s.user_id = v_user and s.tenant_id = p_tenant_id;
+
+    return query select v_gesamt, v_neu;
+end;
+$$;
+
+revoke all on function public.activate_card(uuid) from public, anon, authenticated;
+grant execute on function public.activate_card(uuid) to authenticated;
 
 
 -- ---------------------------------------------------------------- Loeschen
