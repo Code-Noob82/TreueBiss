@@ -790,8 +790,16 @@ function kohortenZeigen(k, z) {
     + '</div>';
 
   const offen = k.vouchers_open, verfallen = k.vouchers_expired;
+  // Geloeschte Karten stehen bei den anderen Zaehlern, nicht als Kachel: Sie
+  // sind eine Zahl, keine Quote - und eine fuenfte Kachel liesse das 2x2-
+  // Raster mit einem einzelnen Feld in der dritten Zeile enden.
+  const weg = k.cards_deleted, weg30 = k.cards_deleted_30d;
   fuss.textContent =
     offen + ' Prämie' + (offen === 1 ? '' : 'n') + ' offen, ' + verfallen + ' verfallen. '
+    + (weg > 0
+        ? weg + (weg === 1 ? ' Karte wurde gelöscht' : ' Karten wurden gelöscht')
+          + (weg30 > 0 ? ', ' + weg30 + ' davon in den letzten 30 Tagen' : '') + '. '
+        : 'Keine Karte wurde gelöscht. ')
     + 'Wiederkehr und Aktivität beziehen sich auf die letzten ' + k.history_days + ' Tage — '
     + 'so weit reicht die Aufbewahrung der Nachweise zurück. '
     + 'Alle Angaben sind Summen über Karten, nicht über Personen.';

@@ -118,6 +118,29 @@ begin
     call test.check(v_erg.cards_left = 1,       'Eine Karte bleibt - die in Betrieb B');
 
     /*
+     * Der Strich an der Wand. Er ist die einzige Spur, die eine Loeschung
+     * hinterlassen darf - und er darf keinen Personenbezug tragen, sonst
+     * waere der Zaehler selbst wieder das, was geloescht werden sollte.
+     */
+    reset role;
+    select count(*) into v_anzahl from public.card_deletions where tenant_id = v_a;
+    call test.check(v_anzahl = 1, 'Die Loeschung ist als Kennzahl vermerkt');
+    select count(*) into v_anzahl from public.card_deletions
+     where tenant_id = v_a and stamps_at_deletion = 3;
+    call test.check(v_anzahl = 1, 'Mit dem Fuellstand von drei Stempeln');
+    select count(*) into v_anzahl
+      from information_schema.columns
+     where table_schema = 'public' and table_name = 'card_deletions'
+       and column_name = 'user_id';
+    call test.check(v_anzahl = 0, 'Und ohne jeden Verweis auf die Person');
+
+    select count(*) into v_anzahl from public.card_deletions where tenant_id = v_b;
+    call test.check(v_anzahl = 0, 'Betrieb B hat keine Loeschung');
+
+    call auth.become(v_kunde);
+    set local role authenticated;
+
+    /*
      * Ohne Rolle nachsehen. Unter `authenticated` zeigt die Policy dem Kunden
      * ohnehin nur eigene Zeilen - null Zeilen hiessen dort "unsichtbar", nicht
      * "geloescht". Genau diese Verwechslung hat in diesem Projekt schon
@@ -159,6 +182,18 @@ begin
     select count(*) into v_anzahl from public.offers where id = v_angebot;
     call test.check(v_anzahl = 1, 'Das Angebot des Betriebs bleibt bestehen');
 
+    -- --------------------------------------------- in der Sicht des Betriebs
+    reset role;
+    select cards_deleted into v_anzahl from public.pilot_cohorts where tenant_id = v_a;
+    call test.check(v_anzahl = 1, 'Die Kohortensicht zaehlt die geloeschte Karte');
+    select cards_deleted_30d into v_anzahl from public.pilot_cohorts where tenant_id = v_a;
+    call test.check(v_anzahl = 1, 'Und zwar auch im Fenster der letzten 30 Tage');
+    select cards from public.pilot_cohorts where tenant_id = v_a into v_anzahl;
+    call test.check(v_anzahl = 1, 'Gezaehlt wird nur noch die verbliebene Karte');
+
+    call auth.become(v_kunde);
+    set local role authenticated;
+
     -- ------------------------------------------------------- zweiter Aufruf
     call auth.become(v_kunde);
     set local role authenticated;
@@ -169,6 +204,21 @@ begin
         v_ok := sqlerrm like '%no card%';
     end;
     call test.check(v_ok, 'Ein zweiter Aufruf faellt auf - die Karte ist weg');
+
+    /*
+     * Die Zaehlzeile ist eine Betriebszahl, keine Kundenzahl. Aus dem Browser
+     * darf sie niemand lesen - der Betrieb sieht sie ueber pilot_cohorts,
+     * und dorthin kommt nur, wer staff_pilot_cohorts() aufrufen darf.
+     */
+    call test.check(
+        not has_table_privilege('anon', 'public.card_deletions', 'SELECT'),
+        'anon liest die Loeschzahlen nicht');
+    call test.check(
+        not has_table_privilege('authenticated', 'public.card_deletions', 'SELECT'),
+        'Auch ein angemeldeter Kunde liest sie nicht');
+    call test.check(
+        not has_table_privilege('authenticated', 'public.card_deletions', 'INSERT'),
+        'Und schreibt sie erst recht nicht');
 
     reset role;
     raise notice '--- Karte loeschen bestanden ---';

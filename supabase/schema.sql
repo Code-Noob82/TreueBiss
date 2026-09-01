@@ -1734,6 +1734,38 @@ revoke all on function public.staff_pilot_summary() from public, anon, authentic
 grant execute on function public.staff_pilot_summary() to authenticated;
 
 -- --------------------------------------------------------- Kohortenzahlen
+
+/*
+ * Geloeschte Karten.
+ *
+ * Ein Kunde, der seine Karte wegwirft, ist ein Signal - und zwar das
+ * einzige, das der Betrieb sonst nie zu sehen bekaeme: Wer aufhoert,
+ * verschwindet lautlos aus jeder anderen Zahl.
+ *
+ * Diese Tabelle haelt bewusst *kein* user_id. Eine Loeschung nach Art. 17
+ * darf keinen Verweis auf die geloeschte Person zuruecklassen; sonst waere
+ * der Zaehler selbst wieder ein Personenbezug. Was bleibt, ist ein Strich
+ * an der Wand: welcher Betrieb, wann, wie voll die Karte war.
+ *
+ * Der Fuellstand steht dabei, weil er die Aussage traegt: Eine leere Karte,
+ * die geht, ist Aufraeumen. Eine mit acht von zehn Stempeln ist Aerger.
+ */
+create table if not exists public.card_deletions (
+    id                 uuid primary key default gen_random_uuid(),
+    tenant_id          uuid not null references public.tenants(id) on delete cascade,
+    deleted_at         timestamptz not null default now(),
+    stamps_at_deletion int not null default 0
+);
+
+create index if not exists card_deletions_tenant_idx
+    on public.card_deletions (tenant_id, deleted_at desc);
+
+alter table public.card_deletions enable row level security;
+
+-- Niemand aus dem Browser liest hier unmittelbar. Der Betrieb sieht die
+-- Zahl ueber pilot_cohorts, und die Zeile schreibt delete_card als definer.
+revoke all on public.card_deletions from anon, authenticated;
+
 /*
  * Die Frage, die ein Betrieb tatsaechlich stellt, ist nicht "wie viele
  * Stempel", sondern "lohnt sich meine Karte". Sie laesst sich beantworten,
@@ -1795,7 +1827,16 @@ select
     (select count(*) from public.vouchers v
       where v.tenant_id = t.id and not v.is_redeemed
         and v.expires_at >= (extract(epoch from now()) * 1000)::int8)
-        as vouchers_open
+        as vouchers_open,
+
+    -- Die Gegenzahl zu allem darueber: Karten, die es nicht mehr gibt, weil
+    -- ihr Besitzer sie geloescht hat. Ohne diese Spalte sieht ein Betrieb nur
+    -- die, die geblieben sind.
+    (select count(*) from public.card_deletions d where d.tenant_id = t.id)
+        as cards_deleted,
+    (select count(*) from public.card_deletions d
+      where d.tenant_id = t.id and d.deleted_at >= now() - interval '30 days')
+        as cards_deleted_30d
 from public.tenants t
 cross join lateral (
     select
@@ -2272,6 +2313,17 @@ begin
     delete from public.stamps
      where user_id = v_user and tenant_id = v_tenant;
     get diagnostics v_stamps = row_count;
+
+    /*
+     * Der Strich an der Wand, und zwar hier - nach dem Zaehlen der Stempel,
+     * vor dem Rest. Danach liesse sich der Fuellstand nicht mehr feststellen,
+     * und ohne ihn ist die Zeile halb so viel wert: Eine leere Karte, die
+     * geht, ist Aufraeumen; acht von zehn sind Aerger.
+     *
+     * Ohne user_id, mit Absicht - siehe card_deletions.
+     */
+    insert into public.card_deletions (tenant_id, stamps_at_deletion)
+         values (v_tenant, v_stamps);
 
     delete from public.vouchers
      where user_id = v_user and tenant_id = v_tenant;
