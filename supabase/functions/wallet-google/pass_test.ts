@@ -9,8 +9,8 @@
  *   node --experimental-strip-types supabase/functions/wallet-google/pass_test.ts
  */
 import {
-  claimsBauen, farbe, kennungSaeubern, klasseBauen, klasseId, objektBauen, objektId,
-  SPEICHERN_URL, type Betrieb,
+  claimsBauen, farbe, kennungSaeubern, klasseBauen, klasseId, NACHRICHT_ID,
+  nachrichtBauen, objektBauen, objektId, SPEICHERN_URL, type Betrieb,
 } from "./pass.ts";
 import { b64url, jwtBauen, pemZuBytes, sha256Hex } from "./signieren.ts";
 
@@ -125,6 +125,35 @@ pruefe(token2.split(".").length === 3, "Und ergibt ebenfalls ein gültiges JWT")
 
 pruefe(SPEICHERN_URL === "https://pay.google.com/gp/v/save/",
   "Die Save-URL entspricht der Dokumentation");
+
+/* ---------------------------------------------------- Nachricht an alle */
+const nachricht = nachrichtBauen("Frisch aus dem Ofen", "Ab 15 Uhr: Zwiebelkuchen.");
+pruefe(nachricht.length === 1, "Eine Nachricht, nicht mehrere");
+pruefe(nachricht[0].id === NACHRICHT_ID,
+  "Sie traegt eine feste Kennung — der naechste Aufruf ersetzt sie");
+pruefe(nachricht[0].messageType === "TEXT", "Als TEXT ausgezeichnet");
+pruefe(nachricht[0].header === "Frisch aus dem Ofen" && nachricht[0].body === "Ab 15 Uhr: Zwiebelkuchen.",
+  "Titel und Text kommen unveraendert an");
+
+const nachrichtUmbrueche = nachrichtBauen("  Zwei   Woerter  ", "Zeile eins\n\nZeile zwei");
+pruefe(nachrichtUmbrueche[0].header === "Zwei Woerter",
+  "Mehrfache Leerzeichen werden zu einem");
+pruefe(nachrichtUmbrueche[0].body === "Zeile eins Zeile zwei",
+  "Zeilenumbrueche auch — Google zeigt den Text einzeilig an");
+
+const nachrichtLang = nachrichtBauen("t".repeat(200), "b".repeat(600));
+pruefe(nachrichtLang[0].header.length === 60, "Der Titel wird auf 60 Zeichen gekuerzt");
+pruefe(nachrichtLang[0].body.length === 300, "Der Text auf 300");
+
+for (const [titel, text, was] of [
+  ["", "Text", "ohne Titel"],
+  ["   ", "Text", "mit einem Titel aus Leerzeichen"],
+  ["Titel", "", "ohne Text"],
+] as const) {
+  let abgewiesen = false;
+  try { nachrichtBauen(titel, text); } catch { abgewiesen = true; }
+  pruefe(abgewiesen, `Eine Nachricht ${was} wird abgewiesen`);
+}
 
 console.log(fehler === 0
   ? "\n--- Google-Wallet-Pass bestanden ---"

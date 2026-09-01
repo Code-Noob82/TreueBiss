@@ -50,3 +50,32 @@ jobs:
           # run.sh sucht die Binaerdateien sonst unter dem Homebrew-Pfad.
           PGBIN: /usr/lib/postgresql/16/bin
         run: supabase/test/run.sh
+
+  deno:
+    name: Edge Functions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # --no-check ist Absicht, kein Uebergehen von Fehlern.
+      #
+      # Der Typpruefer aktueller Deno-Fassungen ist strenger als die Laufzeit,
+      # unter der Supabase die Functions ausfuehrt: Er beanstandet
+      # `Uint8Array<ArrayBufferLike>` gegen `ArrayBuffer` in crypto.subtle -
+      # Code, der in der Produktion nachweislich laeuft und die Wallet-Paesse
+      # ausliefert. Wer diese Meldungen "behebt", baut gegen eine andere
+      # Laufzeit als die, in der das Ergebnis landet.
+      #
+      # Die Pruefungen selbst laufen vollstaendig: 89 Zusicherungen ueber
+      # Beleg-Signaturen, Apple-Paket und Google-Pass, alle ohne Netz und ohne
+      # Zugangsdaten.
+      - name: Tests
+        run: >
+          deno test --no-check
+          --allow-net --allow-read --allow-env --allow-write --allow-run
+          supabase/functions/

@@ -82,6 +82,32 @@ export async function klasseSicherstellen(
 }
 
 /**
+ * Die Nachrichten der Klasse setzen - oder mit einer leeren Liste loeschen.
+ *
+ * PATCH statt des eigens dafuer vorgesehenen `addMessage`: Letzteres haengt
+ * an, und der Betrieb haette nach einem halben Jahr eine Chronik im Pass
+ * stehen. Hier gilt, was zuletzt gesetzt wurde.
+ *
+ * Endpunkt https://developers.google.com/wallet/reference/rest/v1/loyaltyclass/patch
+ */
+export async function klasseNachricht(
+  token: string,
+  klasseId: string,
+  nachrichten: unknown[],
+): Promise<Ergebnis[]> {
+  const antwort = await fetch(`${BASIS}/loyaltyClass/${encodeURIComponent(klasseId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: nachrichten }),
+  });
+  return [{
+    schritt: nachrichten.length ? "nachricht setzen" : "nachricht loeschen",
+    status: antwort.status,
+    koerper: await antwort.json(),
+  }];
+}
+
+/**
  * Objekt anlegen und Google antworten lassen.
  *
  * Der Save-Link erzeugt das Objekt sonst erst beim Klick - und wenn dabei
