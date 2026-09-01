@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TreueBiss</title>
+<meta name="theme-color" content="#4CAF50">
+<meta name="robots" content="noindex">
+<meta name="description" content="Digitale Stempelkarte für das Lebensmittelhandwerk. Kundenkarte, Kasse und Verwaltung.">
+<link rel="preload" href="gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="gemeinsam/basis.css">
+<style>
+  /*
+    Diese Seite gab es bisher nicht: Pages liefert `web/` aus, und ohne
+    index.html auf oberster Ebene antwortete die Startadresse mit einer
+    GitHub-Fehlerseite. Wer die Adresse ohne Pfad tippt oder weitergibt -
+    und das passiert, sobald sie irgendwo gedruckt steht - landete im Nichts.
+
+    Keine Weiterleitung auf /app/. Hier kommen zwei verschiedene Leute an:
+    Kunden, die ihre Karte suchen, und Betriebe, die sich die Oberflächen
+    ansehen wollen. Eine Weiterleitung bediente immer nur die eine Hälfte.
+  */
+  .kopf {
+    background: var(--grund); color: var(--grund-text);
+    padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s7);
+    border-radius: 0 0 var(--s5) var(--s5);
+    text-align: center;
+  }
+  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
+  .kopf p {
+    margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
+    text-transform: uppercase; color: var(--grund-leise);
+  }
+  main { max-width: 460px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
+  .tuer { display: block; text-decoration: none; color: inherit; }
+  .tuer b {
+    display: block; font-family: var(--display);
+    font-size: var(--t-gross); font-weight: 700; line-height: 1.2;
+    margin-bottom: var(--s1);
+  }
+  .tuer span { font-size: var(--t-klein); color: var(--tinte-leise); line-height: 1.5; }
+  .tuer:hover b { color: var(--marke); }
+  .fuss {
+    max-width: 460px; margin: 0 auto; padding: 0 var(--s5) var(--s7);
+    font-size: var(--t-mikro); line-height: 1.6; color: var(--tinte-leise);
+  }
+  .fuss a { color: var(--tinte-leise); }
+</style>
+</head>
+<body>
+
+<header class="kopf">
+  <h1>TreueBiss</h1>
+  <p>Digitale Stempelkarte</p>
+</header>
+
+<main>
+  <a class="karte tuer" href="app/">
+    <b>Deine Stempelkarte</b>
+    <span>Für Kundinnen und Kunden. Ohne Installation, ohne Konto — den
+    Zugang gibt es über den QR-Code am Tresen oder den Link des Betriebs.</span>
+  </a>
+
+  <a class="karte neben tuer" href="kasse/">
+    <b>Kasse</b>
+    <span>Für das Verkaufsteam: Gutschein einlösen und den Tresen-Code zeigen.</span>
+  </a>
+
+  <a class="karte neben tuer" href="verwaltung/">
+    <b>Verwaltung</b>
+    <span>Für den Betrieb: Kennzahlen, Kartengröße, Prämie und Angebote.</span>
+  </a>
+</main>
+
+<p class="fuss">
+  TreueBiss ist ein Angebot von
+  <a href="https://byteundhandwerk.de/treuebiss">byte &amp; Handwerk</a>.
+  Ohne Betrieb in der Adresse zeigt die Kundenkarte keine Stempel — sie
+  gehört immer zu genau einem Laden.
+</p>
+
+</body>
+</html>
