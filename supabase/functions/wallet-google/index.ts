@@ -19,12 +19,12 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  claimsBauen, klasseBauen, klasseId, nachrichtBauen, objektBauen,
+  claimsBauen, klasseBauen, klasseId, nachrichtBauen, objektBauen, objektId,
   SPEICHERN_URL, type Betrieb,
 } from "./pass.ts";
 import { jwtBauen, sha256Hex } from "./signieren.ts";
 import {
-  klasseNachricht, klasseSicherstellen, objektAnlegen, zugriffstokenHolen,
+  klasseNachricht, klasseSicherstellen, objektAnlegen, objektStilllegen, zugriffstokenHolen,
 } from "./google.ts";
 
 const KOPF = {
@@ -134,6 +134,39 @@ Deno.serve(async (req: Request) => {
     .eq("id", tenant_id).limit(1);
   const betrieb = betriebe?.[0] as Betrieb | undefined;
   if (!betrieb) return antwort({ fehler: "Betrieb unbekannt." }, 404);
+
+  /*
+   * Pass stilllegen, bevor die Karte geloescht wird.
+   *
+   * Hier unten statt oben bei "nachricht", weil dieser Zweig den
+   * Kartenschluessel braucht - und den liest die Policy nur fuer den
+   * Eigentuemer. Damit ist die Berechtigung schon geklaert: Wer keine Karte
+   * hat, ist oben mit 404 herausgefallen.
+   *
+   * Die App ruft das *vor* delete_card auf. Danach gaebe es keine
+   * Mitgliedschaft mehr, aus der sich die Objektkennung ableiten liesse.
+   */
+  if (aktion === "stilllegen") {
+    try {
+      const dienstToken = await zugriffstokenHolen(saEmail, saKey);
+      const tokenHash = await sha256Hex(karte.card_token);
+      const spur = await objektStilllegen(
+        dienstToken, objektId(issuerId, betrieb, tokenHash));
+      const letzte = spur[spur.length - 1];
+      /*
+       * 404 heisst: Dieser Kunde hatte den Pass nie gespeichert. Das ist der
+       * haeufigere Fall und kein Fehler - ein 500 waere hier eine
+       * Falschmeldung, die die Loeschung in der App als kaputt darstellte.
+       */
+      const gut = letzte.status < 400 || letzte.status === 404;
+      return antwort(
+        { stillgelegt: letzte.status < 400, gab_es_nicht: letzte.status === 404, spur },
+        gut ? 200 : 502);
+    } catch (e) {
+      console.error("wallet-google stilllegen", e);
+      return antwort({ fehler: "Der Pass liess sich nicht stilllegen.", grund: String(e) }, 500);
+    }
+  }
 
   const { count } = await alsNutzer
     .from("stamps").select("id", { count: "exact", head: true })

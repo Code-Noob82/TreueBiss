@@ -598,6 +598,28 @@ async function karteLoeschen() {
   const knopf = $('loeschen-ja');
   beschaeftigt(knopf, true, 'Wird gelöscht …');
   try {
+    /*
+     * Zuerst den Google-Pass stilllegen, dann erst loeschen. Umgekehrt ginge
+     * es nicht: Die Objektkennung leitet sich aus dem Kartenschluessel ab,
+     * und der steht in der Mitgliedschaft, die es gleich nicht mehr gibt.
+     *
+     * Scheitert das, wird trotzdem geloescht. Das Recht auf Loeschung darf
+     * nicht daran haengen, ob Google gerade antwortet - der Pass bliebe dann
+     * als Karteileiche stehen, aber die Daten sind weg. Umgekehrt waere es
+     * schlimmer.
+     */
+    let passStillgelegt = false;
+    if (betrieb?.id) {
+      try {
+        const { data: w } = await db.functions.invoke('wallet-google', {
+          body: { tenant_id: betrieb.id, aktion: 'stilllegen' },
+        });
+        passStillgelegt = !!w?.stillgelegt;
+      } catch (e) {
+        console.warn('wallet-google stilllegen', e);
+      }
+    }
+
     const { data, error } = await db.rpc('delete_card', { p_slug: slug });
     if (error) throw error;
     const erg = Array.isArray(data) ? data[0] : data;
@@ -623,8 +645,13 @@ async function karteLoeschen() {
     $('betrieb').textContent = erg?.tenant_name ?? 'Karte gelöscht';
     $('kopf-zeile').textContent = 'Karte gelöscht';
     melden('Deine Karte ist weg — mit allen Stempeln, Gutscheinen und '
-         + 'Kaufnachweisen. Ein Pass in deiner Wallet bleibt auf dem Handy '
-         + 'stehen; den entfernst du dort selbst.'
+         + 'Kaufnachweisen. '
+         + (passStillgelegt
+             ? 'Der Google-Pass ist als abgelaufen markiert; löschen kannst '
+             + 'nur du ihn, er liegt in deinem Konto. '
+             : '')
+         + 'Ein Pass in Apple Wallet bleibt auf dem Handy stehen — den '
+         + 'entfernst du dort selbst.'
          + ((erg?.cards_left ?? 0) > 0
             ? ' Deine Karten in anderen Betrieben sind unberührt.'
             : ''), true);

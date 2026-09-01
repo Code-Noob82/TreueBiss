@@ -108,6 +108,40 @@ export async function klasseNachricht(
 }
 
 /**
+ * Pass stilllegen.
+ *
+ * Loescht ein Kunde seine Karte, verschwindet sie aus unserer Datenbank - der
+ * Pass in seiner Wallet aber nicht. Er stuende weiter auf dem Telefon und
+ * zeigte einen Stand, den es nicht mehr gibt.
+ *
+ * `EXPIRED` ist dafuer der vorgesehene Zustand: Google schiebt den Pass in
+ * den abgelaufenen Bereich und hoert auf, ihn am Sperrbildschirm oder in der
+ * Naehe des Ladens anzubieten. Entfernen kann ihn nur der Besitzer selbst -
+ * er liegt in seinem Google-Konto, nicht in unserem.
+ *
+ * 404 ist hier kein Fehler, sondern der Normalfall: Die meisten Kunden haben
+ * den Pass nie gespeichert. Die Antwort geht trotzdem in die Spur, damit ein
+ * echter Fehler nicht als "gab es nicht" durchgeht.
+ *
+ * Endpunkt https://developers.google.com/wallet/reference/rest/v1/loyaltyobject/patch
+ */
+export async function objektStilllegen(
+  token: string,
+  objektId: string,
+): Promise<Ergebnis[]> {
+  const antwort = await fetch(`${BASIS}/loyaltyObject/${encodeURIComponent(objektId)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ state: "EXPIRED" }),
+  });
+  return [{
+    schritt: "objekt stilllegen",
+    status: antwort.status,
+    koerper: await antwort.json(),
+  }];
+}
+
+/**
  * Objekt anlegen und Google antworten lassen.
  *
  * Der Save-Link erzeugt das Objekt sonst erst beim Klick - und wenn dabei
