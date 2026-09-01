@@ -262,6 +262,19 @@
             <input id="a-bis" type="date">
           </div>
         </div>
+
+        <div class="paar">
+          <div>
+            <label for="a-min">Erst ab … Stempeln</label>
+            <input id="a-min" type="number" min="0" step="1" placeholder="0">
+          </div>
+          <div>
+            <label for="a-max">Nur bis … Stempeln</label>
+            <input id="a-max" type="number" min="0" step="1" placeholder="ohne Grenze">
+          </div>
+        </div>
+        <p class="hinweis" id="a-stand-hinweis"></p>
+
         <label class="schalter">
           <input id="a-einloesbar" type="checkbox">
           <span><b>Als Coupon einlösbar</b><br>
@@ -732,6 +745,8 @@ function kohortenZeigen(k, z) {
 }
 
 async function angeboteLaden() {
+  // Die Grenzen haengen an der Kartengroesse, die sich aendern kann.
+  kartenstandGrenzeSetzen();
   // Die Einloesungen gleich mit: Ein Betrieb, der einen Coupon ausgibt, will
   // als Erstes wissen, ob ihn jemand nimmt.
   const [{ data, error }, { data: eingeloest }] = await Promise.all([
@@ -754,7 +769,8 @@ async function angeboteLaden() {
     const zeitraum = [a.valid_from, a.valid_to].some(Boolean)
       ? `${a.valid_from ? datum(a.valid_from) : '…'} – ${a.valid_to ? datum(a.valid_to) : '…'}`
       : '';
-    const unten = [a.description, zeitraum].filter(Boolean).map(h).join(' · ');
+    const unten = [a.description, zeitraum, kartenstandText(a)]
+      .filter(Boolean).map(h).join(' · ');
     /*
      * Ob das Angebot gerade beim Kunden steht, entscheidet die Policy
      * `offers_read`. Der Betrieb liest ueber `offers_owner_read` auch das
@@ -837,6 +853,9 @@ function angebotInsFormular(a) {
   $('a-bis').value = a.valid_to ?? '';
   $('a-einloesbar').checked = !!a.is_redeemable;
   $('a-limit').value = a.redeem_limit ?? 'einmal';
+  $('a-min').value = a.min_stamps ? String(a.min_stamps) : '';
+  $('a-max').value = a.max_stamps === null || a.max_stamps === undefined
+    ? '' : String(a.max_stamps);
   limitFeldZeigen();
   $('a-speichern').textContent = 'Änderung speichern';
   $('a-abbrechen').classList.remove('verborgen');
@@ -845,7 +864,8 @@ function angebotInsFormular(a) {
 
 function angebotFormularLeeren() {
   bearbeitet = null;
-  ['a-titel', 'a-text', 'a-bild', 'a-von', 'a-bis'].forEach((id) => { $(id).value = ''; });
+  ['a-titel', 'a-text', 'a-bild', 'a-von', 'a-bis', 'a-min', 'a-max']
+    .forEach((id) => { $(id).value = ''; });
   $('a-einloesbar').checked = false;
   $('a-limit').value = 'einmal';
   limitFeldZeigen();
@@ -1027,6 +1047,10 @@ $('a-speichern').onclick = async () => {
     valid_to: bis,
     is_redeemable: $('a-einloesbar').checked,
     redeem_limit: $('a-limit').value,
+    // Leeres Feld heisst "keine Grenze". Unten ist das 0, oben null - die
+    // beiden bedeuten hier Verschiedenes und duerfen nicht zusammenfallen.
+    min_stamps: Number($('a-min').value) || 0,
+    max_stamps: $('a-max').value === '' ? null : Number($('a-max').value),
   };
 
   beschaeftigt($('a-speichern'), true, 'Wird gespeichert …');
@@ -1046,6 +1070,38 @@ $('a-speichern').onclick = async () => {
  * sie auch beim Aushang da, sieht das Formular nach einer Entscheidung aus,
  * die gar keine ist.
  */
+/*
+ * Was in der Liste unter einem Angebot steht, wenn es an den Kartenstand
+ * gebunden ist. Ohne diesen Vermerk sähe ein Angebot, das nur ein Teil der
+ * Kunden sieht, aus wie eines für alle.
+ */
+function kartenstandText(a) {
+  const min = a.min_stamps ?? 0;
+  const max = a.max_stamps ?? null;
+  if (!min && max === null) return '';
+  if (max === null) return `ab ${min} Stempeln`;
+  if (!min) return `bis ${max} Stempel`;
+  return `${min}–${max} Stempel`;
+}
+
+/*
+ * Die Obergrenze der Eingabefelder hängt an der Kartengröße des Betriebs.
+ * Eine volle Karte wird sofort zum Gutschein und ihre Stempel verschwinden -
+ * der Stand liegt also immer zwischen 0 und stamps_per_card − 1. Ein Angebot
+ * „ab 10 Stempeln" bei zehn Stempeln pro Karte träfe nie zu, und das fiele
+ * niemandem auf: Es fehlt einfach.
+ */
+function kartenstandGrenzeSetzen() {
+  const n = Number(aktiv?.stamps_per_card) || 10;
+  const hoechst = Math.max(0, n - 1);
+  $('a-min').max = String(hoechst);
+  $('a-max').max = String(hoechst);
+  $('a-stand-hinweis').textContent =
+    `Ohne Angabe sieht jeder Kunde das Angebot. Bei ${n} Stempeln pro Karte `
+    + `liegt der Stand immer zwischen 0 und ${hoechst} — eine volle Karte wird `
+    + `sofort zum Gutschein.`;
+}
+
 function limitFeldZeigen() {
   $('a-limit-huelle').classList.toggle('verborgen', !$('a-einloesbar').checked);
 }
