@@ -416,6 +416,21 @@ returns boolean language sql stable security invoker as $$
     );
 $$;
 
+/*
+ * anon hat hier nichts zu suchen: Ohne Anmeldung ist auth.uid() leer, die
+ * Antwort waere immer "nein". Die Freigabe war nur die, die Supabase jeder
+ * neuen Funktion mitgibt.
+ *
+ * authenticated behaelt sie, und das ist keine Nachlaessigkeit: Die Policies
+ * auf offer_redemptions und tenant_registers rufen diese Funktion, und der
+ * Ausdruck einer Policy laeuft mit den Rechten dessen, der die Abfrage
+ * stellt. Ein Entzug hier legt das Lesen dort still - mit "permission denied
+ * for function is_staff_of" an einer Stelle, an der niemand die Ursache
+ * sucht.
+ */
+revoke all on function public.is_staff_of(uuid) from public, anon;
+grant execute on function public.is_staff_of(uuid) to authenticated;
+
 -- ============================================ Einloesen (serverseitig)
 
 /*
@@ -909,6 +924,12 @@ returns boolean language sql stable security invoker as $$
         where m.user_id = auth.uid() and m.tenant_id = target_tenant
     );
 $$;
+
+-- Anders als is_staff_of steht diese Funktion in keiner Policy und in keinem
+-- Aufruf der App - issue_stamp_intern fragt die Mitgliedschaft selbst ab, weil
+-- der Nutzer dort als Parameter kommt. Also bleibt sie zu, bis jemand sie
+-- braucht; die Freigabe ist dann eine Zeile.
+revoke all on function public.is_member_of(uuid) from public, anon, authenticated;
 
 -- Stempel und Gutscheine darf die App LESEN, aber nicht anlegen.
 -- Es gibt bewusst keine insert-Policy: Wer selbst schreiben kann, kann sich
@@ -1935,6 +1956,11 @@ returns boolean language sql stable security invoker as $$
     );
 $$;
 
+-- Gerufen wird sie ausschliesslich aus staff_redeem_voucher und
+-- staff_counter_token, und die laufen als definer. Aus dem Browser braucht sie
+-- niemand.
+revoke all on function public.is_demo_of(uuid) from public, anon, authenticated;
+
 -- Darf der Aufrufer diesen Betrieb verwalten?
 create or replace function public.is_owner_of(target_tenant uuid)
 returns boolean language sql stable security invoker as $$
@@ -1945,6 +1971,11 @@ returns boolean language sql stable security invoker as $$
           and s.role = 'owner'
     );
 $$;
+
+-- Wie bei is_staff_of: anon nein, authenticated ja - die Policies auf offers
+-- und tenant_registers haengen daran.
+revoke all on function public.is_owner_of(uuid) from public, anon;
+grant execute on function public.is_owner_of(uuid) to authenticated;
 
 -- ------------------------------------------------------------- Angebote
 -- Angebote tragen nichts Schuetzenswertes, deshalb reichen hier Policies;
