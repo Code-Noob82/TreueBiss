@@ -119,6 +119,11 @@
 </header>
 
 <main>
+  <div id="demo-schild" class="demo-schild verborgen">
+    <b>Demozugang — nur zum Ansehen</b>
+    Einlösen und Tresen-Code sind abgeschaltet. So sieht die Kasse aus, wenn
+    Sie TreueBiss betreiben.
+  </div>
   <div id="bestaetigung" role="status" aria-live="polite"></div>
   <div id="meldung" role="status" aria-live="polite"></div>
 
@@ -400,8 +405,19 @@ async function scanBeenden(wert) {
 async function wechselPruefen() {
   const { data, error } = await db.from('tenant_staff').select('role');
   if (error) { console.error('tenant_staff', error); return; }
-  const darf = (data ?? []).some((r) => r.role === 'owner');
-  $('wechsel').classList.toggle('verborgen', !darf);
+  const rollen = (data ?? []).map((r) => r.role);
+  $('wechsel').classList.toggle('verborgen', !rollen.includes('owner'));
+
+  /*
+   * Demozugang: sehen ja, anfassen nein. Die Datenbank weist Einloesen und
+   * Tresen-Token ohnehin ab (`is_demo_of`); hier geht es nur darum, keine
+   * Knoepfe anzubieten, die nichts tun - und den Scanner gar nicht erst zu
+   * starten, damit niemand eine Kamerafreigabe fuer nichts gibt.
+   */
+  const nurAnsehen = rollen.length > 0 && rollen.every((r) => r === 'demo');
+  document.body.classList.toggle('nur-ansehen', nurAnsehen);
+  $('demo-schild').classList.toggle('verborgen', !nurAnsehen);
+  if (nurAnsehen) $('tresen').classList.add('verborgen');
 }
 
 /*

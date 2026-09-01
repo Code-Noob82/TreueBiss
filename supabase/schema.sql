@@ -688,6 +688,11 @@ begin
     if not public.is_staff_of(v_tenant) then
         raise exception 'not staff of this tenant' using errcode = '42501';
     end if;
+    -- Ein Demozugang sieht die Gutscheine, verbraucht aber keinen. Sonst
+    -- stuende der naechste Interessent vor einer leergeraeumten Demo.
+    if public.is_demo_of(v_tenant) then
+        raise exception 'demo access is read only' using errcode = '42501';
+    end if;
     if v_redeemed then
         raise exception 'voucher already redeemed' using errcode = '22023';
     end if;
@@ -1268,6 +1273,15 @@ declare
 begin
     if not public.is_staff_of(p_tenant_id) then
         raise exception 'not staff of this tenant' using errcode = '42501';
+    end if;
+    /*
+     * Hier wiegt es schwerer als beim Einloesen: Der Tresen-Token ist der
+     * Schluessel zum Stempel. Wer ihn bekommt, kann sich in der Kunden-App
+     * selbst welche ausstellen - ein Demozugang bekaeme damit Schreibrechte
+     * auf dem Umweg ueber eine andere Oberflaeche.
+     */
+    if public.is_demo_of(p_tenant_id) then
+        raise exception 'demo access is read only' using errcode = '42501';
     end if;
     select counter_qr_seconds, counter_qr_enabled into v_dauer, v_an
       from public.tenants where id = p_tenant_id and is_active;
@@ -1850,15 +1864,34 @@ alter table public.tenant_staff
 
 -- `add constraint if not exists` gibt es nicht; auf einem schon
 -- eingerichteten Projekt liefe das Skript sonst beim zweiten Lauf auf.
-do $$
-begin
-    if not exists (
-        select 1 from pg_constraint where conname = 'tenant_staff_role_check'
-    ) then
-        alter table public.tenant_staff
-            add constraint tenant_staff_role_check check (role in ('staff', 'owner'));
-    end if;
-end
+-- Drei Rollen:
+--   staff - Kasse: Gutscheine einloesen, Tresen-QR, Zahlen sehen.
+--   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
+--   demo  - darf alles *sehen* und nichts aendern. Fuer Betriebe, die sich
+--           das Produkt ansehen wollen, bevor sie es bestellen.
+--
+-- Neu gesetzt statt "if not exists": Die Bedingung gab es schon mit zwei
+-- Rollen, und ein `if not exists` haette sie unveraendert stehenlassen.
+alter table public.tenant_staff drop constraint if exists tenant_staff_role_check;
+alter table public.tenant_staff
+    add constraint tenant_staff_role_check check (role in ('staff', 'owner', 'demo'));
+
+/*
+ * Sieht der Aufrufer nur zu?
+ *
+ * `is_staff_of` fragt nicht nach der Rolle - jede Zeile in tenant_staff
+ * genuegt. Fuer die Demo reicht das nicht: Sie soll lesen duerfen wie das
+ * Personal und nichts anfassen. Deshalb diese Gegenfrage an den zwei
+ * Stellen, an denen Personal schreibt oder ein Geheimnis bekommt.
+ */
+create or replace function public.is_demo_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid()
+          and s.tenant_id = target_tenant
+          and s.role = 'demo'
+    );
 $$;
 
 -- Darf der Aufrufer diesen Betrieb verwalten?
