@@ -24,7 +24,16 @@ export function b64url(daten: Uint8Array | string): string {
  * Wird das beim Ablegen in den Secrets nicht aufgeloest, schlaegt der Import
  * mit einer nichtssagenden Meldung fehl - deshalb hier beides behandeln.
  */
-export function pemZuBytes(pem: string): Uint8Array {
+/*
+ * `new ArrayBuffer(n)` statt `new Uint8Array(n)`.
+ *
+ * Seit TypeScript 5.7 ist Uint8Array ueber seinen Puffer parametrisiert. Wer
+ * eine Laenge uebergibt, bekommt `Uint8Array<ArrayBufferLike>` - und das
+ * schliesst SharedArrayBuffer ein, den WebCrypto und fetch nicht annehmen.
+ * Der Puffer ausdruecklich angelegt, ist der Typ `Uint8Array<ArrayBuffer>`
+ * und passt. Zur Laufzeit aendert sich nichts.
+ */
+export function pemZuBytes(pem: string): Uint8Array<ArrayBuffer> {
   const koerper = pem
     .replace(/\\n/g, "\n")
     .replace(/-----BEGIN [^-]+-----/, "")
@@ -32,7 +41,7 @@ export function pemZuBytes(pem: string): Uint8Array {
     .replace(/\s+/g, "");
   if (!koerper) throw new Error("Der Schluessel ist leer.");
   const roh = atob(koerper);
-  const bytes = new Uint8Array(roh.length);
+  const bytes = new Uint8Array(new ArrayBuffer(roh.length));
   for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i);
   return bytes;
 }

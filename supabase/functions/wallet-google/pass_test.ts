@@ -85,7 +85,11 @@ pruefe(claims.typ === "savetowallet", "typ ist savetowallet");
 pruefe(claims.iss.includes("@"), "iss ist die Dienstkonto-Adresse");
 pruefe(Number.isInteger(claims.iat) && claims.iat > 1_700_000_000,
   "iat ist eine plausible Unix-Zeit in Sekunden");
-pruefe(claims.payload.loyaltyClasses.length === 1 && claims.payload.loyaltyObjects.length === 1,
+// Optionale Felder: claimsBauen laesst die Klasse weg, wenn sie schon bei
+// Google liegt. Der Test deckt den anderen Fall ab - das muss er sagen,
+// statt sich auf den Nicht-Null-Zustand zu verlassen.
+pruefe(claims.payload.loyaltyClasses?.length === 1
+         && claims.payload.loyaltyObjects?.length === 1,
   "Klasse und Objekt reisen zusammen — beide entstehen beim Speichern");
 
 // ------------------------------------------------------------------ Signatur
