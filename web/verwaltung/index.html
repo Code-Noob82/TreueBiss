@@ -382,6 +382,19 @@
       </p>
 
       <label class="schalter">
+        <input id="b-willkommen" type="checkbox">
+        <span>Ersten Stempel fürs Aktivieren vergeben</span>
+      </label>
+      <p class="hinweis">
+        Wer die Karte am Tresen zum ersten Mal öffnet, hat sofort einen
+        Stempel darauf — einmal je Karte. <strong>Er setzt keinen Kauf
+        voraus</strong>, wie der Tresen-Code auch. Die App sagt das dem
+        Kunden ausdrücklich, statt den Stempel stillschweigend gutzuschreiben.
+        In den Zahlen stehen diese Stempel getrennt, damit „Stempel pro Tag"
+        nicht mit jedem neuen Kunden steigt.
+      </p>
+
+      <label class="schalter">
         <input id="b-tresen" type="checkbox">
         <span>Stempel-QR am Tresen anbieten</span>
       </label>
@@ -693,6 +706,7 @@ function formularFuellen() {
   $('b-nurkassen').checked = !!aktiv.require_known_register;
   $('b-frei').checked = aktiv.allow_opaque_proofs !== false;
   $('b-signatur').checked = !!aktiv.require_signed_proof;
+  $('b-willkommen').checked = !!aktiv.welcome_stamp_enabled;
   $('b-tresen').checked = !!aktiv.counter_qr_enabled;
   $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
   $('b-detail').value = aktiv.proof_detail_days ?? 30;
@@ -742,6 +756,14 @@ async function zahlenLaden() {
     [z.members, 'Teilnehmer'],
     [z.stamps_issued, 'Stempel gesamt'],
     [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
+    /*
+     * Nur wenn es Willkommensstempel gibt. Sonst liest sich "Stempel gesamt"
+     * ohnehin richtig, und eine fünfte Kachel liesse das 2x2-Raster mit einem
+     * einzelnen Feld in der dritten Zeile enden.
+     */
+    ...((z.welcome_stamps ?? 0) > 0
+        ? [[(z.stamps_issued ?? 0) - (z.welcome_stamps ?? 0), 'davon für Käufe']]
+        : []),
     [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
   ].map(([wert, was]) => zahl(wert, was)).join('');
 
@@ -1061,6 +1083,7 @@ $('b-speichern').onclick = async () => {
     p_require_known: $('b-nurkassen').checked,
     p_allow_opaque: $('b-frei').checked,
     p_require_signed: $('b-signatur').checked,
+    p_welcome_stamp: $('b-willkommen').checked,
     p_counter_enabled: $('b-tresen').checked,
     p_counter_seconds: Number($('b-tresen-sek').value),
     p_detail_days: Number($('b-detail').value),

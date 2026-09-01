@@ -31,6 +31,7 @@ declare
         array['public.issue_stamp(uuid, text, text)',               'n', 'j', 'j'],
         array['public.adopt_card(text)',                            'n', 'j', 'j'],
         array['public.delete_card(text)',                           'n', 'j', 'j'],
+        array['public.activate_card(uuid)',                         'n', 'j', 'j'],
         array['public.staff_pilot_summary()',                       'n', 'j', 'j'],
         array['public.staff_pilot_cohorts()',                       'n', 'j', 'j'],
         array['public.owner_set_redeem_code(uuid, text)',           'n', 'j', 'j'],
@@ -38,7 +39,7 @@ declare
         array['public.owner_update_tenant(uuid, text, text, text, text, text,'
               ' text, int, int)',                                   'n', 'j', 'j'],
         array['public.owner_update_proof_rules(uuid, int, int, int, boolean,'
-              ' boolean, boolean, boolean, int, int, int)',         'n', 'j', 'j'],
+              ' boolean, boolean, boolean, int, int, int, boolean)','n', 'j', 'j'],
         -- Die Frage "arbeitet der hier?" steht in Policies auf
         -- offer_redemptions, offers und tenant_registers, und die gelten fuer
         -- authenticated. Der Ausdruck einer Policy laeuft mit den Rechten

@@ -407,14 +407,19 @@ async function datenHolen() {
   if (!reihen?.length) return 'unbekannt';
   betrieb = reihen[0];
 
-  // Ohne Mitgliedschaft lehnen die Policies spaetere Schreibvorgaenge ab.
-  // user_id muss mit: Die insert-Policy vergleicht sie mit auth.uid(), und
-  // eine Vorgabe hat die Spalte nicht. ignoreDuplicates, sonst macht
-  // PostgREST daraus ein Update - und dafuer gibt es bewusst keine Policy.
-  const { error: mFehler } = await db.from('memberships').upsert(
-    { user_id: nutzerId, tenant_id: betrieb.id },
-    { ignoreDuplicates: true, onConflict: 'user_id,tenant_id' });
-  if (mFehler) throw mFehler;
+  /*
+   * Karte anlegen laesst jetzt die Datenbank, nicht der Browser.
+   *
+   * Frueher stand hier ein upsert auf memberships. Das reichte, solange
+   * dabei nichts zu entscheiden war. Seit der Betrieb einen Willkommens-
+   * stempel vergeben kann, haengt am Anlegen eine Regel - und eine Regel im
+   * Browser ist eine Bitte, keine Regel.
+   */
+  const { data: akt, error: aFehler } = await db.rpc('activate_card', {
+    p_tenant_id: betrieb.id,
+  });
+  if (aFehler) throw aFehler;
+  const willkommen = (Array.isArray(akt) ? akt[0] : akt)?.welcome_stamp === true;
 
   const [{ count }, { data: gs }, { data: an }, { data: el }] = await Promise.all([
     db.from('stamps').select('id', { count: 'exact', head: true }).eq('tenant_id', betrieb.id),
@@ -438,6 +443,17 @@ async function datenHolen() {
   angeboteZeichnen(an);
   $('umzug-bereich').classList.toggle('verborgen', !kartenSchluessel);
   $('loeschen-bereich').classList.toggle('verborgen', !kartenSchluessel);
+
+  /*
+   * Der Willkommensstempel wird angesagt, nicht untergeschoben. Wer ihn
+   * stillschweigend bekaeme, saehe beim ersten Oeffnen eine Karte mit einem
+   * Stempel darauf und wuesste nicht, wofuer - das ist genau die Sorte
+   * Gutschrift, die Misstrauen erzeugt statt Bindung.
+   */
+  if (willkommen) {
+    melden('Karte aktiviert — und der erste Stempel ist schon drauf. '
+         + 'Den gibt es fürs Mitmachen, die nächsten fürs Einkaufen.', true);
+  }
   walletKnoepfeZeigen();
   return 'ok';
 }
