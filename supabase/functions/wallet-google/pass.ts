@@ -50,6 +50,37 @@ export function objektId(issuerId: string, betrieb: Betrieb, tokenHashHex: strin
   return `${issuerId}.${kennungSaeubern(betrieb.slug)}-${tokenHashHex.slice(0, 32)}`;
 }
 
+/*
+ * Eine Nachricht an alle, die den Pass dieses Betriebs gespeichert haben.
+ *
+ * Sie haengt an der *Klasse*, nicht am Objekt. Das ist der Unterschied
+ * zwischen einem Aufruf und einem je Kunde: Die Klasse gibt es einmal je
+ * Betrieb, und Google traegt ihre Nachrichten in jeden Pass, der auf sie
+ * zeigt. Ueber die Objekte zu gehen hiesse, sie erst alle aufzulisten - und
+ * jeder neue Kunde bekaeme die Nachricht dann nicht mehr.
+ *
+ * Und sie braucht keine Identitaet: Der Betrieb erreicht seine Kundschaft,
+ * ohne einen einzigen Namen zu kennen.
+ *
+ * Eine feste `id`, damit ein spaeterer Aufruf die alte Nachricht ersetzt
+ * statt sie zu ergaenzen. Ein Pass mit sechs alten Ankuendigungen ist
+ * schlimmer als keiner.
+ */
+export const NACHRICHT_ID = "treuebiss-aktuell";
+
+/** Auf eine Zeile bringen und kuerzen - Google schneidet sonst mitten im Wort. */
+function knapp(roh: string, hoechstens: number): string {
+  return roh.replace(/\s+/g, " ").trim().slice(0, hoechstens);
+}
+
+export function nachrichtBauen(titel: string, text: string) {
+  const header = knapp(titel, 60);
+  const body = knapp(text, 300);
+  if (!header) throw new Error("Die Nachricht braucht einen Titel.");
+  if (!body) throw new Error("Die Nachricht braucht einen Text.");
+  return [{ id: NACHRICHT_ID, header, body, messageType: "TEXT" }];
+}
+
 export function klasseBauen(issuerId: string, betrieb: Betrieb, logoUrl: string) {
   return {
     id: klasseId(issuerId, betrieb),

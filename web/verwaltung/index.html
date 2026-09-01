@@ -295,6 +295,34 @@
       </div>
     </section>
 
+    <!-- Nachricht an die Wallet-Pässe -->
+    <section class="karte">
+      <p class="marke">Nachricht an Wallet-Pässe</p>
+      <p class="hinweis">
+        Erscheint im Google-Pass aller Kunden, die ihn gespeichert haben — ohne
+        dass Sie einen Namen kennen. <b>Apple-Pässe erreicht sie nicht:</b>
+        die tragen den Stand vom Abruf und aktualisieren sich nicht.
+      </p>
+
+      <div class="gruppe">
+        <label for="w-titel">Titel</label>
+        <input id="w-titel" maxlength="60" placeholder="z. B. Frisch aus dem Ofen">
+
+        <label for="w-text">Text</label>
+        <textarea id="w-text" maxlength="300"
+                  placeholder="Ab 15 Uhr: Zwiebelkuchen, solange der Vorrat reicht."></textarea>
+
+        <div class="reihe">
+          <button id="w-senden">Nachricht setzen</button>
+          <button id="w-loeschen" class="still">Nachricht entfernen</button>
+        </div>
+        <p class="hinweis">
+          Es gilt immer die zuletzt gesetzte Nachricht — eine neue ersetzt die
+          alte. Wie schnell sie beim Kunden ankommt, entscheidet Google.
+        </p>
+      </div>
+    </section>
+
     <!-- Belegprüfung -->
     <section class="karte">
       <p class="marke">Belegprüfung</p>
@@ -1108,6 +1136,45 @@ function limitFeldZeigen() {
 $('a-einloesbar').onchange = limitFeldZeigen;
 
 $('a-abbrechen').onclick = () => { angebotFormularLeeren(); melden(''); };
+
+/*
+ * Nachricht an die Wallet-Pässe.
+ *
+ * Der Aufruf geht an dieselbe Edge Function wie der Save-Link — sie hat den
+ * Dienstschlüssel, der nie in den Browser darf. Die Berechtigung prüft sie
+ * dort gegen tenant_staff; hier steht nur die Bedienung.
+ */
+async function nachrichtSenden(loeschen) {
+  melden('');
+  const titel = $('w-titel').value.trim();
+  const text = $('w-text').value.trim();
+  if (!loeschen && (!titel || !text)) {
+    melden('Titel und Text werden beide gebraucht.');
+    return;
+  }
+  const knopf = loeschen ? $('w-loeschen') : $('w-senden');
+  beschaeftigt(knopf, true, loeschen ? 'Wird entfernt …' : 'Wird gesetzt …');
+  const { data, error } = await db.functions.invoke('wallet-google', {
+    body: { tenant_id: aktiv.id, aktion: 'nachricht', titel, text, loeschen },
+  });
+  beschaeftigt(knopf, false);
+
+  // Die Function antwortet bei einem Fehler mit Klartext im Körper; error
+  // allein sagt nur, dass der Aufruf schiefging.
+  const grund = data?.fehler ?? error?.message ?? '';
+  if (grund) {
+    console.error('wallet-google.nachricht', data ?? error);
+    melden(/eingerichtet/i.test(grund)
+      ? 'Google Wallet ist für TreueBiss noch nicht eingerichtet.'
+      : grund);
+    return;
+  }
+  if (loeschen) { $('w-titel').value = ''; $('w-text').value = ''; }
+  melden(loeschen ? 'Nachricht entfernt.' : 'Nachricht gesetzt.', true);
+}
+
+$('w-senden').onclick = () => nachrichtSenden(false);
+$('w-loeschen').onclick = () => nachrichtSenden(true);
 
 $('code-setzen').onclick = async () => {
   melden('');

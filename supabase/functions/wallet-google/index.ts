@@ -18,9 +18,14 @@
  *   supabase secrets set APP_BASIS_URL=https://code-noob82.github.io/TreueBiss/app/
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { claimsBauen, klasseBauen, objektBauen, SPEICHERN_URL, type Betrieb } from "./pass.ts";
+import {
+  claimsBauen, klasseBauen, klasseId, nachrichtBauen, objektBauen,
+  SPEICHERN_URL, type Betrieb,
+} from "./pass.ts";
 import { jwtBauen, sha256Hex } from "./signieren.ts";
-import { klasseSicherstellen, objektAnlegen, zugriffstokenHolen } from "./google.ts";
+import {
+  klasseNachricht, klasseSicherstellen, objektAnlegen, zugriffstokenHolen,
+} from "./google.ts";
 
 const KOPF = {
   "Access-Control-Allow-Origin": "*",
@@ -49,8 +54,10 @@ Deno.serve(async (req: Request) => {
   const basis = Deno.env.get("APP_BASIS_URL") ?? "";
 
   let tenant_id: string, pruefen = false;
+  let aktion = "", titel = "", text = "", loeschen = false;
   try {
-    ({ tenant_id, pruefen = false } = await req.json());
+    ({ tenant_id, pruefen = false, aktion = "", titel = "", text = "",
+       loeschen = false } = await req.json());
   } catch {
     return antwort({ fehler: "Anfrage nicht lesbar." }, 400);
   }
@@ -65,6 +72,49 @@ Deno.serve(async (req: Request) => {
   });
   const { data: { user }, error: authFehler } = await alsNutzer.auth.getUser();
   if (authFehler || !user) return antwort({ fehler: "Anmeldung ungültig." }, 401);
+
+  /*
+   * Nachricht an alle Passinhaber des Betriebs.
+   *
+   * Steht vor dem Kundenpfad, weil hier keine Karte gebraucht wird: Der
+   * Aufrufer ist der Betrieb, nicht ein Kunde. Die Berechtigung kommt aus
+   * tenant_staff, gelesen mit dem Token des Aufrufers - die Policy
+   * tenant_staff_select_own laesst ihn ohnehin nur die eigenen Zeilen sehen.
+   *
+   * Warum die Klasse zuerst sichergestellt wird: Hat noch nie jemand den Pass
+   * gespeichert, gibt es sie bei Google nicht, und ein PATCH liefe auf 404.
+   */
+  if (aktion === "nachricht") {
+    const { data: rolle } = await alsNutzer
+      .from("tenant_staff").select("role")
+      .eq("tenant_id", tenant_id).maybeSingle();
+    if (rolle?.role !== "owner") {
+      return antwort({ fehler: "Das darf nur der Betrieb." }, 403);
+    }
+
+    const { data: betriebe } = await alsNutzer
+      .from("tenants").select("slug, name, primary_color, stamps_per_card")
+      .eq("id", tenant_id).limit(1);
+    const betrieb = betriebe?.[0] as Betrieb | undefined;
+    if (!betrieb) return antwort({ fehler: "Betrieb unbekannt." }, 404);
+
+    try {
+      const nachrichten = loeschen ? [] : nachrichtBauen(titel, text);
+      const dienstToken = await zugriffstokenHolen(saEmail, saKey);
+      const spur = [
+        ...await klasseSicherstellen(
+          dienstToken, klasseBauen(issuerId, betrieb, `${basis}icon-512.png`)),
+        ...await klasseNachricht(dienstToken, klasseId(issuerId, betrieb), nachrichten),
+      ];
+      const letzte = spur[spur.length - 1];
+      if (letzte.status >= 400) {
+        return antwort({ fehler: "Google hat die Nachricht abgelehnt.", spur }, 502);
+      }
+      return antwort({ gesetzt: !loeschen, klasse: klasseId(issuerId, betrieb), spur });
+    } catch (e) {
+      return antwort({ fehler: String(e instanceof Error ? e.message : e) }, 400);
+    }
+  }
 
   /*
    * Der Kartenschluessel steht in memberships und ist durch die Policy nur
