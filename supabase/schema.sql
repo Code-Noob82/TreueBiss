@@ -1067,7 +1067,7 @@ alter table public.stamp_proofs
 alter table public.stamp_proofs enable row level security;
 
 /*
- * Fremde Policies wegraeumen - und zwar die, die niemand hier angelegt hat.
+ * Fremde Policies wegraeumen - alle Tabellen, nicht nur die des Kartenwegs.
  *
  * Am 02.09.2026 von aussen nachgewiesen: Jeder anonym Angemeldete konnte sich
  * Stempel und Gutscheine unmittelbar eintragen, ohne Kaufnachweis und ohne
@@ -1075,19 +1075,26 @@ alter table public.stamp_proofs enable row level security;
  * insert access" und "Allow individual read access" auf stamps und vouchers -
  * Vorlagen aus dem Supabase-Dashboard, irgendwann angeklickt und vergessen.
  *
- * Die Zeilen darunter loeschen `stamps_insert_own` und Konsorten, also die
- * Namen, die dieses Schema selbst einmal vergeben hat. Fremde Namen kennt es
- * nicht - und ein Skript kann nicht wegraeumen, was es nicht kennt.
+ * Das Schema loescht die Namen, die es selbst vergeben hat. Fremde Namen kennt
+ * es nicht - und ein Skript kann nicht wegraeumen, was es nicht kennt. Deshalb
+ * hier andersherum: Was nicht auf dieser Liste steht, fliegt.
  *
- * Deshalb hier andersherum: Was nicht auf der Liste steht, fliegt. Damit
- * ueberlebt keine Handanlage aus dem Dashboard das naechste Einspielen.
+ * Die Liste steht ein zweites Mal im Test, und das ist Absicht. Wer eine
+ * Policy anlegt und nur eine der beiden Listen pflegt, faellt auf: Fehlt sie
+ * hier, raeumt dieser Block sie beim naechsten Einspielen weg und der Test
+ * vermisst sie. Fehlt sie dort, meldet der Test sie als fremd.
  */
 do $$
 declare
     v_erlaubt text[] := array[
-        'stamps_select_own', 'vouchers_select_own',
+        'tenants_read',
+        'tenant_staff_select_own',
+        'tenant_registers_read', 'tenant_registers_owner_insert',
+        'tenant_registers_owner_delete',
+        'offers_read', 'offers_owner_read', 'offers_owner_insert',
+        'offers_owner_update', 'offers_owner_delete',
         'memberships_select_own', 'memberships_insert_own', 'memberships_delete_own',
-        'stamp_proofs_select_own',
+        'stamps_select_own', 'vouchers_select_own', 'stamp_proofs_select_own',
         'offer_redemptions_select_own', 'offer_redemptions_staff_read'
     ];
     v_p record;
@@ -1097,8 +1104,6 @@ begin
           from pg_policy p
           join pg_class c on c.oid = p.polrelid
          where c.relnamespace = 'public'::regnamespace
-           and c.relname in ('stamps', 'vouchers', 'memberships',
-                             'stamp_proofs', 'offer_redemptions')
            and not (p.polname = any (v_erlaubt))
     loop
         execute format('drop policy %I on public.%I', v_p.name, v_p.tabelle);
