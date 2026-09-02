@@ -31,10 +31,11 @@ let scanLaeuft = false;
 /*
  * Ist die Karte geloescht, darf nichts mehr nachladen.
  *
- * datenHolen ruft activate_card, und das legt die Karte an - mit
- * Willkommensstempel, wenn der Betrieb ihn vergibt. Ohne diese Sperre kam die
- * geloeschte Karte zurueck, sobald der Kunde die App wechselte und wiederkam.
- * Aus seiner Sicht hatte das Loeschen dann nichts getan.
+ * Frueher rief datenHolen activate_card und legte die Karte damit neu an -
+ * die geloeschte kam zurueck, sobald der Kunde die App wechselte. Seit die
+ * Karte erst mit dem ersten Stempel entsteht, kann das nicht mehr passieren.
+ * Die Sperre bleibt trotzdem: Nach dem Loeschen gibt es nichts nachzuladen,
+ * und ein Nachladen ins Leere zeigte kurz eine Vorschau statt "geloescht".
  */
 let karteGeloescht = false;
 let sammelnLaeuft = false;
@@ -304,7 +305,10 @@ function karteZeichnen() {
   // "Noch drei" treibt an, "7 von 10" ist Buchhaltung. Beides zeigen, aber
   // in dieser Reihenfolge.
   $('stand-text').innerHTML = stempel === 0
-    ? 'Noch kein Stempel auf der Karte.'
+    ? (kartenSchluessel
+        ? 'Noch kein Stempel auf der Karte.'
+        // Noch keine Karte: Sie entsteht mit dem ersten Stempel.
+        : 'Deine Karte entsteht mit dem ersten Stempel.')
     : rest === 1
       ? 'Nur noch <b>ein</b> Stempel bis zur vollen Karte.'
       : `Noch <b>${rest}</b> Stempel bis zur vollen Karte.`;
@@ -438,11 +442,15 @@ async function datenHolen() {
    * stempel vergeben kann, haengt am Anlegen eine Regel - und eine Regel im
    * Browser ist eine Bitte, keine Regel.
    */
-  const { data: akt, error: aFehler } = await db.rpc('activate_card', {
-    p_tenant_id: betrieb.id,
-  });
-  if (aFehler) throw aFehler;
-  const willkommen = (Array.isArray(akt) ? akt[0] : akt)?.welcome_stamp === true;
+  /*
+   * Kein activate_card mehr beim Laden.
+   *
+   * Bis zum 02.09.2026 entstand die Karte hier, beim blossen Oeffnen des
+   * Links. Damit zaehlte "Teilnehmer" jeden, der einmal hingeschaut hat, und
+   * der Willkommensstempel fiel fuer jeden Blick. Jetzt entsteht die Karte
+   * mit dem ersten Stempel - in issue_stamp, nicht hier. Wer nur schaut,
+   * hinterlaesst nichts. Bis dahin zeigt die Seite eine Vorschau.
+   */
 
   const [{ count }, { data: gs }, { data: an }, { data: el }] = await Promise.all([
     db.from('stamps').select('id', { count: 'exact', head: true }).eq('tenant_id', betrieb.id),
@@ -473,10 +481,6 @@ async function datenHolen() {
    * Stempel darauf und wuesste nicht, wofuer - das ist genau die Sorte
    * Gutschrift, die Misstrauen erzeugt statt Bindung.
    */
-  if (willkommen) {
-    melden('Karte aktiviert — und der erste Stempel ist schon drauf. '
-         + 'Den gibt es fürs Mitmachen, die nächsten fürs Einkaufen.', true);
-  }
   walletKnoepfeZeigen();
   return 'ok';
 }
@@ -528,10 +532,21 @@ async function stempelHolen(belegRef) {
   const neu = data?.[0];
   // Die Zaehlung kommt aus der Funktion und gilt vor dem Kartenreset.
   frischerIndex = neu?.voucher_id ? -1 : (neu?.stamp_count ?? 1) - 1;
+  /*
+   * War das der erste Stempel, ist die Karte eben erst entstanden - und mit
+   * ihr der Willkommensstempel, wenn der Betrieb ihn vergibt. Dann stehen
+   * zwei auf der Karte, und das soll angesagt werden, nicht untergeschoben.
+   */
+  const ersterStempel = !kartenSchluessel;
   await datenHolen();
   melden(neu?.voucher_id
     ? 'Karte voll! Dein Gutschein liegt bereit.'
-    : 'Stempel gesammelt.', true);
+    : ersterStempel && betrieb?.welcome_stamp_enabled && (neu?.stamp_count ?? 0) >= 2
+      ? 'Deine Karte ist angelegt — mit zwei Stempeln: einer fürs Mitmachen, '
+        + 'einer für den Einkauf.'
+    : ersterStempel
+      ? 'Deine Karte ist angelegt, der erste Stempel ist drauf.'
+      : 'Stempel gesammelt.', true);
 }
 
 // ----------------------------------------------------------------- Einlösen

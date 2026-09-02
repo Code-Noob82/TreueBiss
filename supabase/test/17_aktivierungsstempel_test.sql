@@ -159,6 +159,34 @@ begin
      where user_id = v_kunde and tenant_id = v_mit;
     call test.check(v_anzahl = 1, 'Es bleibt bei einem Stempel');
 
+    /*
+     * Der Weg, den ein Kunde jetzt wirklich geht: kein activate_card, sondern
+     * gleich der erste Stempel ueber den Tresen oder den Beleg. Die Karte
+     * entsteht dabei, und mit ihr der Willkommensstempel - zwei auf einmal.
+     */
+    reset role;
+    insert into auth.users default values returning id into v_zweit;
+    call auth.become(v_zweit);
+    set local role authenticated;
+    select stamp_count into v_anzahl
+      from public.issue_stamp(v_mit, 'erster-einkauf-' || v_zweit::text);
+    reset role;
+    call test.check(v_anzahl = 2, 'Erster Stempel plus Willkommen: zwei auf der Karte');
+    select count(*) into v_anzahl from public.stamp_proofs
+     where user_id = v_zweit and tenant_id = v_mit and source = 'aktivierung';
+    call test.check(v_anzahl = 1, 'Der Willkommensstempel ist als solcher vermerkt');
+
+    -- Beim Betrieb ohne Schalter: nur der eine. Er wurde weiter oben
+    -- abgeschaltet, um genau das zu pruefen - hier braucht er wieder Strom.
+    update public.tenants set is_active = true where id = v_ohne;
+    insert into auth.users default values returning id into v_zweit;
+    call auth.become(v_zweit);
+    set local role authenticated;
+    select stamp_count into v_anzahl
+      from public.issue_stamp(v_ohne, 'erster-einkauf-' || v_zweit::text);
+    reset role;
+    call test.check(v_anzahl = 1, 'Ohne Schalter bleibt es beim einen Stempel');
+
     raise notice '--- Aktivierungsstempel bestanden ---';
 end;
 $$;
