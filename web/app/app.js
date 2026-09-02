@@ -875,6 +875,62 @@ async function scannerOeffnen() {
 }
 
 /*
+ * Die teilnehmenden Betriebe zur Auswahl.
+ *
+ * TreueBiss ist der Einstiegspunkt fuer den Kunden - wer die Adresse ohne
+ * Betrieb oeffnet, muss den seinen finden koennen. Der Aufsteller bleibt der
+ * schnellere Weg, aber er setzt voraus, dass der Kunde gerade im Laden steht.
+ *
+ * Gelesen wird aus betriebe_oeffentlich: zwei Spalten, ohne Anmeldung. Ein
+ * anonymes Konto entsteht erst, wenn wirklich eine Karte angelegt wird.
+ */
+let betriebeAlle = [];
+
+async function verzeichnisZeigen() {
+  const feld = $('betriebsliste'), suche = $('betrieb-suche');
+  feld.innerHTML = '<p class="leer-text">Betriebe werden geladen …</p>';
+
+  const { data, error } = await db.from('betriebe_oeffentlich')
+    .select('slug, name').order('name');
+  if (error) {
+    console.error('betriebe_oeffentlich', error);
+    feld.innerHTML = '<p class="leer-text">Die Liste liess sich nicht laden. '
+                   + 'Scanne den Aufsteller am Tresen.</p>';
+    return;
+  }
+  betriebeAlle = data ?? [];
+  if (!betriebeAlle.length) {
+    feld.innerHTML = '<p class="leer-text">Hier ist noch kein Betrieb eingetragen.</p>';
+    return;
+  }
+
+  // Ein Suchfeld erst, wenn die Liste laenger wird als der Bildschirm.
+  const brauchtSuche = betriebeAlle.length > 6;
+  suche.classList.toggle('verborgen', !brauchtSuche);
+  $('suche-schild').classList.toggle('verborgen', !brauchtSuche);
+  suche.oninput = () => listeZeichnen(suche.value);
+  listeZeichnen('');
+}
+
+function listeZeichnen(filter) {
+  const feld = $('betriebsliste');
+  const wort = filter.trim().toLowerCase();
+  const treffer = wort
+    ? betriebeAlle.filter((b) => b.name.toLowerCase().includes(wort))
+    : betriebeAlle;
+
+  if (!treffer.length) {
+    feld.innerHTML = '<p class="leer-text">Kein Betrieb mit diesem Namen.</p>';
+    return;
+  }
+  feld.innerHTML = treffer
+    .map((b) => `<button data-betrieb="${h(b.slug)}">${h(b.name)}</button>`).join('');
+  feld.querySelectorAll('[data-betrieb]').forEach((k) => {
+    k.onclick = () => zumBetrieb(k.dataset.betrieb);
+  });
+}
+
+/*
  * Den Aufsteller lesen, wenn noch keine Karte da ist.
  *
  * Eigene Schleife statt scannerOeffnen: Dort haengt alles am Kartenbereich -
@@ -932,7 +988,20 @@ async function aufstellerLesen() {
     if (!wert) { requestAnimationFrame(suchen); return; }
 
     const slug = slugAusCode(wert);
-    if (slug) { schliessen(); zumBetrieb(slug); return; }
+    if (slug) {
+      /*
+       * Gegen das Verzeichnis halten, statt blind zu laden. Ein Code mit
+       * einem unbekannten Betrieb fuehrte sonst auf eine Karte, die es nicht
+       * gibt - und die Meldung dort sagte "Stimmt die Adresse?", obwohl der
+       * Kunde nichts getippt hat.
+       */
+      if (betriebeAlle.length && !betriebeAlle.some((b) => b.slug === slug)) {
+        melden('Dieser Betrieb nimmt bei TreueBiss nicht (mehr) teil.');
+        requestAnimationFrame(suchen);
+        return;
+      }
+      schliessen(); zumBetrieb(slug); return;
+    }
 
     /*
      * Weiterlesen statt abbrechen: Im Bild kann noch etwas anderes liegen,
@@ -1139,6 +1208,7 @@ async function starten() {
      * niemandem etwas schicken. Genau das ist der Punkt dieses Produkts.
      */
     $('einstieg').classList.remove('verborgen');
+    await verzeichnisZeigen();
     return;
   }
 
