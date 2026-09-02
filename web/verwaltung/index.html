@@ -55,6 +55,21 @@
   /* Fuellstand als ein Balken, nicht als vier Zahlen: Wo die Karten haengen
      bleiben, ist eine Verteilung. Vier Zahlen nebeneinander zwingen zum
      Kopfrechnen, ein Balken zeigt es. */
+  /* Ein Balken je Tag. Mindesthöhe, damit ein Tag mit einem Stempel nicht wie
+     ein leerer aussieht - und ein leerer trotzdem sichtbar bleibt. */
+  .verlauf {
+    display: flex; align-items: flex-end; gap: 2px;
+    height: 3.5rem; margin: var(--s3) 0 var(--s2);
+  }
+  .verlauf i {
+    flex: 1; min-width: 2px; background: var(--marke);
+    border-radius: 1px 1px 0 0;
+  }
+  .verlauf i.unbekannt {
+    background: repeating-linear-gradient(45deg,
+      var(--linie) 0 3px, transparent 3px 6px);
+  }
+
   .fuellstand {
     display: flex; height: .8rem; margin-top: var(--s4);
     border-radius: 99px; overflow: hidden; background: var(--leer);
@@ -169,6 +184,12 @@
     <section class="karte neben">
       <p class="marke">Zahlen</p>
       <div class="zahlen" id="zahlen"></div>
+
+      <div class="gruppe">
+        <p class="marke">Läuft die Karte an?</p>
+        <div id="verlauf"></div>
+        <p class="fussnote" id="verlauf-fussnote"></p>
+      </div>
 
       <div class="gruppe">
         <p class="marke">Lohnt sich die Karte?</p>
@@ -745,9 +766,11 @@ const quote = (v) => (v === null || v === undefined ? '–' : String(v).replace(
 async function zahlenLaden() {
   // Beide Abfragen zusammen: Die Kohortenzahlen ohne die Grundzahlen daneben
   // sind schwer einzuordnen, und umgekehrt.
-  const [{ data, error }, { data: kdaten, error: kfehler }] = await Promise.all([
+  const [{ data, error }, { data: kdaten, error: kfehler },
+         { data: vdaten, error: vfehler }] = await Promise.all([
     db.rpc('staff_pilot_summary'),
     db.rpc('staff_pilot_cohorts'),
+    db.rpc('staff_pilot_daily', { p_tage: 28 }),
   ]);
   if (error) { $('zahlen').innerHTML = ''; melden(fehlertext(error)); return; }
   const z = (data ?? []).find((r) => r.tenant_id === aktiv.id);
@@ -769,6 +792,54 @@ async function zahlenLaden() {
 
   if (kfehler) { melden(fehlertext(kfehler)); return; }
   kohortenZeigen((kdaten ?? []).find((r) => r.tenant_id === aktiv.id), z);
+
+  if (vfehler) console.error('staff_pilot_daily', vfehler);
+  verlaufZeigen((vdaten ?? []).filter((r) => r.tenant_id === aktiv.id));
+}
+
+/*
+ * Vier Wochen als Balken je Tag.
+ *
+ * Der Betrieb sah bisher nur Stände. "412 Stempel" beantwortet nicht, ob die
+ * Karte anläuft - "letzte Woche 61, diese Woche 22" schon.
+ *
+ * Ein Tag ohne Balken heißt null, kein ausgelassener Tag: Die Datenbank füllt
+ * die Lücken. Ein schraffierter Balken heißt "nicht mehr bekannt" - die
+ * Nachweise sind nach der Aufbewahrungsfrist gelöscht, und eine Null wäre
+ * dort eine Behauptung.
+ */
+function verlaufZeigen(reihen) {
+  const feld = $('verlauf'), fuss = $('verlauf-fussnote');
+  if (!reihen.length) { feld.innerHTML = ''; fuss.textContent = ''; return; }
+
+  const hoechst = Math.max(1, ...reihen.map((r) => r.stempel ?? 0));
+  const tag = (r) => new Date(r.tag + 'T00:00:00')
+    .toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+
+  feld.innerHTML = '<div class="verlauf" role="img" aria-label="'
+    + h('Stempel je Tag über ' + reihen.length + ' Tage: '
+        + reihen.map((r) => tag(r) + ' '
+            + (r.stempel === null ? 'nicht mehr bekannt' : r.stempel)).join(', '))
+    + '">'
+    + reihen.map((r) => {
+        if (r.stempel === null) return '<i class="unbekannt" style="height:100%"></i>';
+        const hoch = Math.round((r.stempel / hoechst) * 100);
+        return `<i style="height:${Math.max(hoch, r.stempel > 0 ? 4 : 1)}%"></i>`;
+      }).join('')
+    + '</div>';
+
+  const summe = (feld) => reihen.reduce((n, r) => n + (r[feld] ?? 0), 0);
+  const spanne = (ab, bis) => reihen.slice(ab, bis)
+    .reduce((n, r) => n + (r.stempel ?? 0), 0);
+  const unbekannt = reihen.filter((r) => r.stempel === null).length;
+
+  fuss.textContent =
+    `${spanne(-7)} Stempel in den letzten sieben Tagen, ${spanne(-14, -7)} in den sieben davor. `
+    + `${summe('neue_karten')} neue Karten und ${summe('einloesungen')} Einlösungen `
+    + `in ${reihen.length} Tagen.`
+    + (unbekannt > 0
+        ? ` ${unbekannt} Tage liegen vor der Aufbewahrungsfrist — dort ist der Stand nicht mehr bekannt.`
+        : '');
 }
 
 /*

@@ -34,6 +34,7 @@ declare
         array['public.activate_card(uuid)',                         'n', 'j', 'j'],
         array['public.staff_pilot_summary()',                       'n', 'j', 'j'],
         array['public.staff_pilot_cohorts()',                       'n', 'j', 'j'],
+        array['public.staff_pilot_daily(int)',                      'n', 'j', 'j'],
         array['public.owner_set_redeem_code(uuid, text)',           'n', 'j', 'j'],
         array['public.owner_clear_redeem_code(uuid)',               'n', 'j', 'j'],
         array['public.owner_update_tenant(uuid, text, text, text, text, text,'
