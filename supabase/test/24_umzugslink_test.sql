@@ -80,3 +80,67 @@ begin
     raise notice '--- Umzugslink bestanden ---';
 end;
 $$;
+
+-- ============================================================================
+-- Zwei Karten auf einem Geraet
+--
+-- Zusammenlegen waere eine Hintertuer: Das Tageslimit zaehlt je Karte, wer
+-- fuenf Sitzungen anlegt, sammelt fuenfmal das Tagesmaximum. adopt_card
+-- uebertraegt deshalb und fuehrt nicht zusammen - und bricht lieber ab, als
+-- still Stempel zu loeschen.
+--
+-- Die Absage darf aber keine Sackgasse sein. Sie traegt beide Staende mit,
+-- damit die App sagen kann, was auf dem Spiel steht und was ginge.
+-- ============================================================================
+do $$
+declare
+    v_b      uuid;
+    v_alt    uuid;
+    v_neu    uuid;
+    v_tok    text;
+    v_detail text;
+    v_erg    record;
+    v_anzahl int;
+begin
+    insert into public.tenants (slug, name, stamps_per_card, allow_opaque_proofs)
+         values ('zweikarten', 'Zweikartenbetrieb', 10, true) returning id into v_b;
+    insert into auth.users default values returning id into v_alt;
+    insert into auth.users default values returning id into v_neu;
+
+    perform public.issue_stamp_intern(v_alt, v_b, 'alt-' || i, null, null)
+       from generate_series(1, 5) as g(i);
+    perform public.issue_stamp_intern(v_neu, v_b, 'neu-' || i, null, null)
+       from generate_series(1, 3) as g(i);
+    select card_token into v_tok from public.memberships
+     where user_id = v_alt and tenant_id = v_b;
+
+    call auth.become(v_neu);
+    begin
+        perform public.adopt_card(v_tok);
+        v_detail := 'ging durch';
+    exception when insufficient_privilege then
+        get stacked diagnostics v_detail = pg_exception_detail;
+    end;
+    call test.check(v_detail = 'hier=3 dort=5',
+                    'Die Absage nennt beide Staende: ' || v_detail);
+
+    -- Nichts angefasst: Die Absage darf nicht die Haelfte erledigt haben.
+    select count(*) into v_anzahl from public.stamps
+     where tenant_id = v_b and user_id = v_alt;
+    call test.check(v_anzahl = 5, 'Die andere Karte behaelt ihre fuenf');
+    select count(*) into v_anzahl from public.stamps
+     where tenant_id = v_b and user_id = v_neu;
+    call test.check(v_anzahl = 3, 'Und diese ihre drei');
+
+    -- ------------------------------------------------------ Der Ausweg
+    perform public.delete_card('zweikarten');
+    select * into v_erg from public.adopt_card(v_tok);
+    reset role;
+    call test.check(v_erg.stamps = 5, 'Nach dem Loeschen zieht die andere ein');
+
+    select count(*) into v_anzahl from public.memberships where tenant_id = v_b;
+    call test.check(v_anzahl = 1, 'Und es bleibt bei einer Karte');
+
+    raise notice '--- Zwei Karten bestanden ---';
+end;
+$$;

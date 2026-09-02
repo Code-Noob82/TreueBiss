@@ -131,6 +131,11 @@ function istNetzfehler(fehler) {
 }
 
 /** Uebersetzt die Fehler der Datenbankfunktionen in Klartext. */
+/** "1 Stempel" oder "5 Stempel" - der Singular faellt sonst jedem auf. */
+function stempelWort(n) {
+  return n === 1 ? '1 Stempel' : `${n} Stempel`;
+}
+
 function fehlertext(fehler) {
   if (istNetzfehler(fehler)) return 'Gerade keine Verbindung. Bitte später noch einmal.';
   const t = (fehler?.message ?? '') + (fehler?.details ?? '');
@@ -151,8 +156,19 @@ function fehlertext(fehler) {
   if (/card not found/i.test(t)) return 'Diesen Kartenschlüssel gibt es hier nicht.';
   if (/invalid card token/i.test(t)) return 'Der Kartenschlüssel ist unvollständig.';
   if (/device already has a card here/i.test(t)) {
-    return 'Auf diesem Gerät liegt hier schon eine Karte mit Stempeln. '
-         + 'Zwei Karten lassen sich nicht zusammenlegen.';
+    /*
+     * Die Zahlen stehen in `details`, die adopt_card mitgibt. Ohne sie waere
+     * die Meldung eine Sackgasse: Sie nennt, was nicht geht, und verschweigt,
+     * was ginge. Fehlen sie doch einmal, bleibt der Satz trotzdem richtig.
+     */
+    const z = /hier=(\d+) dort=(\d+)/.exec(t);
+    const staende = z
+      ? `Hier liegen ${stempelWort(+z[1])}, die andere Karte bringt `
+        + `${stempelWort(+z[2])} mit. `
+      : '';
+    return staende
+         + 'Zwei Karten lassen sich nicht zusammenlegen. Wenn du die Karte auf '
+         + 'diesem Gerät weiter unten löschst, zieht die andere ein.';
   }
   if (/offer not redeemable/i.test(t)) return 'Dieses Angebot lässt sich nicht einlösen.';
   if (/offer not valid today/i.test(t)) return 'Dieses Angebot gilt heute nicht.';

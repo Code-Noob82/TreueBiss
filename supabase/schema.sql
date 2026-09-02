@@ -1804,6 +1804,8 @@ declare
     v_neu    uuid := auth.uid();
     v_alt    uuid;
     v_tenant uuid;
+    v_hier   int;
+    v_dort   int;
 begin
     if v_neu is null then
         raise exception 'not signed in' using errcode = '28000';
@@ -1837,7 +1839,24 @@ begin
                     where s.user_id = v_neu and s.tenant_id = v_tenant)
            or exists (select 1 from public.offer_redemptions r
                        where r.user_id = v_neu and r.tenant_id = v_tenant) then
-            raise exception 'device already has a card here' using errcode = '42501';
+            /*
+             * Beide Staende wandern in `detail`, damit die App sagen kann, was
+             * auf dem Spiel steht: "hier 3, dort 5". Ohne die Zahlen bleibt die
+             * Meldung eine Sackgasse - sie nennt, was nicht geht, und
+             * verschweigt, was ginge. Der Ausweg ist das Loeschen der Karte auf
+             * diesem Geraet; danach zieht die andere ein.
+             *
+             * Zusammenlegen ist keine Loesung, sondern eine Hintertuer: Das
+             * Tageslimit zaehlt je Karte. Wer fuenf Sitzungen anlegt, sammelt
+             * fuenfmal das Tagesmaximum und fuehrte es dann zusammen.
+             */
+            select count(*) into v_hier from public.stamps s
+             where s.user_id = v_neu and s.tenant_id = v_tenant;
+            select count(*) into v_dort from public.stamps s
+             where s.user_id = v_alt and s.tenant_id = v_tenant;
+            raise exception 'device already has a card here'
+                using errcode = '42501',
+                      detail  = format('hier=%s dort=%s', v_hier, v_dort);
         end if;
 
         -- Die leere Mitgliedschaft dieses Geraets weicht der uebernommenen.
