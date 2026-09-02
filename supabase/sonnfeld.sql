@@ -10,7 +10,7 @@
 -- welche sich dabei nicht bewegt - und genau das ist der Zweck.
 --
 -- Alle Schalter stehen an, damit nichts unbetretbar bleibt: Tresen-Code,
--- Willkommensstempel, freie Nachweise. Was davon im Alltag taugt, entscheidet
+-- freie Nachweise. Was davon im Alltag taugt, entscheidet
 -- sich beim Durchklicken, nicht hier.
 --
 -- Wiederholbar: Ein zweiter Lauf legt nichts doppelt an und loescht nichts.
@@ -44,9 +44,9 @@ begin
     -- wer sie in der Verwaltung geaendert hat, soll sie nicht verlieren.
     insert into public.tenants (slug, name, stamps_per_card, voucher_validity_days,
                                 counter_qr_enabled, counter_qr_seconds,
-                                welcome_stamp_enabled, allow_opaque_proofs,
+                                allow_opaque_proofs,
                                 daily_stamp_limit, primary_color)
-         values (c_slug, c_name, 10, 30, true, 60, true, true, 25, '#7A9A3B')
+         values (c_slug, c_name, 10, 30, true, 60, true, 25, '#7A9A3B')
     on conflict (slug) do nothing;
 
     select id into v_tenant from public.tenants where slug = c_slug;
@@ -69,7 +69,7 @@ begin
     raise notice '';
     raise notice 'Landbäckerei Sonnfeld steht.';
     raise notice '  Karte:      10 Stempel, Gutschein 30 Tage gültig';
-    raise notice '  Angeschaltet: Tresen-Code (60 s), Willkommensstempel, freie Nachweise';
+    raise notice '  Angeschaltet: Tresen-Code (60 s), freie Nachweise';
     raise notice '  Karten im Umlauf: %', v_karten;
     raise notice '';
     raise notice 'Kundenkarte  https://byte-und-handwerk.github.io/TreueBiss/app/?b=%', c_slug;

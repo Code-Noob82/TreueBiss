@@ -10,7 +10,7 @@
 -- eine Frage nicht beantworten kann.
 --
 -- Der Ablauf wird mit den echten Funktionen gefahren - issue_stamp,
--- redeem_voucher, activate_card, delete_card. Nur die Zeit wird nachtraeglich
+-- redeem_voucher, delete_card. Nur die Zeit wird nachtraeglich
 -- verschoben: Stempel entstehen mit now() und werden danach auf den
 -- gewuenschten Tag zurueckdatiert. Anders liesse sich ein Monat nicht in einer
 -- Sekunde spielen, und die Regeln der Funktionen sollen dabei gelten.
@@ -80,8 +80,8 @@ begin
     raise notice '    Teilnehmer % · Stempel gesamt % · Stempel pro Tag % · Gutscheine %/%',
         z.members, z.stamps_issued, coalesce(z.stamps_per_active_day::text, '–'),
         z.vouchers_redeemed, z.vouchers_created;
-    if z.welcome_stamps > 0 then
-        raise notice '    davon fuer Kaeufe: %', z.stamps_issued - z.welcome_stamps;
+    if z.stamps_issued <> z.purchase_stamps then
+        raise notice '    davon fuer Kaeufe: %', z.purchase_stamps;
     end if;
     raise notice '    kommen wieder % · erreichen die Praemie % · Praemien eingeloest % · aktiv 30 Tage %',
         coalesce(k.return_rate_percent::text || ' %', '–'),
@@ -112,6 +112,7 @@ declare
     v_gut     uuid;
     v_angebot_alle uuid;
     v_angebot_fast uuid;
+    v_tresen text;
     v_anzahl  int;
     v_voll    int;
     v_tage    numeric;
@@ -120,9 +121,9 @@ begin
     raise notice '════ Landbaeckerei Sonnfeld ════';
 
     -- ---------------------------------------------------------- Einrichtung
-    insert into public.tenants (slug, name, stamps_per_card, welcome_stamp_enabled,
+    insert into public.tenants (slug, name, stamps_per_card,
                                 counter_qr_enabled, voucher_validity_days)
-         values ('sonnfeld', 'Landbaeckerei Sonnfeld', 10, true, true, 30)
+         values ('sonnfeld', 'Landbaeckerei Sonnfeld', 10, true, 30)
     returning id into v_b;
     insert into public.tenant_secrets (tenant_id, counter_secret)
          values (v_b, encode(extensions.gen_random_bytes(32), 'hex'));
@@ -132,19 +133,23 @@ begin
     insert into public.tenant_staff (user_id, tenant_id, role)
          values (v_chef, v_b, 'owner'), (v_kasse, v_b, 'staff');
 
-    raise notice '  Betrieb angelegt: 10er Karte, Willkommensstempel an,';
-    raise notice '  Tresen-Code an, Gutschein 30 Tage gueltig.';
+    raise notice '  Betrieb angelegt: 10er Karte, Tresen-Code an,';
+    raise notice '  Gutschein 30 Tage gueltig.';
 
     -- ------------------------------------------------- Woche 1: Eroeffnung
-    -- 14 Kunden scannen den Aufsteller. Jeder bekommt den Willkommensstempel.
+    -- 14 Kunden scannen den Aufsteller. Der Tresen-Code legt die Karte an
+    -- und ist zugleich ihr erster Punkt. Den Code holt hier der Betreiber,
+    -- nicht der Kunde - counter_token ist fuer authenticated gesperrt, genau
+    -- wie im Betrieb: Der Kunde scannt ihn vom Bildschirm, er ruft ihn nicht ab.
+    v_tresen := public.counter_token(v_b, 0);
     for v_i in 1..14 loop
         insert into auth.users default values returning id into v_u;
         v_kunden := array_append(v_kunden, v_u);
         call auth.become(v_u);
         set local role authenticated;
-        perform public.activate_card(v_b);
+        perform public.issue_stamp(v_b, 'tresen:' || v_tresen);
         reset role;
-        -- Die Aktivierung faellt auf den Tag des ersten Besuchs.
+        -- Der erste Besuch faellt auf den Eroeffnungstag.
         update public.stamps
            set created_at = date_trunc('day', now()) - make_interval(days => 34)
                             + make_interval(hours => 8, mins => v_i * 3)
@@ -247,10 +252,9 @@ begin
      where tenant_id = v_b and source = 'counter';
     raise notice '';
     raise notice '  "Kommen die Stempel vom Bon oder vom Tresenaufsteller?"';
-    raise notice '    % ueber den Tresen-Code, % ueber den Bon, % ueber Aktivierung -',
+    raise notice '    % ueber den Tresen-Code, % ueber den Bon -',
         v_anzahl,
-        (select count(*) from public.stamp_proofs where tenant_id = v_b and source = 'receipt'),
-        (select count(*) from public.stamp_proofs where tenant_id = v_b and source = 'aktivierung');
+        (select count(*) from public.stamp_proofs where tenant_id = v_b and source = 'receipt');
     raise notice '    steht in stamp_proofs.source, wird aber nirgends gezeigt.';
 
     raise notice '';

@@ -435,21 +435,14 @@ async function datenHolen() {
   betrieb = reihen[0];
 
   /*
-   * Karte anlegen laesst jetzt die Datenbank, nicht der Browser.
+   * Die Karte entsteht in der Datenbank, nicht im Browser - und erst mit dem
+   * ersten Stempel.
    *
-   * Frueher stand hier ein upsert auf memberships. Das reichte, solange
-   * dabei nichts zu entscheiden war. Seit der Betrieb einen Willkommens-
-   * stempel vergeben kann, haengt am Anlegen eine Regel - und eine Regel im
-   * Browser ist eine Bitte, keine Regel.
-   */
-  /*
-   * Kein activate_card mehr beim Laden.
-   *
-   * Bis zum 02.09.2026 entstand die Karte hier, beim blossen Oeffnen des
-   * Links. Damit zaehlte "Teilnehmer" jeden, der einmal hingeschaut hat, und
-   * der Willkommensstempel fiel fuer jeden Blick. Jetzt entsteht die Karte
-   * mit dem ersten Stempel - in issue_stamp, nicht hier. Wer nur schaut,
-   * hinterlaesst nichts. Bis dahin zeigt die Seite eine Vorschau.
+   * Bis zum 02.09.2026 stand hier ein upsert auf memberships, danach ein
+   * Aufruf von activate_card. Beides legte die Karte beim blossen Oeffnen des
+   * Links an: "Teilnehmer" zaehlte jeden, der einmal hingeschaut hat. Jetzt
+   * entsteht sie in issue_stamp. Wer nur schaut, hinterlaesst nichts, und die
+   * Seite zeigt bis dahin eine Vorschau.
    */
 
   const [{ count }, { data: gs }, { data: an }, { data: el }] = await Promise.all([
@@ -475,12 +468,6 @@ async function datenHolen() {
   $('umzug-bereich').classList.toggle('verborgen', !kartenSchluessel);
   $('loeschen-bereich').classList.toggle('verborgen', !kartenSchluessel);
 
-  /*
-   * Der Willkommensstempel wird angesagt, nicht untergeschoben. Wer ihn
-   * stillschweigend bekaeme, saehe beim ersten Oeffnen eine Karte mit einem
-   * Stempel darauf und wuesste nicht, wofuer - das ist genau die Sorte
-   * Gutschrift, die Misstrauen erzeugt statt Bindung.
-   */
   walletKnoepfeZeigen();
   return 'ok';
 }
@@ -532,18 +519,11 @@ async function stempelHolen(belegRef) {
   const neu = data?.[0];
   // Die Zaehlung kommt aus der Funktion und gilt vor dem Kartenreset.
   frischerIndex = neu?.voucher_id ? -1 : (neu?.stamp_count ?? 1) - 1;
-  /*
-   * War das der erste Stempel, ist die Karte eben erst entstanden - und mit
-   * ihr der Willkommensstempel, wenn der Betrieb ihn vergibt. Dann stehen
-   * zwei auf der Karte, und das soll angesagt werden, nicht untergeschoben.
-   */
+  // War das der erste Stempel, ist die Karte eben erst entstanden.
   const ersterStempel = !kartenSchluessel;
   await datenHolen();
   melden(neu?.voucher_id
     ? 'Karte voll! Dein Gutschein liegt bereit.'
-    : ersterStempel && betrieb?.welcome_stamp_enabled && (neu?.stamp_count ?? 0) >= 2
-      ? 'Deine Karte ist angelegt — mit zwei Stempeln: einer fürs Mitmachen, '
-        + 'einer für den Einkauf.'
     : ersterStempel
       ? 'Deine Karte ist angelegt, der erste Stempel ist drauf.'
       : 'Stempel gesammelt.', true);
