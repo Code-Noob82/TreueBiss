@@ -49,6 +49,20 @@ function betriebAusAdresse() {
   return new URLSearchParams(location.search).get('b')?.trim() || null;
 }
 
+/*
+ * Der Tresen-Code aus der Adresse.
+ *
+ * Der QR an der Kasse fuehrt seit dem 02.09.2026 hierher statt nur den Token
+ * zu tragen: .../app/?b=<betrieb>&tresen=<token>. Damit ist ein Scan am Tresen
+ * der vollstaendige Einstieg - Karte anlegen und ersten Stempel holen in einem
+ * Zug. Vorher konnte gerade der auffaelligste Code im Laden keine Karte
+ * anlegen, weil er den Betrieb nicht kennt.
+ */
+function tresenAusAdresse() {
+  const s = new URLSearchParams(location.search).get('tresen')?.trim();
+  return /^[0-9a-z]{8,64}$/i.test(s ?? '') ? s : null;
+}
+
 /** Der Kartenschluessel aus einem Umzugslink oder einem Wallet-Pass. */
 function schluesselAusAdresse() {
   const k = new URLSearchParams(location.search).get('karte')?.trim();
@@ -875,6 +889,62 @@ async function scannerOeffnen() {
 }
 
 /*
+ * Die teilnehmenden Betriebe zur Auswahl.
+ *
+ * TreueBiss ist der Einstiegspunkt fuer den Kunden - wer die Adresse ohne
+ * Betrieb oeffnet, muss den seinen finden koennen. Der Aufsteller bleibt der
+ * schnellere Weg, aber er setzt voraus, dass der Kunde gerade im Laden steht.
+ *
+ * Gelesen wird aus betriebe_oeffentlich: zwei Spalten, ohne Anmeldung. Ein
+ * anonymes Konto entsteht erst, wenn wirklich eine Karte angelegt wird.
+ */
+let betriebeAlle = [];
+
+async function verzeichnisZeigen() {
+  const feld = $('betriebsliste'), suche = $('betrieb-suche');
+  feld.innerHTML = '<p class="leer-text">Betriebe werden geladen …</p>';
+
+  const { data, error } = await db.from('betriebe_oeffentlich')
+    .select('slug, name').order('name');
+  if (error) {
+    console.error('betriebe_oeffentlich', error);
+    feld.innerHTML = '<p class="leer-text">Die Liste liess sich nicht laden. '
+                   + 'Scanne den Aufsteller am Tresen.</p>';
+    return;
+  }
+  betriebeAlle = data ?? [];
+  if (!betriebeAlle.length) {
+    feld.innerHTML = '<p class="leer-text">Hier ist noch kein Betrieb eingetragen.</p>';
+    return;
+  }
+
+  // Ein Suchfeld erst, wenn die Liste laenger wird als der Bildschirm.
+  const brauchtSuche = betriebeAlle.length > 6;
+  suche.classList.toggle('verborgen', !brauchtSuche);
+  $('suche-schild').classList.toggle('verborgen', !brauchtSuche);
+  suche.oninput = () => listeZeichnen(suche.value);
+  listeZeichnen('');
+}
+
+function listeZeichnen(filter) {
+  const feld = $('betriebsliste');
+  const wort = filter.trim().toLowerCase();
+  const treffer = wort
+    ? betriebeAlle.filter((b) => b.name.toLowerCase().includes(wort))
+    : betriebeAlle;
+
+  if (!treffer.length) {
+    feld.innerHTML = '<p class="leer-text">Kein Betrieb mit diesem Namen.</p>';
+    return;
+  }
+  feld.innerHTML = treffer
+    .map((b) => `<button data-betrieb="${h(b.slug)}">${h(b.name)}</button>`).join('');
+  feld.querySelectorAll('[data-betrieb]').forEach((k) => {
+    k.onclick = () => zumBetrieb(k.dataset.betrieb);
+  });
+}
+
+/*
  * Den Aufsteller lesen, wenn noch keine Karte da ist.
  *
  * Eigene Schleife statt scannerOeffnen: Dort haengt alles am Kartenbereich -
@@ -932,17 +1002,45 @@ async function aufstellerLesen() {
     if (!wert) { requestAnimationFrame(suchen); return; }
 
     const slug = slugAusCode(wert);
-    if (slug) { schliessen(); zumBetrieb(slug); return; }
+    if (slug) {
+      /*
+       * Gegen das Verzeichnis halten, statt blind zu laden. Ein Code mit
+       * einem unbekannten Betrieb fuehrte sonst auf eine Karte, die es nicht
+       * gibt - und die Meldung dort sagte "Stimmt die Adresse?", obwohl der
+       * Kunde nichts getippt hat.
+       */
+      if (betriebeAlle.length && !betriebeAlle.some((b) => b.slug === slug)) {
+        melden('Dieser Betrieb nimmt bei TreueBiss nicht (mehr) teil.');
+        requestAnimationFrame(suchen);
+        return;
+      }
+      let mit = null;
+      try { mit = new URL(wert, location.href).searchParams.get('tresen'); } catch { /* egal */ }
+      schliessen(); zumBetrieb(slug, mit); return;
+    }
 
     /*
      * Weiterlesen statt abbrechen: Im Bild kann noch etwas anderes liegen,
      * und ein Abbruch bei jedem falschen Code machte das Scannen im Laden
      * unbrauchbar.
      */
-    melden(/^V0;/.test(wert)
-      ? 'Das ist ein Kassenbon. Den brauchst du erst, wenn du eine Karte hast — '
-        + 'scanne zuerst den Aufsteller am Tresen.'
-      : 'Dieser Code gehört nicht zu TreueBiss.');
+    /*
+     * Die beiden Codes, die im Laden ausserdem herumliegen, beim Namen
+     * nennen. "Gehoert nicht zu TreueBiss" waere bei beiden schlicht falsch -
+     * sie gehoeren dazu, nur an eine andere Stelle.
+     *
+     * Der Tresen-Code ist der wahrscheinlichste Fehlgriff: Er haengt gross
+     * auf einem Bildschirm direkt vor dem Kunden. Er traegt aber keinen
+     * Betrieb, deshalb laesst sich daraus keine Karte anlegen.
+     */
+    melden(
+      /^tresen:/.test(wert)
+        ? 'Das ist der Stempel-Code der Kasse. Er gilt erst, wenn du eine '
+          + 'Karte hast — wähle zuerst deinen Betrieb aus der Liste.'
+      : /^V0;/.test(wert)
+        ? 'Das ist ein Kassenbon. Den brauchst du erst, wenn du eine Karte '
+          + 'hast — wähle zuerst deinen Betrieb aus der Liste.'
+        : 'Dieser Code gehört nicht zu TreueBiss.');
     requestAnimationFrame(suchen);
   };
   requestAnimationFrame(suchen);
@@ -966,9 +1064,13 @@ function slugAusCode(wert) {
   return null;
 }
 
-function zumBetrieb(slug) {
+function zumBetrieb(slug, tresen) {
   const u = new URL(location.href);
   u.searchParams.set('b', slug);
+  // Der Tresen-Code reist mit, wenn er im gescannten Bild stand: Dann ist der
+  // eine Scan Anmeldung und Stempel zugleich.
+  if (tresen) u.searchParams.set('tresen', tresen);
+  else u.searchParams.delete('tresen');
   location.assign(u);
 }
 
@@ -1139,6 +1241,7 @@ async function starten() {
      * niemandem etwas schicken. Genau das ist der Punkt dieses Produkts.
      */
     $('einstieg').classList.remove('verborgen');
+    await verzeichnisZeigen();
     return;
   }
 
@@ -1211,6 +1314,24 @@ async function starten() {
       melden('Diesen Betrieb gibt es hier nicht. Stimmt die Adresse?');
       return;
     }
+
+    /*
+     * Kam der Kunde ueber den Tresen-Code, gehoert der Stempel jetzt dazu -
+     * nach dem Laden, damit die Karte schon dasteht und der Stempel darauf
+     * sichtbar faellt.
+     *
+     * Erst aus der Adresse nehmen, dann einloesen: Ein Neuladen duerfte den
+     * Code sonst ein zweites Mal schicken. Abgewiesen wuerde er ohnehin, aber
+     * der Kunde saehe eine Fehlermeldung fuer etwas, das er nicht getan hat.
+     */
+    const tresen = tresenAusAdresse();
+    if (tresen) {
+      const u = new URL(location.href);
+      u.searchParams.delete('tresen');
+      history.replaceState(null, '', u);
+      await stempelHolen('tresen:' + tresen);
+    }
+
     band('');
   } catch (e) {
     console.error('start', e);

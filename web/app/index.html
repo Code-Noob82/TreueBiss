@@ -177,6 +177,11 @@
   #umzug-code { display: grid; justify-items: center; gap: var(--s3); margin-top: var(--s4); }
   /* Die qrcode-Bibliothek schreibt eigene width/height ins Element; ohne das
      hier sprengt die Leinwand ihre Spalte. */
+  #betriebsliste { display: grid; gap: var(--s2); margin-bottom: var(--s3); }
+  #betriebsliste button { text-align: left; }
+  #betriebsliste .leer-text { margin: 0; font-size: var(--t-klein); color: var(--tinte-leise); }
+  #betrieb-suche { margin-bottom: var(--s3); }
+
   #einstieg-video {
     width: 100%; border-radius: var(--s3); background: #000;
     margin-bottom: var(--s3); aspect-ratio: 4 / 3; object-fit: cover;
@@ -230,14 +235,20 @@
   <section id="einstieg" class="karte verborgen">
     <p class="marke">Noch keine Karte</p>
     <p class="umzug-text">
-      Deine Karte gehört zu genau einem Betrieb. Den Aufsteller findest du am
-      Tresen — scanne ihn hier oder mit der Kamera deines Handys.
+      Deine Karte gehört zu genau einem Betrieb. Wähle ihn hier, oder scanne
+      den Aufsteller am Tresen.
     </p>
+    <label class="verborgen" for="betrieb-suche" id="suche-schild">Betrieb suchen</label>
+    <input id="betrieb-suche" class="verborgen" type="search"
+           autocapitalize="off" spellcheck="false" placeholder="Name des Betriebs">
+    <div id="betriebsliste"></div>
     <div id="einstieg-scanner" class="verborgen">
       <video id="einstieg-video" playsinline muted></video>
     </div>
     <div class="umzug-knoepfe">
-      <button id="aufsteller-scannen">Aufsteller scannen</button>
+      <!-- Zweitrangig: Die Auswahl ist der Hauptweg, der Scanner der
+           schnellere Nebenweg fuer den, der im Laden steht. -->
+      <button id="aufsteller-scannen" class="still">Aufsteller scannen</button>
       <button id="einstieg-abbrechen" class="still verborgen">Abbrechen</button>
     </div>
   </section>

@@ -937,6 +937,31 @@ drop policy if exists offer_redemptions_staff_read  on public.offer_redemptions;
 
 -- Betriebe und Angebote sind ein Katalog: lesbar fuer alle Angemeldeten,
 -- aus der App nicht schreibbar.
+/*
+ * Das oeffentliche Verzeichnis der teilnehmenden Betriebe.
+ *
+ * TreueBiss ist der Einstiegspunkt fuer den Kunden: Wer die Adresse ohne
+ * Betrieb oeffnet, muss den seinen finden koennen. Bis zum 02.09.2026 ging
+ * das nicht - tenants ist nur fuer Angemeldete lesbar, und der leere Einstieg
+ * meldet sich mit Absicht nicht an.
+ *
+ * Genau zwei Spalten, und beide stehen ohnehin auf dem Aufsteller im Laden:
+ * der Name und der Kurzname aus der Adresse. Farbe, Kartengroesse und
+ * Einstellungen bleiben draussen - die gehen den Kunden nichts an, solange er
+ * die Karte nicht hat.
+ *
+ * Die Sicht laeuft nicht als invoker, umgeht also die Policy auf tenants. Das
+ * ist der Zweck: Sie soll ohne Anmeldung lesbar sein. `is_active` steht
+ * trotzdem hier, damit ein abgeschalteter Betrieb aus dem Verzeichnis
+ * verschwindet.
+ */
+create or replace view public.betriebe_oeffentlich as
+select t.slug, t.name
+  from public.tenants t
+ where t.is_active;
+
+grant select on public.betriebe_oeffentlich to anon, authenticated;
+
 create policy tenants_read on public.tenants
     for select to authenticated using (is_active);
 
