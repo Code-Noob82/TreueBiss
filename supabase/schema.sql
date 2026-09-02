@@ -1880,6 +1880,13 @@ end;
 $$;
 
 revoke all on function public.cleanup_expired_proofs() from public, anon, authenticated;
+do $$
+begin
+    if exists (select 1 from pg_roles where rolname = 'service_role') then
+        execute 'grant execute on function public.cleanup_expired_proofs() to service_role';
+    end if;
+end
+$$;
 
 /*
  * Verwaiste Karten wegraeumen.
@@ -1934,7 +1941,7 @@ revoke all on function public.cleanup_orphan_cards() from public, anon, authenti
 do $$
 begin
     if exists (select 1 from pg_roles where rolname = 'service_role') then
-        execute 'grant execute on function public.cleanup_expired_proofs() to service_role';
+        execute 'grant execute on function public.cleanup_orphan_cards() to service_role';
     end if;
 end
 $$;
