@@ -49,6 +49,20 @@ function betriebAusAdresse() {
   return new URLSearchParams(location.search).get('b')?.trim() || null;
 }
 
+/*
+ * Der Tresen-Code aus der Adresse.
+ *
+ * Der QR an der Kasse fuehrt seit dem 02.09.2026 hierher statt nur den Token
+ * zu tragen: .../app/?b=<betrieb>&tresen=<token>. Damit ist ein Scan am Tresen
+ * der vollstaendige Einstieg - Karte anlegen und ersten Stempel holen in einem
+ * Zug. Vorher konnte gerade der auffaelligste Code im Laden keine Karte
+ * anlegen, weil er den Betrieb nicht kennt.
+ */
+function tresenAusAdresse() {
+  const s = new URLSearchParams(location.search).get('tresen')?.trim();
+  return /^[0-9a-z]{8,64}$/i.test(s ?? '') ? s : null;
+}
+
 /** Der Kartenschluessel aus einem Umzugslink oder einem Wallet-Pass. */
 function schluesselAusAdresse() {
   const k = new URLSearchParams(location.search).get('karte')?.trim();
@@ -1000,7 +1014,9 @@ async function aufstellerLesen() {
         requestAnimationFrame(suchen);
         return;
       }
-      schliessen(); zumBetrieb(slug); return;
+      let mit = null;
+      try { mit = new URL(wert, location.href).searchParams.get('tresen'); } catch { /* egal */ }
+      schliessen(); zumBetrieb(slug, mit); return;
     }
 
     /*
@@ -1048,9 +1064,13 @@ function slugAusCode(wert) {
   return null;
 }
 
-function zumBetrieb(slug) {
+function zumBetrieb(slug, tresen) {
   const u = new URL(location.href);
   u.searchParams.set('b', slug);
+  // Der Tresen-Code reist mit, wenn er im gescannten Bild stand: Dann ist der
+  // eine Scan Anmeldung und Stempel zugleich.
+  if (tresen) u.searchParams.set('tresen', tresen);
+  else u.searchParams.delete('tresen');
   location.assign(u);
 }
 
@@ -1294,6 +1314,24 @@ async function starten() {
       melden('Diesen Betrieb gibt es hier nicht. Stimmt die Adresse?');
       return;
     }
+
+    /*
+     * Kam der Kunde ueber den Tresen-Code, gehoert der Stempel jetzt dazu -
+     * nach dem Laden, damit die Karte schon dasteht und der Stempel darauf
+     * sichtbar faellt.
+     *
+     * Erst aus der Adresse nehmen, dann einloesen: Ein Neuladen duerfte den
+     * Code sonst ein zweites Mal schicken. Abgewiesen wuerde er ohnehin, aber
+     * der Kunde saehe eine Fehlermeldung fuer etwas, das er nicht getan hat.
+     */
+    const tresen = tresenAusAdresse();
+    if (tresen) {
+      const u = new URL(location.href);
+      u.searchParams.delete('tresen');
+      history.replaceState(null, '', u);
+      await stempelHolen('tresen:' + tresen);
+    }
+
     band('');
   } catch (e) {
     console.error('start', e);

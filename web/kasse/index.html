@@ -161,14 +161,18 @@
   <!-- Stempel-QR für den Tresen -->
   <section id="tresen" class="karte verborgen">
     <p class="marke">Stempel sammeln</p>
-    <p class="hinweis" id="tresen-hinweis">Kunde scannt diesen Code.</p>
+    <p class="hinweis" id="tresen-hinweis">
+      Kunde scannt diesen Code — auch ohne Karte. Er legt sie an und gibt
+      den ersten Stempel.
+    </p>
     <div class="qr-feld"><canvas id="tresen-qr"></canvas></div>
     <p class="frist" id="tresen-frist"></p>
     <details class="tresen-tippen">
       <summary>Kamera geht nicht?</summary>
       <p class="hinweis">
-        Der Kunde tippt diesen Code in seiner Karte unter „Nummer vom
-        Kassenbon“ ein. Er wechselt genauso oft wie der QR-Code.
+        Für Kunden, die ihre Karte schon offen haben: Der Code kommt unter
+        „Nummer vom Kassenbon“ hinein. Er wechselt genauso oft wie der
+        QR-Code. Wer noch keine Karte hat, scannt den Code oben.
       </p>
       <p class="tresen-code" id="tresen-code"></p>
     </details>
@@ -214,6 +218,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY,
 const $ = (id) => document.getElementById(id);
 let scanLaeuft = false;
 let aktiverBetrieb = null;
+let aktiverSlug = null;
 
 function melden(text) {
   $('meldung').innerHTML = text ? `<div class="meldung">${text}</div>` : '';
@@ -341,13 +346,16 @@ async function betriebLaden() {
   }
   if (!rollen?.length) return 'kein-betrieb';
 
+  // slug dazu: Der Tresen-QR fuehrt seit dem 02.09.2026 auf die Kundenkarte
+  // dieses Betriebs, und dafuer braucht er den Kurznamen.
   const { data: betriebe, error: fehler2 } = await db
-    .from('tenants').select('id, name').eq('id', rollen[0].tenant_id).limit(1);
+    .from('tenants').select('id, name, slug').eq('id', rollen[0].tenant_id).limit(1);
   if (fehler2) return { fehler: 'Der Betrieb liess sich nicht laden: ' + fehler2.message };
   // Zuordnung da, Betrieb nicht lesbar: Die Policy verlangt is_active.
   if (!betriebe?.length) return 'kein-betrieb';
 
   aktiverBetrieb = betriebe[0].id;
+  aktiverSlug = betriebe[0].slug;
   $('betrieb').textContent = betriebe[0].name;
   return 'ok';
 }
@@ -456,9 +464,25 @@ async function tresenZeigen(tenantId) {
   const { token, gueltig_bis } = data[0];
   $('tresen').classList.remove('verborgen');
 
+  /*
+   * Der Code fuehrt auf die Kundenkarte dieses Betriebs und traegt den Token
+   * mit: .../app/?b=<betrieb>&tresen=<token>.
+   *
+   * Vorher stand nur "tresen:<token>" darin. Das half nur dem, der die Karte
+   * schon hatte - ausgerechnet der auffaelligste Code im Laden konnte keine
+   * anlegen, weil er den Betrieb nicht nannte. Jetzt ist ein Scan am Tresen
+   * der vollstaendige Einstieg: Karte anlegen und ersten Stempel in einem Zug.
+   *
+   * Der abgetippte Code darunter bleibt "tresen:<token>". Wer tippt, hat die
+   * Karte schon offen; eine ganze Adresse abzutippen waere Zumutung.
+   */
+  const ziel = new URL('../app/', location.href);
+  ziel.searchParams.set('b', aktiverSlug);
+  ziel.searchParams.set('tresen', token);
+
   const { default: QRCode } = await import('https://esm.sh/qrcode@1.5.4');
   const leinwand = $('tresen-qr');
-  await QRCode.toCanvas(leinwand, 'tresen:' + token, {
+  await QRCode.toCanvas(leinwand, ziel.toString(), {
     width: 640, margin: 1, errorCorrectionLevel: 'M',
     color: { dark: '#000000', light: '#ffffff' },
   });
