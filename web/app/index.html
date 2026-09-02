@@ -169,7 +169,8 @@
   /* Nur mit ?diagnose=1 sichtbar. */
   #plattform-diagnose {
     margin: var(--s3) 0 0; padding: var(--s3);
-    background: var(--grund-leise); color: var(--tinte); border-radius: var(--s2);
+    /* Siehe Kasse: --grund-leise ist Schrift, keine Flaeche. */
+      background: var(--papier); color: var(--tinte); border-radius: var(--s2);
     font-size: var(--t-mikro); line-height: 1.5;
     white-space: pre-wrap; word-break: break-all;
   }
