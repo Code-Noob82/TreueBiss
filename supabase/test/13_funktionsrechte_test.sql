@@ -40,7 +40,7 @@ declare
         array['public.owner_update_tenant(uuid, text, text, text, text, text,'
               ' text, int, int)',                                   'n', 'j', 'j'],
         array['public.owner_update_proof_rules(uuid, int, int, int, boolean,'
-              ' boolean, boolean, boolean, int, int, int, boolean)','n', 'j', 'j'],
+              ' boolean, boolean, boolean, int, int, int, boolean, int)','n', 'j', 'j'],
         -- Die Frage "arbeitet der hier?" steht in Policies auf
         -- offer_redemptions, offers und tenant_registers, und die gelten fuer
         -- authenticated. Der Ausdruck einer Policy laeuft mit den Rechten
@@ -57,6 +57,7 @@ declare
         -- Nur die Edge Function und der Zeitplan, niemand aus dem Browser.
         array['public.service_issue_stamp(uuid, uuid, text, text)',  'n', 'n', 'j'],
         array['public.cleanup_expired_proofs()',                     'n', 'n', 'j'],
+        array['public.cleanup_orphan_cards()',                       'n', 'n', 'j'],
         -- Innereien: werden ausschliesslich von anderen Funktionen gerufen,
         -- die als definer laufen. Aus dem Browser erreichbar sein duerfen sie
         -- nicht - counter_token gibt den Tresen-Token heraus.
