@@ -82,8 +82,18 @@ begin
     perform public.issue_stamp(v_t, test.bon(p_tx => '1001'));
     select proof_ref into v_ref from public.stamp_proofs
      where tenant_id = v_t order by created_at desc limit 1;
-    call test.check(v_ref = 'AMA-2642:1001:44131',
-                    'Der Schlüssel entsteht aus Kasse, Transaktion und Zähler');
+    /*
+     * Seit dem 02.09.2026 gehasht. Der Schlüssel entsteht weiterhin aus
+     * Kasse, Transaktion und Zähler - er steht nur nicht mehr im Klartext in
+     * der Tabelle, weil er dort die Löschfrist für die Kassennummer
+     * überlebte. Geprüft wird deshalb gegen den Hash genau dieser drei
+     * Bestandteile, nicht gegen irgendeinen Hash.
+     */
+    call test.check(
+        v_ref = encode(extensions.digest('AMA-2642:1001:44131', 'sha256'), 'hex'),
+        'Der Schlüssel ist der Hash aus Kasse, Transaktion und Zähler');
+    call test.check(position('AMA-2642' in v_ref) = 0,
+                    'Die Kassennummer steht nicht mehr im Schlüssel');
     select count(*) = 1 into v_ok from public.stamps where tenant_id = v_t;
     call test.check(v_ok, 'Ein frischer Beleg gibt einen Stempel');
 
