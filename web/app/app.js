@@ -1383,6 +1383,30 @@ async function starten() {
 }
 
 if ('serviceWorker' in navigator) {
+  /*
+   * Einmal neu laden, wenn ein neuer Worker uebernimmt.
+   *
+   * Der Worker ruft skipWaiting und clients.claim - er uebernimmt also sofort.
+   * Aber die Seite, die das Update angestossen hat, kam schon aus dem alten
+   * Cache: Der erste Aufruf nach jedem Rollout laeuft mit der alten App, erst
+   * der zweite bekommt die neue. Am 02.09.2026 hat genau dieser erste alte
+   * Lauf auf dem Smartphone noch activate_card gerufen und eine Karte
+   * angelegt, die es nach der neuen Regel gar nicht mehr geben durfte.
+   *
+   * Nur bei einem Wechsel, nicht bei der ersten Installation: Ohne Controller
+   * vorher gab es nichts Altes, das laufen konnte. Und nur einmal je Sitzung,
+   * sonst laeuft ein kaputter Worker in eine Schleife.
+   */
+  const hatteController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hatteController) return;
+    try {
+      if (sessionStorage.getItem('treuebiss:neu-geladen')) return;
+      sessionStorage.setItem('treuebiss:neu-geladen', '1');
+    } catch { /* ohne Speicher lieber gar nicht neu laden als endlos */ return; }
+    if (scanLaeuft || sammelnLaeuft) return;   // nicht mitten im Vorgang
+    location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch((e) => console.error('sw', e));
   });
