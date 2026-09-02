@@ -128,6 +128,37 @@ begin
       from public.pilot_summary where tenant_id = v_mit;
     call test.check(v_anzahl = 0, 'Auf einen Kauf geht bisher keiner zurueck');
 
+    /*
+     * Der Fehler, der am 02.09.2026 das Einspielen zum Scheitern brachte.
+     *
+     * activate_card schrieb den Schluessel im Klartext, issue_stamp_intern
+     * hasht ihn seit dem Vortag. Die Migration hashte den bestehenden
+     * Eintrag - und der naechste Aufruf schrieb wieder Klartext, der mit
+     * nichts mehr kollidierte. Ergebnis: ein zweiter Willkommensstempel,
+     * und beim naechsten Einspielen ein Fehler auf der Bedingung
+     * unique (tenant_id, proof_ref).
+     */
+    reset role;
+    select count(*) into v_anzahl from public.stamp_proofs
+     where tenant_id = v_mit and source = 'aktivierung'
+       and proof_ref !~ '^[0-9a-f]{64}$';
+    call test.check(v_anzahl = 0, 'Der Aktivierungsschluessel steht gehasht da');
+
+    -- Migration nachstellen: Sie darf einen zweiten Lauf ueberstehen.
+    update public.stamp_proofs
+       set proof_ref = encode(extensions.digest(proof_ref, 'sha256'), 'hex')
+     where proof_ref !~ '^[0-9a-f]{64}$';
+
+    call auth.become(v_kunde);
+    set local role authenticated;
+    select * into v_erg from public.activate_card(v_mit);
+    reset role;
+    call test.check(not v_erg.welcome_stamp,
+                    'Auch nach dem Einspielen faellt kein zweiter Willkommensstempel');
+    select count(*) into v_anzahl from public.stamps
+     where user_id = v_kunde and tenant_id = v_mit;
+    call test.check(v_anzahl = 1, 'Es bleibt bei einem Stempel');
+
     raise notice '--- Aktivierungsstempel bestanden ---';
 end;
 $$;

@@ -1048,10 +1048,37 @@ create table if not exists public.stamp_proofs (
  * Klartext. Damit ist der Lauf wiederholbar, ohne zweimal zu hashen.
  */
 do $$
+declare v_weg int; v_um int;
 begin
+    /*
+     * Erst die Doppelten weg.
+     *
+     * Ein Klartext-Eintrag, dessen Hash schon danebensteht, beschreibt
+     * denselben Nachweis zweimal - entstanden, weil activate_card bis heute
+     * Klartext schrieb und die Migration den aelteren Eintrag bereits gehasst
+     * hatte. Ohne diesen Schritt scheitert das Einspielen an der Bedingung
+     * unique (tenant_id, proof_ref), und zwar bei jedem weiteren Versuch.
+     *
+     * Behalten wird der gehashte: Er ist der aeltere und der, auf den sich
+     * alles Spaetere schon bezieht.
+     */
+    delete from public.stamp_proofs a
+     where a.proof_ref !~ '^[0-9a-f]{64}$'
+       and exists (
+           select 1 from public.stamp_proofs b
+            where b.tenant_id = a.tenant_id
+              and b.proof_ref = encode(extensions.digest(a.proof_ref, 'sha256'), 'hex')
+       );
+    get diagnostics v_weg = row_count;
+
     update public.stamp_proofs
        set proof_ref = encode(extensions.digest(proof_ref, 'sha256'), 'hex')
      where proof_ref !~ '^[0-9a-f]{64}$';
+    get diagnostics v_um = row_count;
+
+    if v_weg > 0 or v_um > 0 then
+        raise notice 'Nachweisschluessel: % gehasht, % doppelte entfernt', v_um, v_weg;
+    end if;
 end;
 $$;
 
@@ -2526,7 +2553,18 @@ begin
          */
         begin
             insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
-                 values (p_tenant_id, v_user, 'aktivierung:' || v_user::text,
+                 values (p_tenant_id, v_user,
+                         /*
+                          * Gehasht wie in issue_stamp_intern. Stand hier bis
+                          * zum 02.09.2026 im Klartext - und damit war die
+                          * Einmal-Garantie geloest, sobald das Schema einmal
+                          * eingespielt wurde: Die Migration hashte den
+                          * bestehenden Eintrag, der naechste Aufruf schrieb
+                          * wieder Klartext, und der kollidierte mit nichts
+                          * mehr. Zweiter Willkommensstempel.
+                          */
+                         encode(extensions.digest('aktivierung:' || v_user::text,
+                                                  'sha256'), 'hex'),
                          'aktivierung');
             insert into public.stamps (id, user_id, tenant_id)
                  values (gen_random_uuid(), v_user, p_tenant_id);
