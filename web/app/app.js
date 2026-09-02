@@ -28,6 +28,15 @@ let gutscheine = [];
 let einloesungen = [];   // eingeloeste Coupons dieses Kunden
 let kartenSchluessel = null;  // identifiziert die Karte, nicht das Geraet
 let scanLaeuft = false;
+/*
+ * Ist die Karte geloescht, darf nichts mehr nachladen.
+ *
+ * datenHolen ruft activate_card, und das legt die Karte an - mit
+ * Willkommensstempel, wenn der Betrieb ihn vergibt. Ohne diese Sperre kam die
+ * geloeschte Karte zurueck, sobald der Kunde die App wechselte und wiederkam.
+ * Aus seiner Sicht hatte das Loeschen dann nichts getan.
+ */
+let karteGeloescht = false;
 let sammelnLaeuft = false;
 /** Index des gerade gesetzten Stempels - nur der wird animiert. */
 let frischerIndex = -1;
@@ -654,10 +663,23 @@ async function karteLoeschen() {
     if (error) throw error;
     const erg = Array.isArray(data) ? data[0] : data;
 
+    karteGeloescht = true;
     try {
       localStorage.removeItem(schluessel());
       if (betriebGemerkt() === slug) localStorage.removeItem(LETZTER);
     } catch { /* privater Modus: dann bleibt nur der Server-Stand, und der ist weg */ }
+
+    /*
+     * Den Betrieb aus der Adresse nehmen.
+     *
+     * Bleibt er stehen, legt ein Neuladen die Karte sofort wieder an - und der
+     * Kunde, der gerade geloescht hat, steht vor einer neuen Karte mit einem
+     * Stempel darauf. Ohne den Betrieb landet er auf der Auswahl, und das ist
+     * die ehrliche Antwort: Es gibt hier nichts mehr.
+     */
+    const u = new URL(location.href);
+    for (const k of ['b', 'karte', 'tresen']) u.searchParams.delete(k);
+    history.replaceState(null, '', u);
 
     /*
      * Bleibt keine Karte, ist das anonyme Konto eine Kennung ohne eine
@@ -1306,7 +1328,7 @@ async function starten() {
      */
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
-      if (scanLaeuft || sammelnLaeuft) return;
+      if (scanLaeuft || sammelnLaeuft || karteGeloescht) return;
       datenHolen().catch((e) => console.warn('Nachladen fehlgeschlagen', e));
     });
     if (stand === 'unbekannt') {
