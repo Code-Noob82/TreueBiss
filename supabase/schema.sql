@@ -1387,6 +1387,7 @@ declare
     v_beleg     record;
     v_ref       text;
     v_token     text;
+    v_karte     text;
     v_heute     int;
 begin
     if v_user is null then
@@ -1406,6 +1407,28 @@ begin
      */
     if p_proof_ref is null or length(trim(p_proof_ref)) = 0 then
         raise exception 'proof reference required' using errcode = '22023';
+    end if;
+
+    /*
+     * Ein Umzugslink ist kein Kaufnachweis.
+     *
+     * Der QR auf dem Wallet-Pass traegt den Kartenschluessel. Wer ihn in den
+     * Stempel-Scanner haelt, schickte ihn bisher als freien Nachweis los: Es
+     * entstand eine zweite Karte mit einem Stempel - und weil dieses Geraet
+     * damit Stempel hatte, verweigerte adopt_card danach den Umzug, fuer den
+     * der Code gedacht war. Der Code zerstoerte also genau das, was er
+     * bewirken sollte. Am 02.09.2026 beim Durchspielen aufgefallen.
+     *
+     * Der Riegel steht hier und nicht im Browser: Der Browser schickt, was er
+     * will, und ein zweiter Weg zu derselben Regel driftet ab.
+     *
+     * Gesucht wird die 64er-Hexfolge im Text, nachgeschlagen ueber den
+     * Eindeutigkeitsindex auf card_token. Ein Kassenbon traegt so etwas nicht.
+     */
+    v_karte := substring(trim(p_proof_ref) from '[0-9a-f]{64}');
+    if v_karte is not null
+       and exists (select 1 from public.memberships m where m.card_token = v_karte) then
+        raise exception 'card link is not a proof' using errcode = '22023';
     end if;
 
     select * into v_tenant from public.tenants where id = p_tenant_id and is_active;

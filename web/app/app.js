@@ -142,6 +142,12 @@ function fehlertext(fehler) {
   if (fehler?.code === '23505' || /duplicate key|stamp_proofs/i.test(t)) {
     return 'Dieser Beleg wurde schon gezählt.';
   }
+  // Der QR vom Wallet-Pass, in den Stempel-Scanner gehalten. Er sieht aus wie
+  // ein Code zum Sammeln, ist aber der zum Mitnehmen.
+  if (/card link is not a proof/i.test(t)) {
+    return 'Das ist der Code zum Mitnehmen deiner Karte, kein Kassenbon. '
+         + 'Öffne ihn auf dem neuen Gerät, dann zieht die Karte dorthin um.';
+  }
   if (/card not found/i.test(t)) return 'Diesen Kartenschlüssel gibt es hier nicht.';
   if (/invalid card token/i.test(t)) return 'Der Kartenschlüssel ist unvollständig.';
   if (/device already has a card here/i.test(t)) {
