@@ -153,7 +153,18 @@ function fehlertext(fehler) {
     return 'Das ist der Code zum Mitnehmen deiner Karte, kein Kassenbon. '
          + 'Öffne ihn auf dem neuen Gerät, dann zieht die Karte dorthin um.';
   }
-  if (/card not found/i.test(t)) return 'Diesen Kartenschlüssel gibt es hier nicht.';
+  /*
+   * Der haeufigste Grund ist nicht ein Tippfehler, sondern eine Karte, die es
+   * nicht mehr gibt: geloescht, oder der Link stammt von einem Geraet, das
+   * seine Karte schon weitergegeben hat. "Gibt es hier nicht" laesst den
+   * Kunden damit allein - er steht vor einer Vorschau und weiss nicht, ob er
+   * etwas falsch gemacht hat.
+   */
+  if (/card not found/i.test(t)) {
+    return 'Diese Karte gibt es nicht mehr — gelöscht, oder sie ist schon '
+         + 'umgezogen. Hier anzufangen geht trotzdem: Der erste Stempel legt '
+         + 'eine neue Karte an.';
+  }
   if (/invalid card token/i.test(t)) return 'Der Kartenschlüssel ist unvollständig.';
   if (/device already has a card here/i.test(t)) {
     /*
