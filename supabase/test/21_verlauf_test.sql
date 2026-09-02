@@ -19,6 +19,13 @@ declare
     v_kunde  uuid;
     v_anzahl int;
     v_wert   int;
+    /*
+     * Der Tag nach Berliner Zeit, nicht nach der Zeitzone der Sitzung.
+     * Mit dem Sitzungsdatum fiel dieser Test in der CI um 00:01 Berliner Zeit
+     * durch: Berlin war schon im naechsten Tag, die Sitzung in UTC noch im
+     * vorigen. Genau derselbe Riss steckte in staff_pilot_daily.
+     */
+    v_heute  date := (now() at time zone 'Europe/Berlin')::date;
 begin
     -- Die Detailfrist muss in die Aufbewahrung passen, das prueft eine
     -- Bedingung an der Tabelle. Zehn Tage Aufbewahrung heisst also auch eine
@@ -72,17 +79,17 @@ begin
      * Wer die Luecken auslaesst, zeichnet eine Linie, die es nicht gab.
      */
     select stempel into v_wert from public.staff_pilot_daily(7)
-     where tag = current_date;
+     where tag = v_heute;
     call test.check(v_wert = 2, 'Heute zwei Stempel');
     select stempel into v_wert from public.staff_pilot_daily(7)
-     where tag = current_date - 1;
+     where tag = v_heute - 1;
     call test.check(v_wert = 0, 'Gestern null - und der Tag steht trotzdem da');
     select stempel into v_wert from public.staff_pilot_daily(7)
-     where tag = current_date - 2;
+     where tag = v_heute - 2;
     call test.check(v_wert = 1, 'Vorgestern einer');
 
     select neue_karten into v_wert from public.staff_pilot_daily(7)
-     where tag = current_date;
+     where tag = v_heute;
     call test.check(v_wert = 1, 'Und eine neue Karte heute');
 
     /*
@@ -90,7 +97,7 @@ begin
      * dem Tag war nichts" - und das weiss hier niemand mehr.
      */
     select stempel into v_wert from public.staff_pilot_daily(30)
-     where tag = current_date - 20;
+     where tag = v_heute - 20;
     call test.check(v_wert is null, 'Jenseits der Aufbewahrung: unbekannt statt null');
     select count(*) into v_anzahl from public.staff_pilot_daily(30)
      where stempel is null;

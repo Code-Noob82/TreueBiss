@@ -1387,6 +1387,7 @@ declare
     v_beleg     record;
     v_ref       text;
     v_token     text;
+    v_karte     text;
     v_heute     int;
 begin
     if v_user is null then
@@ -1406,6 +1407,28 @@ begin
      */
     if p_proof_ref is null or length(trim(p_proof_ref)) = 0 then
         raise exception 'proof reference required' using errcode = '22023';
+    end if;
+
+    /*
+     * Ein Umzugslink ist kein Kaufnachweis.
+     *
+     * Der QR auf dem Wallet-Pass traegt den Kartenschluessel. Wer ihn in den
+     * Stempel-Scanner haelt, schickte ihn bisher als freien Nachweis los: Es
+     * entstand eine zweite Karte mit einem Stempel - und weil dieses Geraet
+     * damit Stempel hatte, verweigerte adopt_card danach den Umzug, fuer den
+     * der Code gedacht war. Der Code zerstoerte also genau das, was er
+     * bewirken sollte. Am 02.09.2026 beim Durchspielen aufgefallen.
+     *
+     * Der Riegel steht hier und nicht im Browser: Der Browser schickt, was er
+     * will, und ein zweiter Weg zu derselben Regel driftet ab.
+     *
+     * Gesucht wird die 64er-Hexfolge im Text, nachgeschlagen ueber den
+     * Eindeutigkeitsindex auf card_token. Ein Kassenbon traegt so etwas nicht.
+     */
+    v_karte := substring(trim(p_proof_ref) from '[0-9a-f]{64}');
+    if v_karte is not null
+       and exists (select 1 from public.memberships m where m.card_token = v_karte) then
+        raise exception 'card link is not a proof' using errcode = '22023';
     end if;
 
     select * into v_tenant from public.tenants where id = p_tenant_id and is_active;
@@ -1781,6 +1804,8 @@ declare
     v_neu    uuid := auth.uid();
     v_alt    uuid;
     v_tenant uuid;
+    v_hier   int;
+    v_dort   int;
 begin
     if v_neu is null then
         raise exception 'not signed in' using errcode = '28000';
@@ -1814,7 +1839,24 @@ begin
                     where s.user_id = v_neu and s.tenant_id = v_tenant)
            or exists (select 1 from public.offer_redemptions r
                        where r.user_id = v_neu and r.tenant_id = v_tenant) then
-            raise exception 'device already has a card here' using errcode = '42501';
+            /*
+             * Beide Staende wandern in `detail`, damit die App sagen kann, was
+             * auf dem Spiel steht: "hier 3, dort 5". Ohne die Zahlen bleibt die
+             * Meldung eine Sackgasse - sie nennt, was nicht geht, und
+             * verschweigt, was ginge. Der Ausweg ist das Loeschen der Karte auf
+             * diesem Geraet; danach zieht die andere ein.
+             *
+             * Zusammenlegen ist keine Loesung, sondern eine Hintertuer: Das
+             * Tageslimit zaehlt je Karte. Wer fuenf Sitzungen anlegt, sammelt
+             * fuenfmal das Tagesmaximum und fuehrte es dann zusammen.
+             */
+            select count(*) into v_hier from public.stamps s
+             where s.user_id = v_neu and s.tenant_id = v_tenant;
+            select count(*) into v_dort from public.stamps s
+             where s.user_id = v_alt and s.tenant_id = v_tenant;
+            raise exception 'device already has a card here'
+                using errcode = '42501',
+                      detail  = format('hier=%s dort=%s', v_hier, v_dort);
         end if;
 
         -- Die leere Mitgliedschaft dieses Geraets weicht der uebernommenen.
@@ -2410,20 +2452,33 @@ stable
 security definer
 set search_path = public
 as $$
+    /*
+     * Heute nach Berliner Zeit, nicht nach der Zeitzone der Sitzung.
+     *
+     * Die drei Sichten darunter gruppieren nach Europe/Berlin, die Reihe hier
+     * lief bis zum 03.09.2026 ueber current_date - und das ist in Supabase
+     * UTC. Zwischen 22 und 24 Uhr Berliner Zeit war Berlin schon im naechsten
+     * Tag, die Reihe noch im vorigen: Die Stempel des laufenden Tages fielen
+     * hinten aus der Reihe heraus, und der Betrieb sah abends einen leeren
+     * neuesten Tag. Aufgefallen ist es in der Testsuite, die um 00:01
+     * Berliner Zeit lief.
+     */
+    with heute as (select (now() at time zone 'Europe/Berlin')::date as tag)
     select
         t.id,
         d.tag::date,
         coalesce(s.new_members, 0)::int,
         -- Aelter als die Aufbewahrung: nicht null, sondern unbekannt.
-        case when d.tag::date < (current_date - t.proof_retention_days)
+        case when d.tag::date < (h.tag - t.proof_retention_days)
              then null else coalesce(st.stamps, 0)::int end,
-        case when d.tag::date < (current_date - t.proof_retention_days)
+        case when d.tag::date < (h.tag - t.proof_retention_days)
              then null else coalesce(st.customers, 0)::int end,
         coalesce(r.redemptions, 0)::int
     from public.tenants t
+    cross join heute h
     cross join generate_series(
-        current_date - (greatest(least(coalesce(p_tage, 30), 365), 1) - 1),
-        current_date, interval '1 day') as d(tag)
+        h.tag - (greatest(least(coalesce(p_tage, 30), 365), 1) - 1),
+        h.tag, interval '1 day') as d(tag)
     left join public.pilot_daily_signups s
            on s.tenant_id = t.id and s.day = d.tag::date
     left join public.pilot_daily_stamps st

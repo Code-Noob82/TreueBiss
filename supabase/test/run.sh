@@ -123,7 +123,8 @@ run_scenario() {
                           "$T/20_schreibrechte_test.sql"
                           "$T/21_verlauf_test.sql"
                           "$T/22_verzeichnis_test.sql"
-                          "$T/23_verwaiste_karten_test.sql") ;;
+                          "$T/23_verwaiste_karten_test.sql"
+                            "$T/24_umzugslink_test.sql") ;;
         *)        files=("$T/01_issue_stamp_test.sql" "$T/02_rls_test.sql"
                           "$T/04_redeem_test.sql" "$T/05_telemetry_test.sql"
                           "$T/06_staff_test.sql" "$T/07_admin_test.sql"
@@ -141,7 +142,8 @@ run_scenario() {
                           "$T/20_schreibrechte_test.sql"
                           "$T/21_verlauf_test.sql"
                           "$T/22_verzeichnis_test.sql"
-                          "$T/23_verwaiste_karten_test.sql") ;;
+                          "$T/23_verwaiste_karten_test.sql"
+                            "$T/24_umzugslink_test.sql") ;;
     esac
 
     # Ausgabe erst in eine Datei, dann filtern. Direkt durch die Pipe

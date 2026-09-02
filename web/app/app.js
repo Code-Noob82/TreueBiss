@@ -131,6 +131,11 @@ function istNetzfehler(fehler) {
 }
 
 /** Uebersetzt die Fehler der Datenbankfunktionen in Klartext. */
+/** "1 Stempel" oder "5 Stempel" - der Singular faellt sonst jedem auf. */
+function stempelWort(n) {
+  return n === 1 ? '1 Stempel' : `${n} Stempel`;
+}
+
 function fehlertext(fehler) {
   if (istNetzfehler(fehler)) return 'Gerade keine Verbindung. Bitte später noch einmal.';
   const t = (fehler?.message ?? '') + (fehler?.details ?? '');
@@ -142,11 +147,39 @@ function fehlertext(fehler) {
   if (fehler?.code === '23505' || /duplicate key|stamp_proofs/i.test(t)) {
     return 'Dieser Beleg wurde schon gezählt.';
   }
-  if (/card not found/i.test(t)) return 'Diesen Kartenschlüssel gibt es hier nicht.';
+  // Der QR vom Wallet-Pass, in den Stempel-Scanner gehalten. Er sieht aus wie
+  // ein Code zum Sammeln, ist aber der zum Mitnehmen.
+  if (/card link is not a proof/i.test(t)) {
+    return 'Das ist der Code zum Mitnehmen deiner Karte, kein Kassenbon. '
+         + 'Öffne ihn auf dem neuen Gerät, dann zieht die Karte dorthin um.';
+  }
+  /*
+   * Der haeufigste Grund ist nicht ein Tippfehler, sondern eine Karte, die es
+   * nicht mehr gibt: geloescht, oder der Link stammt von einem Geraet, das
+   * seine Karte schon weitergegeben hat. "Gibt es hier nicht" laesst den
+   * Kunden damit allein - er steht vor einer Vorschau und weiss nicht, ob er
+   * etwas falsch gemacht hat.
+   */
+  if (/card not found/i.test(t)) {
+    return 'Diese Karte gibt es nicht mehr — gelöscht, oder sie ist schon '
+         + 'umgezogen. Hier anzufangen geht trotzdem: Der erste Stempel legt '
+         + 'eine neue Karte an.';
+  }
   if (/invalid card token/i.test(t)) return 'Der Kartenschlüssel ist unvollständig.';
   if (/device already has a card here/i.test(t)) {
-    return 'Auf diesem Gerät liegt hier schon eine Karte mit Stempeln. '
-         + 'Zwei Karten lassen sich nicht zusammenlegen.';
+    /*
+     * Die Zahlen stehen in `details`, die adopt_card mitgibt. Ohne sie waere
+     * die Meldung eine Sackgasse: Sie nennt, was nicht geht, und verschweigt,
+     * was ginge. Fehlen sie doch einmal, bleibt der Satz trotzdem richtig.
+     */
+    const z = /hier=(\d+) dort=(\d+)/.exec(t);
+    const staende = z
+      ? `Hier liegen ${stempelWort(+z[1])}, die andere Karte bringt `
+        + `${stempelWort(+z[2])} mit. `
+      : '';
+    return staende
+         + 'Zwei Karten lassen sich nicht zusammenlegen. Wenn du die Karte auf '
+         + 'diesem Gerät weiter unten löschst, zieht die andere ein.';
   }
   if (/offer not redeemable/i.test(t)) return 'Dieses Angebot lässt sich nicht einlösen.';
   if (/offer not valid today/i.test(t)) return 'Dieses Angebot gilt heute nicht.';
