@@ -396,6 +396,30 @@ create table if not exists public.tenant_staff (
 
 alter table public.tenant_staff enable row level security;
 
+/*
+ * Die Rolle gehoert zur Tabelle, nicht in den Abschnitt weiter unten, in dem
+ * sie entstanden ist. is_demo_of und is_owner_of fragen sie ab, und Postgres
+ * prueft den Rumpf einer SQL-Funktion beim Anlegen - stuende die Spalte
+ * hinter den Funktionen, scheiterte jedes bestehende Projekt beim Einspielen
+ * mit "column s.role does not exist".
+ */
+alter table public.tenant_staff
+    add column if not exists role text not null default 'staff';
+
+-- `add constraint if not exists` gibt es nicht; auf einem schon
+-- eingerichteten Projekt liefe das Skript sonst beim zweiten Lauf auf.
+-- Drei Rollen:
+--   staff - Kasse: Gutscheine einloesen und Tresen-QR. Keine Zahlen.
+--   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
+--   demo  - darf alles *sehen* und nichts aendern. Fuer Betriebe, die sich
+--           das Produkt ansehen wollen, bevor sie es bestellen.
+--
+-- Neu gesetzt statt "if not exists": Die Bedingung gab es schon mit zwei
+-- Rollen, und ein `if not exists` haette sie unveraendert stehenlassen.
+alter table public.tenant_staff drop constraint if exists tenant_staff_role_check;
+alter table public.tenant_staff
+    add constraint tenant_staff_role_check check (role in ('staff', 'owner', 'demo'));
+
 drop policy if exists tenant_staff_select_own on public.tenant_staff;
 -- Personal sieht nur die eigene Zuordnung; angelegt wird sie nicht hier.
 create policy tenant_staff_select_own on public.tenant_staff
@@ -443,6 +467,44 @@ $$;
  */
 revoke all on function public.is_staff_of(uuid) from public, anon;
 grant execute on function public.is_staff_of(uuid) to authenticated;
+
+/*
+ * Die beiden anderen Rollenfragen stehen hier und nicht weiter unten bei den
+ * Angeboten, wo sie entstanden sind: staff_pilot_summary und
+ * staff_pilot_cohorts rufen sie, und Postgres prueft den Rumpf einer
+ * SQL-Funktion beim Anlegen. Weiter unten waeren sie beim Einspielen noch
+ * nicht da.
+ */
+create or replace function public.is_demo_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid()
+          and s.tenant_id = target_tenant
+          and s.role = 'demo'
+    );
+$$;
+
+-- Gerufen wird sie ausschliesslich aus staff_redeem_voucher und
+-- staff_counter_token, und die laufen als definer. Aus dem Browser braucht sie
+-- niemand.
+revoke all on function public.is_demo_of(uuid) from public, anon, authenticated;
+
+-- Darf der Aufrufer diesen Betrieb verwalten?
+create or replace function public.is_owner_of(target_tenant uuid)
+returns boolean language sql stable security invoker as $$
+    select exists (
+        select 1 from public.tenant_staff s
+        where s.user_id = auth.uid()
+          and s.tenant_id = target_tenant
+          and s.role = 'owner'
+    );
+$$;
+
+-- Wie bei is_staff_of: anon nein, authenticated ja - die Policies auf offers
+-- und tenant_registers haengen daran.
+revoke all on function public.is_owner_of(uuid) from public, anon;
+grant execute on function public.is_owner_of(uuid) to authenticated;
 
 -- ============================================ Einloesen (serverseitig)
 
@@ -1836,8 +1898,21 @@ stable
 security definer
 set search_path = public
 as $$
+    /*
+     * Nur die Betriebsleitung - und der Demozugang, der die Verwaltung ja
+     * gerade zeigen soll.
+     *
+     * Bis zum 02.09.2026 stand hier is_staff_of, und das ist fuer jede Rolle
+     * wahr. Die Oberflaeche filterte zwar auf owner und demo, aber eine
+     * Sperre in der Oberflaeche ist keine Sperre: Wer die Funktion unmittelbar
+     * aufrief, bekam die Zahlen seines Betriebs, auch als Kassenzugang.
+     *
+     * is_demo_of ist fuer authenticated gesperrt. Das stoert hier nicht, weil
+     * diese Funktion als definer laeuft - der Aufruf geschieht mit den
+     * Rechten des Eigentuemers, auth.uid() bleibt der des Anrufers.
+     */
     select * from public.pilot_summary
-     where public.is_staff_of(tenant_id);
+     where public.is_owner_of(tenant_id) or public.is_demo_of(tenant_id);
 $$;
 
 revoke all on function public.staff_pilot_summary() from public, anon, authenticated;
@@ -1990,8 +2065,9 @@ stable
 security definer
 set search_path = public
 as $$
+    -- Siehe staff_pilot_summary: nur Betriebsleitung und Demozugang.
     select * from public.pilot_cohorts
-     where public.is_staff_of(tenant_id);
+     where public.is_owner_of(tenant_id) or public.is_demo_of(tenant_id);
 $$;
 
 revoke all on function public.staff_pilot_cohorts() from public, anon, authenticated;
@@ -2003,29 +2079,16 @@ grant execute on function public.staff_pilot_cohorts() to authenticated;
 -- eine Anbieterleistung. Ab hier macht der Betrieb es selbst.
 --
 -- Zwei Rollen im Personal:
---   staff - Kasse: Gutscheine einloesen, Zahlen sehen.
+--   staff - Kasse: Gutscheine einloesen. Keine Zahlen des Betriebs.
 --   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
 --
 -- Was der Betrieb ausdruecklich NICHT selbst kann, bleibt beim Anbieter:
 -- is_active, slug und die Zuordnung von Personal. Ein Betrieb, der sich
 -- selbst abschaltet oder seinen Bezeichner aendert, ist ein Supportfall -
 -- der Build der App haengt an beidem.
-alter table public.tenant_staff
-    add column if not exists role text not null default 'staff';
+-- Die Rollenspalte steht jetzt oben bei der Tabelle - sie wird schon von
+-- is_demo_of und is_owner_of gebraucht, lange bevor dieser Abschnitt kommt.
 
--- `add constraint if not exists` gibt es nicht; auf einem schon
--- eingerichteten Projekt liefe das Skript sonst beim zweiten Lauf auf.
--- Drei Rollen:
---   staff - Kasse: Gutscheine einloesen, Tresen-QR, Zahlen sehen.
---   owner - zusaetzlich Stammdaten, Kartenregeln, Angebote, Einloese-Code.
---   demo  - darf alles *sehen* und nichts aendern. Fuer Betriebe, die sich
---           das Produkt ansehen wollen, bevor sie es bestellen.
---
--- Neu gesetzt statt "if not exists": Die Bedingung gab es schon mit zwei
--- Rollen, und ein `if not exists` haette sie unveraendert stehenlassen.
-alter table public.tenant_staff drop constraint if exists tenant_staff_role_check;
-alter table public.tenant_staff
-    add constraint tenant_staff_role_check check (role in ('staff', 'owner', 'demo'));
 
 /*
  * Sieht der Aufrufer nur zu?
@@ -2035,36 +2098,7 @@ alter table public.tenant_staff
  * Personal und nichts anfassen. Deshalb diese Gegenfrage an den zwei
  * Stellen, an denen Personal schreibt oder ein Geheimnis bekommt.
  */
-create or replace function public.is_demo_of(target_tenant uuid)
-returns boolean language sql stable security invoker as $$
-    select exists (
-        select 1 from public.tenant_staff s
-        where s.user_id = auth.uid()
-          and s.tenant_id = target_tenant
-          and s.role = 'demo'
-    );
-$$;
 
--- Gerufen wird sie ausschliesslich aus staff_redeem_voucher und
--- staff_counter_token, und die laufen als definer. Aus dem Browser braucht sie
--- niemand.
-revoke all on function public.is_demo_of(uuid) from public, anon, authenticated;
-
--- Darf der Aufrufer diesen Betrieb verwalten?
-create or replace function public.is_owner_of(target_tenant uuid)
-returns boolean language sql stable security invoker as $$
-    select exists (
-        select 1 from public.tenant_staff s
-        where s.user_id = auth.uid()
-          and s.tenant_id = target_tenant
-          and s.role = 'owner'
-    );
-$$;
-
--- Wie bei is_staff_of: anon nein, authenticated ja - die Policies auf offers
--- und tenant_registers haengen daran.
-revoke all on function public.is_owner_of(uuid) from public, anon;
-grant execute on function public.is_owner_of(uuid) to authenticated;
 
 -- ------------------------------------------------------------- Angebote
 -- Angebote tragen nichts Schuetzenswertes, deshalb reichen hier Policies;
