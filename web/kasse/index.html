@@ -84,6 +84,24 @@
     margin-bottom: var(--s3);
   }
   .qr-feld canvas { width: 100%; height: auto; max-width: 320px; image-rendering: pixelated; }
+  .tresen-tippen { margin-top: var(--s3); }
+  .tresen-tippen summary {
+    font-size: var(--t-klein); color: var(--tinte-leise); cursor: pointer;
+  }
+  .tresen-code {
+    margin: var(--s2) 0 0; padding: var(--s3);
+    /*
+     * --papier, nicht --grund-leise. Letzteres ist als Schriftfarbe auf dem
+     * dunklen Kopf gedacht und kippt im dunklen Modus nicht mit: Dort stehen
+     * --grund-leise (66 %) und --tinte (94 %) beide hell, der Code lag bei
+     * 2,02 : 1. --papier und --tinte wechseln gemeinsam.
+     */
+    background: var(--papier); color: var(--tinte); border-radius: var(--s2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-size: var(--t-mikro); line-height: 1.5;
+    word-break: break-all; user-select: all;
+  }
+
   .frist {
     font-size: var(--t-klein); color: var(--tinte-leise);
     font-variant-numeric: tabular-nums; margin: 0; text-align: center;
@@ -146,6 +164,14 @@
     <p class="hinweis" id="tresen-hinweis">Kunde scannt diesen Code.</p>
     <div class="qr-feld"><canvas id="tresen-qr"></canvas></div>
     <p class="frist" id="tresen-frist"></p>
+    <details class="tresen-tippen">
+      <summary>Kamera geht nicht?</summary>
+      <p class="hinweis">
+        Der Kunde tippt diesen Code in seiner Karte unter „Nummer vom
+        Kassenbon“ ein. Er wechselt genauso oft wie der QR-Code.
+      </p>
+      <p class="tresen-code" id="tresen-code"></p>
+    </details>
   </section>
 
   <!--
@@ -441,6 +467,18 @@ async function tresenZeigen(tenantId) {
   // Die 640 bleiben als Aufloesung erhalten, die Darstellung macht das CSS.
   leinwand.style.width = '';
   leinwand.style.height = '';
+
+  /*
+   * Derselbe Code als Text.
+   *
+   * Nicht jede Kamera oeffnet sich - alte Geraete, verweigerte Freigabe, ein
+   * Browser ohne Unterstuetzung. Bisher endete der Tresen-Weg dort, obwohl
+   * die Karte den Code auch getippt annimmt.
+   *
+   * Kein zusaetzliches Risiko: Der QR daneben zeigt dieselbe Zeichenfolge,
+   * gut sichtbar zum Kunden hin, und beide verfallen zur selben Sekunde.
+   */
+  $('tresen-code').textContent = 'tresen:' + token;
 
   const bis = new Date(gueltig_bis).getTime();
   const ticken = () => {
