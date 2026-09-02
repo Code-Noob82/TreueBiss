@@ -1298,16 +1298,23 @@ async function starten() {
   const stand = await betriebeLaden();
   if (stand === 'keine-zuordnung') {
     zeigeAngemeldet(false);
-    melden('Dieser Zugang ist keinem Betrieb zugeordnet. Fehlt der Eintrag '
-         + 'in <code>tenant_staff</code>?');
+    /*
+     * Wer das liest, ist eine Verkaufskraft oder ein Inhaber - kein
+     * Entwickler. Frueher stand hier der Tabellenname, in dem der Eintrag
+     * fehlt: Das beantwortet die Frage des Lesers nicht ("was mache ich
+     * jetzt?") und beschreibt eine Tabelle, die er nie zu sehen bekommt.
+     */
+    melden('Diese Anmeldung gehört zu keinem Betrieb. Vermutlich ist der '
+         + 'Zugang noch nicht freigeschaltet — melde dich bei der Person, '
+         + 'die euren Betrieb eingerichtet hat.');
     return;
   }
   if (stand === 'nur-kasse') {
     zeigeAngemeldet(false);
-    melden('Dieser Zugang gehört zur Kasse, nicht zur Betriebsleitung. '
-         + 'Für die Verwaltung braucht er in <code>tenant_staff</code> '
-         + 'die Rolle <code>owner</code>. Zum Einlösen geht es unter '
-         + '<code>web/kasse/</code>.');
+    // Kein Fehler, sondern die richtige Antwort auf einen falschen Klick.
+    // Deshalb ein Weg zurueck statt einer Anweisung an einen Entwickler.
+    melden('Dieser Zugang ist für die Kasse. In die Verwaltung kommt nur die '
+         + 'Betriebsleitung. <a href="../kasse/">Zurück zur Kasse</a>');
     return;
   }
   if (typeof stand === 'object') { zeigeAngemeldet(false); melden(stand.fehler); return; }
