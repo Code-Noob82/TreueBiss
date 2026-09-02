@@ -974,6 +974,25 @@ create table if not exists public.stamp_proofs (
     unique (tenant_id, proof_ref)
 );
 
+/*
+ * Bestehende Schluessel nachziehen.
+ *
+ * Bis zum 02.09.2026 stand hier bei Beleg-Nachweisen die Kassennummer im
+ * Klartext und ueberlebte damit die Detailfrist, die sie loeschen soll. Diese
+ * Zeilen liegen in laufenden Projekten und muessen mit.
+ *
+ * Erkennungsmerkmal ist die Form: Ein Hash sind genau 64 Hexziffern. Alles
+ * andere - "AMA-2642:13:44131", "tresen:...", "aktivierung:..." - ist noch
+ * Klartext. Damit ist der Lauf wiederholbar, ohne zweimal zu hashen.
+ */
+do $$
+begin
+    update public.stamp_proofs
+       set proof_ref = encode(extensions.digest(proof_ref, 'sha256'), 'hex')
+     where proof_ref !~ '^[0-9a-f]{64}$';
+end;
+$$;
+
 -- Was aus dem Beleg-QR gelesen wurde. Ohne diese beiden Spalten laesst sich
 -- ein abgelehnter oder strittiger Stempel spaeter nicht nachvollziehen.
 alter table public.stamp_proofs
@@ -1091,6 +1110,7 @@ security definer
 set search_path = public
 as $$
 declare
+    v_quelle text;
     v_user      uuid := p_user_id;
     v_stamp_id  uuid := gen_random_uuid();
     v_count     int;
@@ -1165,6 +1185,7 @@ begin
         -- derselbe Bon erneut, sobald ein Leerzeichen anders steht.
         v_ref := v_beleg.register_serial || ':' || v_beleg.transaction_no
                  || ':' || v_beleg.signature_ctr;
+        v_quelle := 'receipt';
     elsif trim(p_proof_ref) like 'tresen:%' then
         /*
          * Der Tresen-Code. Beweist Anwesenheit, nicht Kauf - deshalb muss
@@ -1187,6 +1208,7 @@ begin
         -- Warteschlange nur der erste Kunde seinen Stempel, weil der
         -- Nachweis je Betrieb nur einmal vorkommen darf.
         v_ref := 'tresen:' || v_token || ':' || v_user::text;
+        v_quelle := 'counter';
     else
         -- Kein Beleg-QR. Solange der Betrieb das erlaubt, zaehlt der freie
         -- Nachweis weiter - sonst waere die Pruefung ohnehin umgehbar,
@@ -1195,6 +1217,13 @@ begin
             raise exception 'receipt qr required' using errcode = '22023';
         end if;
         v_ref := trim(p_proof_ref);
+        /*
+         * Frueher bekam dieser Zweig 'receipt', weil p_source unveraendert
+         * durchgereicht wurde - und dessen Vorgabewert lautet 'receipt'. Ein
+         * freier Nachweis ist aber keiner: Er belegt nichts, er ist nur
+         * erlaubt. Die Kachel "davon fuer Kaeufe" zaehlte ihn mit.
+         */
+        v_quelle := 'opaque';
     end if;
 
     select count(*) into v_heute
@@ -1207,13 +1236,34 @@ begin
     end if;
 
     -- Schlaegt bei einem schon verwendeten Beleg mit unique_violation fehl.
+    /*
+     * Den Schluessel gehasht ablegen, nicht im Klartext.
+     *
+     * Bei einem Beleg-QR lautet er <Seriennummer>:<Transaktion>:<Zaehler>.
+     * cleanup_expired_proofs leert nach proof_detail_days (30 Tage)
+     * register_serial und amount_cents - den Schluessel aber nicht. Damit
+     * stand die Kassennummer neben user_id und created_at weiter bis
+     * proof_retention_days (90 Tage) in der Tabelle: "diese Karte war am
+     * 3. Mai um 8:14 an Kasse AMA-2642". Die Datenschutzerklaerung nennt 30.
+     *
+     * Der Hash ist deterministisch, also bleibt der Schutz gegen doppelte
+     * Belege unveraendert: Derselbe Bon ergibt denselben Hash und kollidiert
+     * mit unique (tenant_id, proof_ref) wie vorher. Zurueckgelesen wird der
+     * Wert nirgends - er dient ausschliesslich dieser Bedingung.
+     */
+    v_ref := encode(extensions.digest(v_ref, 'sha256'), 'hex');
+
     insert into public.stamp_proofs (
         tenant_id, user_id, proof_ref, source, register_serial, amount_cents,
         signature_verified
     ) values (
         p_tenant_id, v_user,
         v_ref,
-        case when v_ref like 'tresen:%' then 'counter' else p_source end,
+        /*
+         * v_quelle steht oben fest, weil v_ref inzwischen ein Hash ist und
+         * sein Praefix nicht mehr verraet, woher der Nachweis kam.
+         */
+        v_quelle,
         v_beleg.register_serial, v_beleg.amount_cents,
         coalesce(p_signiert, false)
     );
@@ -1751,7 +1801,18 @@ select
      */
     (select count(*) from public.stamp_proofs s
       where s.tenant_id = t.id and s.source = 'aktivierung')
-        as welcome_stamps
+        as welcome_stamps,
+
+    /*
+     * Stempel, hinter denen ein Kauf steht - und nur die.
+     *
+     * "stamps_issued minus welcome_stamps" war zu grosszuegig: Der Tresen-Code
+     * belegt Anwesenheit, der freie Nachweis gar nichts. Beide zaehlten mit.
+     * Hier zaehlt ausschliesslich, was aus einem Beleg-QR entstanden ist.
+     */
+    (select count(*) from public.stamp_proofs s
+      where s.tenant_id = t.id and s.source = 'receipt')
+        as purchase_stamps
 from public.tenants t;
 
 -- Die Views gehoeren dem Betreiber, nicht der App. Ohne diesen Entzug waeren

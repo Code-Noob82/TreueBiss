@@ -761,8 +761,8 @@ async function zahlenLaden() {
      * ohnehin richtig, und eine fünfte Kachel liesse das 2x2-Raster mit einem
      * einzelnen Feld in der dritten Zeile enden.
      */
-    ...((z.welcome_stamps ?? 0) > 0
-        ? [[(z.stamps_issued ?? 0) - (z.welcome_stamps ?? 0), 'davon für Käufe']]
+    ...((z.stamps_issued ?? 0) !== (z.purchase_stamps ?? 0)
+        ? [[z.purchase_stamps ?? 0, 'davon für Käufe']]
         : []),
     [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
   ].map(([wert, was]) => zahl(wert, was)).join('');
