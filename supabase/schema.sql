@@ -2161,6 +2161,67 @@ as $$
      where public.is_owner_of(tenant_id) or public.is_demo_of(tenant_id);
 $$;
 
+/*
+ * Der Verlauf - die Frage, die ein Betrieb woechentlich stellt.
+ *
+ * Die drei Tagesansichten gibt es seit Langem, aber niemand konnte sie lesen:
+ * Sie sind fuer anon und authenticated gesperrt, und eine staff_-Funktion
+ * dazu fehlte. Der Betrieb sah damit ausschliesslich Staende. "412 Stempel"
+ * beantwortet nicht, ob die Karte anlaeuft; "letzte Woche 61, diese Woche 22"
+ * schon.
+ *
+ * Eine Funktion statt dreier: Die Anzeige braucht eine Zeile je Tag mit allen
+ * drei Zahlen nebeneinander, nicht drei Listen, die der Browser erst
+ * zusammenlegt. Und die Luecken muessen gefuellt sein - ein Tag ohne Eintrag
+ * ist ein Tag mit null, und eine Linie, die ihn ueberspringt, zeigt einen
+ * Verlauf, den es nicht gab.
+ *
+ * `stempel` ist NULL statt 0, sobald der Tag aelter ist als die Aufbewahrung
+ * der Nachweise. Das ist der Unterschied zwischen "an dem Tag war nichts" und
+ * "das wissen wir nicht mehr" - eine Null waere dort schlicht falsch, und die
+ * Anzeige koennte den Unterschied nicht mehr treffen.
+ */
+create or replace function public.staff_pilot_daily(p_tage int default 30)
+returns table (
+    tenant_id     uuid,
+    tag           date,
+    neue_karten   int,
+    stempel       int,
+    kunden        int,
+    einloesungen  int
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select
+        t.id,
+        d.tag::date,
+        coalesce(s.new_members, 0)::int,
+        -- Aelter als die Aufbewahrung: nicht null, sondern unbekannt.
+        case when d.tag::date < (current_date - t.proof_retention_days)
+             then null else coalesce(st.stamps, 0)::int end,
+        case when d.tag::date < (current_date - t.proof_retention_days)
+             then null else coalesce(st.customers, 0)::int end,
+        coalesce(r.redemptions, 0)::int
+    from public.tenants t
+    cross join generate_series(
+        current_date - (greatest(least(coalesce(p_tage, 30), 365), 1) - 1),
+        current_date, interval '1 day') as d(tag)
+    left join public.pilot_daily_signups s
+           on s.tenant_id = t.id and s.day = d.tag::date
+    left join public.pilot_daily_stamps st
+           on st.tenant_id = t.id and st.day = d.tag::date
+    left join public.pilot_daily_redemptions r
+           on r.tenant_id = t.id and r.day = d.tag::date
+    where public.is_owner_of(t.id) or public.is_demo_of(t.id)
+    order by t.id, d.tag;
+$$;
+
+revoke all on function public.staff_pilot_daily(int) from public, anon, authenticated;
+grant execute on function public.staff_pilot_daily(int) to authenticated;
+
 revoke all on function public.staff_pilot_cohorts() from public, anon, authenticated;
 grant execute on function public.staff_pilot_cohorts() to authenticated;
 
