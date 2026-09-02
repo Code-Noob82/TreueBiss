@@ -517,8 +517,10 @@ async function starten() {
   await scannerVorbereiten();
 
   if (stand === 'kein-betrieb') {
-    melden('Dieser Zugang ist keinem Betrieb zugeordnet. Fehlt der Eintrag '
-         + 'in <code>tenant_staff</code>?');
+    // Siehe Verwaltung: Der Leser ist Personal, kein Entwickler.
+    melden('Diese Anmeldung gehört zu keinem Betrieb. Vermutlich ist der '
+         + 'Zugang noch nicht freigeschaltet — melde dich bei der Person, '
+         + 'die euren Betrieb eingerichtet hat.');
   } else if (typeof stand === 'object') {
     melden(stand.fehler);
   }

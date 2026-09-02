@@ -833,8 +833,13 @@ async function scannerOeffnen() {
 
   if (!window.isSecureContext) {
     $('video').classList.add('verborgen');
-    melden('Die Kamera braucht eine <code>https</code>-Adresse. '
-         + 'Tippe die Nummer vom Kassenbon ein.');
+    /*
+     * Dem Kunden nutzt "https" nichts - er kann die Adresse nicht aendern,
+     * und ueber den Aufsteller kommt er ohnehin richtig an. Was er tun kann,
+     * steht deshalb zuerst.
+     */
+    melden('Die Kamera lässt sich hier nicht öffnen. Tippe die Nummer vom '
+         + 'Kassenbon ein — das geht genauso.');
     return;
   }
   let strom;
