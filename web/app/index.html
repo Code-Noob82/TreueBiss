@@ -177,6 +177,11 @@
   #umzug-code { display: grid; justify-items: center; gap: var(--s3); margin-top: var(--s4); }
   /* Die qrcode-Bibliothek schreibt eigene width/height ins Element; ohne das
      hier sprengt die Leinwand ihre Spalte. */
+  #einstieg-video {
+    width: 100%; border-radius: var(--s3); background: #000;
+    margin-bottom: var(--s3); aspect-ratio: 4 / 3; object-fit: cover;
+  }
+
   #umzug-qr { width: 100% !important; height: auto !important; max-width: 15rem; border-radius: var(--s2); }
   .umzug-warnung {
     font-size: var(--t-mikro); color: var(--warn-text); background: var(--warn);
@@ -212,6 +217,30 @@
 <main>
   <div id="band" role="status" aria-live="polite"></div>
   <div id="meldung" role="status" aria-live="polite"></div>
+
+  <!--
+    Einstieg ohne Betrieb.
+
+    Wer hier landet, hat die nackte Adresse geoeffnet. Bis zum 02.09.2026
+    stand hier nur ein Satz: "scanne den QR-Code am Tresen" - ohne Scanner -
+    und "oeffne den Link, den dein Betrieb dir gegeben hat", obwohl der
+    Betrieb keine einzige Adresse seiner Kunden kennt und deshalb gar keinen
+    Link verschicken kann.
+  -->
+  <section id="einstieg" class="karte verborgen">
+    <p class="marke">Noch keine Karte</p>
+    <p class="umzug-text">
+      Deine Karte gehört zu genau einem Betrieb. Den Aufsteller findest du am
+      Tresen — scanne ihn hier oder mit der Kamera deines Handys.
+    </p>
+    <div id="einstieg-scanner" class="verborgen">
+      <video id="einstieg-video" playsinline muted></video>
+    </div>
+    <div class="umzug-knoepfe">
+      <button id="aufsteller-scannen">Aufsteller scannen</button>
+      <button id="einstieg-abbrechen" class="still verborgen">Abbrechen</button>
+    </div>
+  </section>
 
   <!-- Stempelkarte -->
   <section id="karte-bereich" class="karte verborgen">

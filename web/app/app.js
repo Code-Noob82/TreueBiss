@@ -874,6 +874,104 @@ async function scannerOeffnen() {
   requestAnimationFrame(suchen);
 }
 
+/*
+ * Den Aufsteller lesen, wenn noch keine Karte da ist.
+ *
+ * Eigene Schleife statt scannerOeffnen: Dort haengt alles am Kartenbereich -
+ * das Belegfeld, der Abbrechen-Knopf, das Ergebnis geht an stempelHolen. Hier
+ * gibt es keine Karte, an die ein Stempel gehen koennte; gesucht wird der
+ * Betrieb.
+ */
+async function aufstellerLesen() {
+  const knopf = $('aufsteller-scannen'), video = $('einstieg-video');
+  melden('');
+
+  if (!window.isSecureContext) {
+    melden('Die Kamera lässt sich hier nicht öffnen. Scanne den Aufsteller '
+         + 'mit der Kamera deines Handys — der Code führt direkt hierher.');
+    return;
+  }
+  let strom;
+  try {
+    strom = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  } catch {
+    melden('Kein Zugriff auf die Kamera. Scanne den Aufsteller mit der '
+         + 'Kamera deines Handys — der Code führt direkt hierher.');
+    return;
+  }
+
+  const lesen = await leserBauen();
+  if (!lesen) {
+    strom.getTracks().forEach((s) => s.stop());
+    melden('Dieser Browser kann keine QR-Codes lesen. Scanne den Aufsteller '
+         + 'mit der Kamera deines Handys.');
+    return;
+  }
+
+  $('einstieg-scanner').classList.remove('verborgen');
+  $('einstieg-abbrechen').classList.remove('verborgen');
+  knopf.classList.add('verborgen');
+  video.srcObject = strom;
+  await video.play();
+  scanLaeuft = true;
+
+  const schliessen = () => {
+    scanLaeuft = false;
+    strom.getTracks().forEach((s) => s.stop());
+    video.srcObject = null;
+    $('einstieg-scanner').classList.add('verborgen');
+    $('einstieg-abbrechen').classList.add('verborgen');
+    knopf.classList.remove('verborgen');
+  };
+  $('einstieg-abbrechen').onclick = () => { schliessen(); melden(''); };
+
+  const leinwand = document.createElement('canvas');
+  const suchen = async () => {
+    if (!scanLaeuft) return;
+    const wert = await lesen(video, leinwand);
+    if (!wert) { requestAnimationFrame(suchen); return; }
+
+    const slug = slugAusCode(wert);
+    if (slug) { schliessen(); zumBetrieb(slug); return; }
+
+    /*
+     * Weiterlesen statt abbrechen: Im Bild kann noch etwas anderes liegen,
+     * und ein Abbruch bei jedem falschen Code machte das Scannen im Laden
+     * unbrauchbar.
+     */
+    melden(/^V0;/.test(wert)
+      ? 'Das ist ein Kassenbon. Den brauchst du erst, wenn du eine Karte hast — '
+        + 'scanne zuerst den Aufsteller am Tresen.'
+      : 'Dieser Code gehört nicht zu TreueBiss.');
+    requestAnimationFrame(suchen);
+  };
+  requestAnimationFrame(suchen);
+}
+
+/*
+ * Zieht den Betrieb aus dem Aufsteller-Code, oder null.
+ *
+ * Aus dem Code wird ausschliesslich der Parameter `b` genommen, und zumBetrieb
+ * baut die Zieladresse aus location.href. Ein untergeschobener Code kann damit
+ * hoechstens einen anderen Betrieb waehlen - wegleiten kann er nicht. Die
+ * Form ist auf Kleinbuchstaben, Ziffern und Bindestrich begrenzt, damit auch
+ * kein Pfad darin steckt.
+ */
+function slugAusCode(wert) {
+  try {
+    const u = new URL(wert, location.href);
+    const b = u.searchParams.get('b');
+    if (b && /^[a-z0-9-]{1,64}$/.test(b)) return b;
+  } catch { /* kein URL - dann eben nicht */ }
+  return null;
+}
+
+function zumBetrieb(slug) {
+  const u = new URL(location.href);
+  u.searchParams.set('b', slug);
+  location.assign(u);
+}
+
 /**
  * Liefert eine Lesefunktion oder null, wenn der Browser gar nicht kann.
  * Erst der eingebaute Detektor, dann jsQR - das spart auf Android den
@@ -924,6 +1022,7 @@ $('sammeln').onclick = scannerOeffnen;
 $('scan-abbrechen').onclick = () => { scannerSchliessen(); melden(''); };
 $('beleg-senden').onclick = () => stempelHolen($('beleg').value);
 $('beleg').onkeydown = (e) => { if (e.key === 'Enter') stempelHolen($('beleg').value); };
+$('aufsteller-scannen').onclick = aufstellerLesen;
 $('umzug-zeigen').onclick = umzugZeigen;
 $('wallet-google').onclick = zuGoogleWallet;
 $('wallet-apple').onclick = zuAppleWallet;
@@ -1031,8 +1130,15 @@ async function starten() {
     manifestZuruecksetzen();
     // Fuer einen Baeckereikunden geschrieben, nicht fuer den Entwickler:
     // Was `?b=` bedeutet, hilft ihm nicht weiter.
-    melden('Diese Seite gehört noch zu keinem Betrieb. Scanne den QR-Code '
-         + 'am Tresen oder öffne den Link, den dein Betrieb dir gegeben hat.');
+    /*
+     * Kein Satz mehr, sondern ein Weg.
+     *
+     * Hier stand "scanne den QR-Code am Tresen" - ohne Scanner - und "oeffne
+     * den Link, den dein Betrieb dir gegeben hat". Das zweite war schlicht
+     * falsch: Der Betrieb kennt keine einzige Adresse seiner Kunden, er kann
+     * niemandem etwas schicken. Genau das ist der Punkt dieses Produkts.
+     */
+    $('einstieg').classList.remove('verborgen');
     return;
   }
 
