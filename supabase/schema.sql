@@ -122,14 +122,37 @@ alter table public.tenants
     /*
      * Nach wie vielen Tagen eine Karte ohne echten Stempel als verwaist gilt.
      *
-     * Verwaist heisst: nur der Willkommensstempel, nie ein Beleg oder
-     * Tresen-Code, und seit dieser Frist nichts mehr. So sieht eine Karte
-     * aus, deren Sitzung verloren ging - Browserdaten geloescht, Handy
-     * gewechselt. Niemand kann sie mehr erreichen, sie zaehlt aber weiter als
-     * Teilnehmer. Der Zeitplan raeumt sie weg, wie die Nachweise.
+     * Verwaist heisst: seit dieser Frist keine Bewegung. Kein Stempel, kein
+     * Gutschein, nichts. So sieht eine Karte aus, deren Sitzung verloren ging
+     * - Browserdaten geloescht, Handy gewechselt. Niemand kann sie mehr
+     * erreichen, sie zaehlt aber weiter als Teilnehmer.
+     *
+     * Die Frist zaehlt ab der letzten Bewegung, nicht ab dem Anlegen: Ein
+     * Stammkunde, der jede Woche kommt, faengt jede Woche von vorn an.
+     *
+     * Ein Jahr als Vorgabe. Kuerzer waere gegenueber Saisonkunden unfair -
+     * wer im Sommer Eis holt und im Winter nicht, ist kein verlorener Fall.
+     * Laenger hiesse, dass eine unerreichbare Karte die Zahlen des Betriebs
+     * jahrelang verfaelscht.
      */
-    add column if not exists orphan_card_days int not null default 30
+    add column if not exists orphan_card_days int not null default 365
         check (orphan_card_days between 1 and 3650);
+
+-- Wer die Spalte noch mit der alten Vorgabe von 30 Tagen hat, bekommt die
+-- neue: 30 Tage waren fuer "nur Willkommensstempel" gedacht, nicht fuer
+-- "keine Bewegung". Ein ausdruecklich gesetzter anderer Wert bleibt stehen.
+do $$
+begin
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'tenants'
+                  and column_name = 'orphan_card_days'
+                  and column_default like '%30%') then
+        alter table public.tenants alter column orphan_card_days set default 365;
+        update public.tenants set orphan_card_days = 365 where orphan_card_days = 30;
+        raise notice 'Frist fuer verwaiste Karten von 30 auf 365 Tage gesetzt.';
+    end if;
+end
+$$;
 
 do $$
 begin
@@ -175,20 +198,23 @@ alter table public.tenants
     -- Wie lange ein Tresen-Code gilt. Kurz genug, dass ein abfotografierter
     -- Code nichts nuetzt; lang genug, dass eine Warteschlange durchkommt.
     add column if not exists counter_qr_seconds int not null default 60
-        check (counter_qr_seconds between 15 and 900),
-    /*
-     * Ein Stempel fuers Mitmachen, beim Anlegen der Karte.
-     *
-     * Er setzt keinen Kauf voraus - genau wie der Tresen-Code, und aus
-     * demselben Grund abschaltbar: Was ohne Gegenleistung vergeben wird,
-     * entscheidet der Betrieb, nicht die Software. Vorgabe ist aus.
-     *
-     * Farmen laesst er sich nicht. Stempel wandern nie zwischen Karten -
-     * adopt_card uebertraegt, es fuehrt nicht zusammen. Wer sich zehn Karten
-     * anlegt, hat zehnmal eine von zehn und keine Praemie. Der Aufwand dafuer
-     * ist hoeher als der eine Stempel wert ist.
-     */
-    add column if not exists welcome_stamp_enabled boolean not null default false;
+        check (counter_qr_seconds between 15 and 900);
+
+/*
+ * Der Willkommensstempel ist wieder verschwunden.
+ *
+ * Er war als Belohnung fuers Anlegen gedacht und wurde zusammen mit dem
+ * Tresen-Stempel vergeben: zwei Punkte fuer einen Scan. Damit verschenkte er
+ * genau das, was er bewirken sollte. Der Tresen-Stempel IST die Belohnung -
+ * der erste Grund, in den Laden zu kommen, und der erste Besitz, den man
+ * nicht mehr aufgibt. Ein zweiter Punkt daneben verdoppelt den Effekt nicht,
+ * er verwaessert ihn.
+ *
+ * Ob es einen Punkt ohne Kauf gibt, entscheidet weiterhin der Betrieb -
+ * ueber counter_qr_enabled, den Schalter, der schon da war.
+ */
+alter table public.tenants
+    drop column if exists welcome_stamp_enabled;
 
 do $$
 begin
@@ -1090,10 +1116,11 @@ begin
      * Erst die Doppelten weg.
      *
      * Ein Klartext-Eintrag, dessen Hash schon danebensteht, beschreibt
-     * denselben Nachweis zweimal - entstanden, weil activate_card bis heute
-     * Klartext schrieb und die Migration den aelteren Eintrag bereits gehasst
-     * hatte. Ohne diesen Schritt scheitert das Einspielen an der Bedingung
-     * unique (tenant_id, proof_ref), und zwar bei jedem weiteren Versuch.
+     * denselben Nachweis zweimal - entstanden, weil activate_card bis zum
+     * 02.09.2026 Klartext schrieb und die Migration den aelteren Eintrag
+     * bereits gehasst hatte. Ohne diesen Schritt scheitert das Einspielen an
+     * der Bedingung unique (tenant_id, proof_ref), und zwar bei jedem
+     * weiteren Versuch.
      *
      * Behalten wird der gehashte: Er ist der aeltere und der, auf den sich
      * alles Spaetere schon bezieht.
@@ -1282,57 +1309,54 @@ revoke all on function public.parse_receipt_qr(text) from public, anon, authenti
  * Wirft bei bereits verwendetem Nachweis (unique_violation, SQLSTATE 23505).
  */
 /*
- * Karte anlegen, ohne auth.uid() zu fragen.
- *
- * Denselben Kern brauchen zwei Aufrufer: activate_card (Nutzer aus der
- * Sitzung) und issue_stamp_intern (Nutzer als Parameter, weil der Aufruf auch
- * aus der Edge Function kommt). Zweimal geschrieben wuerden die beiden
- * auseinanderlaufen, und der Willkommensstempel ist genau die Sorte Regel, bei
- * der das teuer wird.
- *
- * Gibt zurueck, ob ein Willkommensstempel gefallen ist.
+ * karte_anlegen_intern gab es, solange zwei Wege eine Karte anlegen konnten:
+ * activate_card beim Oeffnen der Seite und issue_stamp_intern beim ersten
+ * Stempel. Seit die Karte nur noch mit dem ersten Stempel entsteht, ist der
+ * zweite Weg der einzige - und der Willkommensstempel, dessentwegen der
+ * gemeinsame Kern noetig war, ist weg. Beides wird hier abgeraeumt.
  */
-create or replace function public.karte_anlegen_intern(p_user uuid, p_tenant uuid)
-returns boolean
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-    v_an  boolean;
-    v_neu boolean := false;
+drop function if exists public.karte_anlegen_intern(uuid, uuid);
+
+/*
+ * Und die Willkommensstempel, die es schon gibt, muessen mit.
+ *
+ * Ein Nachweis mit source 'aktivierung' und der Stempel, der zu ihm gehoert.
+ * Welcher Stempel das ist, steht nirgends - stamps traegt keinen Verweis auf
+ * stamp_proofs. Es ist der aelteste der Karte: Der Willkommensstempel fiel
+ * beim Anlegen, alles andere kam danach.
+ *
+ * In einem Projekt, in dem der Schalter nie an war, passiert hier nichts.
+ */
+do $$
+declare v_stempel int := 0; v_nachweise int := 0;
 begin
-    select t.welcome_stamp_enabled into v_an
-      from public.tenants t where t.id = p_tenant;
+    with betroffen as (
+        select distinct tenant_id, user_id
+          from public.stamp_proofs where source = 'aktivierung'
+    ),
+    aeltester as (
+        select (array_agg(s.id order by s.created_at, s.id))[1] as id
+          from public.stamps s
+          join betroffen b on b.tenant_id = s.tenant_id and b.user_id = s.user_id
+         group by s.tenant_id, s.user_id
+    ),
+    weg as (
+        delete from public.stamps s using aeltester a where s.id = a.id returning 1
+    )
+    select count(*) into v_stempel from weg;
 
-    insert into public.memberships (user_id, tenant_id)
-         values (p_user, p_tenant)
-    on conflict (user_id, tenant_id) do nothing;
+    with weg as (
+        delete from public.stamp_proofs where source = 'aktivierung' returning 1
+    )
+    select count(*) into v_nachweise from weg;
 
-    if coalesce(v_an, false) then
-        /*
-         * Der Einfuegeversuch ist die Pruefung. Ein vorheriges `if exists`
-         * waere ein zweiter Weg zur selben Frage - und zwei Wege driften
-         * auseinander, sobald zwei Anfragen gleichzeitig ankommen.
-         */
-        begin
-            insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
-                 values (p_tenant, p_user,
-                         encode(extensions.digest('aktivierung:' || p_user::text,
-                                                  'sha256'), 'hex'),
-                         'aktivierung');
-            insert into public.stamps (id, user_id, tenant_id)
-                 values (gen_random_uuid(), p_user, p_tenant);
-            v_neu := true;
-        exception when unique_violation then
-            v_neu := false;   -- diese Karte hatte ihren Willkommensstempel schon
-        end;
+    if v_nachweise > 0 then
+        raise warning 'Willkommensstempel abgeraeumt: % Stempel, % Nachweise.',
+            v_stempel, v_nachweise;
     end if;
-    return v_neu;
-end;
+end
 $$;
 
-revoke all on function public.karte_anlegen_intern(uuid, uuid) from public, anon, authenticated;
 
 create or replace function public.issue_stamp_intern(
     p_user_id   uuid,
@@ -1352,7 +1376,6 @@ security definer
 set search_path = public
 as $$
 declare
-    v_willkommen boolean := false;
     v_quelle text;
     v_user      uuid := p_user_id;
     v_stamp_id  uuid := gen_random_uuid();
@@ -1390,8 +1413,15 @@ begin
         raise exception 'unknown or inactive tenant' using errcode = '22023';
     end if;
 
-    -- Ab hier steht fest, dass es den Betrieb gibt und er laeuft.
-    v_willkommen := public.karte_anlegen_intern(p_user_id, p_tenant_id);
+    /*
+     * Ab hier steht fest, dass es den Betrieb gibt und er laeuft - also darf
+     * die Karte entstehen. Sie entsteht hier und nur hier: Der Stempel, der
+     * gleich vergeben wird, ist ihr erster. Wer die Seite nur oeffnet, hinter-
+     * laesst nichts.
+     */
+    insert into public.memberships (user_id, tenant_id)
+         values (p_user_id, p_tenant_id)
+    on conflict (user_id, tenant_id) do nothing;
 
     /*
      * Beleg-QR oder freier Nachweis?
@@ -1916,12 +1946,29 @@ begin
         select m.user_id, m.tenant_id
           from public.memberships m
           join public.tenants t on t.id = m.tenant_id
-         where m.joined_at < now() - make_interval(days => t.orphan_card_days)
-           and not exists (select 1 from public.stamp_proofs p
-                            where p.tenant_id = m.tenant_id and p.user_id = m.user_id
-                              and p.source <> 'aktivierung')
+         where
+           /*
+            * Letzte Bewegung: der juengste Stempel, sonst das Anlegedatum.
+            *
+            * Nicht die Nachweise. Die werden nach proof_retention_days
+            * planmaessig geloescht - eine Karte, die vor einem Vierteljahr
+            * gesammelt hat, steht danach ohne Beleg da, traegt ihre Stempel
+            * aber weiter. Eine Regel, die nach Nachweisen fragt, haelt sie
+            * fuer leer und loescht einem Stammkunden die Punkte weg.
+            */
+           coalesce((select max(s.created_at) from public.stamps s
+                      where s.tenant_id = m.tenant_id and s.user_id = m.user_id),
+                    m.joined_at) < now() - make_interval(days => t.orphan_card_days)
+           /*
+            * Ein Gutschein, der noch eingeloest werden kann, haelt die Karte
+            * fest - unabhaengig davon, wann zuletzt gestempelt wurde. Wer eine
+            * volle Karte hat, steht bei null Stempeln; ohne diese Bedingung
+            * waere er der Erste, den der Hausputz erwischt.
+            */
            and not exists (select 1 from public.vouchers v
-                            where v.tenant_id = m.tenant_id and v.user_id = m.user_id)
+                            where v.tenant_id = m.tenant_id and v.user_id = m.user_id
+                              and not v.is_redeemed
+                              and v.expires_at > (extract(epoch from now()) * 1000)::int8)
     ),
     s as (delete from public.stamps s using verwaist w
            where s.tenant_id = w.tenant_id and s.user_id = w.user_id),
@@ -2080,6 +2127,15 @@ where is_redeemed and redeemed_at is not null
 group by tenant_id, (redeemed_at at time zone 'Europe/Berlin')::date;
 
 -- Gesamtbild pro Betrieb.
+/*
+ * Erst weg, dann neu. `create or replace view` kann Spalten anhaengen, aber
+ * keine entfernen - und welcome_stamps faellt hier weg. Die Funktion daneben
+ * haengt an der Sicht und muss deshalb mit; sie entsteht ein paar Zeilen
+ * weiter unten wieder.
+ */
+drop function if exists public.staff_pilot_summary();
+drop view if exists public.pilot_summary;
+
 create or replace view public.pilot_summary as
 select
     t.id   as tenant_id,
@@ -2116,26 +2172,11 @@ select
         as redemptions_without_timestamp,
 
     /*
-     * Willkommensstempel, getrennt ausgewiesen. Sie setzen keinen Kauf
-     * voraus; ohne diese Spalte stiege "Stempel pro Tag" mit jedem neuen
-     * Kunden, ohne dass jemand etwas gekauft haette - und niemand saehe,
-     * warum. stamps_issued minus dieser Wert ist die ehrliche Zahl.
-     *
-     * Steht am Ende, nicht bei stamps_issued, wo sie inhaltlich hingehoerte:
-     * `create or replace view` kann Spalten nur anhaengen. In der Mitte
-     * eingefuegt scheitert das Einspielen in jedem bestehenden Projekt mit
-     * "cannot change name of view column".
-     */
-    (select count(*) from public.stamp_proofs s
-      where s.tenant_id = t.id and s.source = 'aktivierung')
-        as welcome_stamps,
-
-    /*
      * Stempel, hinter denen ein Kauf steht - und nur die.
      *
-     * "stamps_issued minus welcome_stamps" war zu grosszuegig: Der Tresen-Code
-     * belegt Anwesenheit, der freie Nachweis gar nichts. Beide zaehlten mit.
-     * Hier zaehlt ausschliesslich, was aus einem Beleg-QR entstanden ist.
+     * stamps_issued zaehlt alles: Beleg-QR, Tresen-Code, freien Nachweis. Der
+     * Tresen-Code belegt nur Anwesenheit, der freie Nachweis gar nichts. Hier
+     * zaehlt ausschliesslich, was aus einem Beleg-QR entstanden ist.
      */
     (select count(*) from public.stamp_proofs s
       where s.tenant_id = t.id and s.source = 'receipt')
@@ -2558,6 +2599,7 @@ drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boo
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean);
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean, int);
 
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
@@ -2573,11 +2615,8 @@ create or replace function public.owner_update_proof_rules(
     -- Aufruf ohne diese beiden Werte nichts verstellt.
     p_detail_days     int default 30,
     p_retention_days  int default 90,
-    -- Vorgabe false: Ein bestehender Aufruf ohne diesen Wert schaltet den
-    -- Willkommensstempel nicht versehentlich ein.
-    p_welcome_stamp   boolean default false,
     -- Vorgabe wie in der Tabelle: Ein Aufruf ohne den Wert verstellt nichts.
-    p_orphan_days     int default 30
+    p_orphan_days     int default 365
 )
 returns setof public.tenants
 language plpgsql
@@ -2621,8 +2660,7 @@ begin
            counter_qr_seconds     = p_counter_seconds,
            proof_detail_days      = p_detail_days,
            proof_retention_days   = p_retention_days,
-           welcome_stamp_enabled  = coalesce(p_welcome_stamp, false),
-           orphan_card_days       = coalesce(p_orphan_days, 30)
+           orphan_card_days       = coalesce(p_orphan_days, 365)
      where id = p_tenant_id;
 
     -- Beim Einschalten einen Schluessel anlegen, falls noch keiner da ist.
@@ -2652,8 +2690,8 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean, int) from public, anon, authenticated;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean, int) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, int) from public, anon, authenticated;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, int) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*
@@ -2731,65 +2769,14 @@ grant execute on function public.owner_clear_redeem_code(uuid) to authenticated;
 -- ------------------------------------------------------------ Aktivierung
 
 /*
- * Karte anlegen - und, wenn der Betrieb es will, gleich den ersten Stempel.
+ * activate_card ist Geschichte.
  *
- * Bisher legte die App die Mitgliedschaft selbst an, mit einem upsert. Das
- * ging, solange dabei nichts zu entscheiden war. Ein Stempel ist eine
- * Entscheidung: Er haengt an einem Schalter des Betriebs und darf genau
- * einmal je Karte fallen. Beides gehoert in die Datenbank, nicht in den
- * Browser - im Browser waere es eine Bitte, hier ist es eine Regel.
- *
- * Der Stempel setzt keinen Kauf voraus. Das ist kein Bruch mit dem Grundsatz
- * dieses Produkts, sondern derselbe Fall wie der Tresen-Code: Er belegt, dass
- * jemand im Laden stand, nicht dass er etwas gekauft hat. Deshalb steht er
- * unter demselben Vorbehalt - der Betrieb schaltet ihn ein, oder eben nicht.
- *
- * `source` traegt ihn getrennt aus: Wer spaeter fragt, wie viele Stempel auf
- * Kaeufe zurueckgehen, bekommt eine ehrliche Antwort statt einer
- * geschoenten. Ohne diese Trennung wuerde die Zahl "Stempel pro Tag" mit
- * jedem neuen Kunden steigen, ohne dass jemand etwas gekauft haette.
- *
- * `proof_ref` traegt die Kennung der Karte. Zusammen mit der Bedingung
- * unique (tenant_id, proof_ref) ist der Stempel damit genau einmal je Karte
- * moeglich - nicht durch eine Abfrage, die man vergessen kann, sondern durch
- * den Index.
+ * Sie legte die Karte beim Oeffnen der Seite an und vergab dabei den
+ * Willkommensstempel. Beides ist weg: Die Karte entsteht mit dem ersten
+ * Stempel, und der erste Stempel ist die Begruessung. Die App hat die
+ * Funktion seit dem 02.09.2026 nicht mehr gerufen.
  */
-create or replace function public.activate_card(p_tenant_id uuid)
-returns table (stamps int, welcome_stamp boolean)
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-    v_user   uuid := auth.uid();
-    v_aktiv  boolean;
-    v_neu    boolean;
-    v_gesamt int;
-begin
-    if v_user is null then
-        raise exception 'not signed in' using errcode = '28000';
-    end if;
-
-    select t.is_active into v_aktiv from public.tenants t where t.id = p_tenant_id;
-    if v_aktiv is null then
-        raise exception 'tenant not found' using errcode = '22023';
-    end if;
-    if not v_aktiv then
-        raise exception 'tenant is not active' using errcode = '22023';
-    end if;
-
-    v_neu := public.karte_anlegen_intern(v_user, p_tenant_id);
-
-    select count(*)::int into v_gesamt
-      from public.stamps s
-     where s.user_id = v_user and s.tenant_id = p_tenant_id;
-
-    return query select v_gesamt, v_neu;
-end;
-$$;
-
-revoke all on function public.activate_card(uuid) from public, anon, authenticated;
-grant execute on function public.activate_card(uuid) to authenticated;
+drop function if exists public.activate_card(uuid);
 
 
 -- ---------------------------------------------------------------- Loeschen

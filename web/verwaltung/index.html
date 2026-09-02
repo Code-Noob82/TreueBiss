@@ -403,19 +403,6 @@
       </p>
 
       <label class="schalter">
-        <input id="b-willkommen" type="checkbox">
-        <span>Ersten Stempel fürs Aktivieren vergeben</span>
-      </label>
-      <p class="hinweis">
-        Wer die Karte am Tresen zum ersten Mal öffnet, hat sofort einen
-        Stempel darauf — einmal je Karte. <strong>Er setzt keinen Kauf
-        voraus</strong>, wie der Tresen-Code auch. Die App sagt das dem
-        Kunden ausdrücklich, statt den Stempel stillschweigend gutzuschreiben.
-        In den Zahlen stehen diese Stempel getrennt, damit „Stempel pro Tag"
-        nicht mit jedem neuen Kunden steigt.
-      </p>
-
-      <label class="schalter">
         <input id="b-tresen" type="checkbox">
         <span>Stempel-QR am Tresen anbieten</span>
       </label>
@@ -451,17 +438,19 @@
           <input id="b-aufbewahrung" type="number" min="1" max="3650" inputmode="numeric">
         </div>
         <div>
-          <label for="b-verwaist">Karten ohne Einkauf entfernen nach (Tagen)</label>
+          <label for="b-verwaist">Karten ohne Bewegung entfernen nach (Tagen)</label>
           <input id="b-verwaist" type="number" min="1" max="3650" inputmode="numeric">
         </div>
       </div>
       <p class="warnung verborgen" id="b-frist-warnung"></p>
       <p class="hinweis">
-        Eine Karte, die nur den Willkommensstempel hat und nie einen Einkauf
-        gesehen hat, ist meist eine verlorene: Browserdaten gelöscht, Handy
-        gewechselt. Sie zählt sonst für immer als Teilnehmer. Der nächtliche
-        Lauf entfernt sie nach dieser Frist. Karten mit auch nur einem echten
-        Stempel oder einem Gutschein bleiben.
+        Eine Karte, auf der seit dieser Frist nichts mehr passiert ist, ist
+        meist eine verlorene: Browserdaten gelöscht, Handy gewechselt. Sie
+        zählt sonst für immer als Teilnehmer. Der nächtliche Lauf entfernt sie.
+        <strong>Die Frist zählt ab dem letzten Stempel</strong>, nicht ab dem
+        Anlegen — wer regelmäßig kommt, fängt jedes Mal von vorn an. Ein
+        Gutschein, der noch eingelöst werden kann, hält die Karte in jedem Fall
+        fest. Ein Jahr ist die Vorgabe; kürzer trifft Saisonkunden.
       </p>
 
       <div class="reihe">
@@ -738,12 +727,11 @@ function formularFuellen() {
   $('b-nurkassen').checked = !!aktiv.require_known_register;
   $('b-frei').checked = aktiv.allow_opaque_proofs !== false;
   $('b-signatur').checked = !!aktiv.require_signed_proof;
-  $('b-willkommen').checked = !!aktiv.welcome_stamp_enabled;
   $('b-tresen').checked = !!aktiv.counter_qr_enabled;
   $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
   $('b-detail').value = aktiv.proof_detail_days ?? 30;
   $('b-aufbewahrung').value = aktiv.proof_retention_days ?? 90;
-  $('b-verwaist').value = aktiv.orphan_card_days ?? 30;
+  $('b-verwaist').value = aktiv.orphan_card_days ?? 365;
   tresenWarnungPruefen();
   fristWarnungPruefen();
 }
@@ -792,9 +780,10 @@ async function zahlenLaden() {
     [z.stamps_issued, 'Stempel gesamt'],
     [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
     /*
-     * Nur wenn es Willkommensstempel gibt. Sonst liest sich "Stempel gesamt"
-     * ohnehin richtig, und eine fünfte Kachel liesse das 2x2-Raster mit einem
-     * einzelnen Feld in der dritten Zeile enden.
+     * Nur wenn Stempel ohne Beleg-QR dabei sind - Tresen-Code oder freier
+     * Nachweis. Sonst liest sich "Stempel gesamt" ohnehin richtig, und eine
+     * fünfte Kachel liesse das 2x2-Raster mit einem einzelnen Feld in der
+     * dritten Zeile enden.
      */
     ...((z.stamps_issued ?? 0) !== (z.purchase_stamps ?? 0)
         ? [[z.purchase_stamps ?? 0, 'davon für Käufe']]
@@ -1166,7 +1155,6 @@ $('b-speichern').onclick = async () => {
     p_require_known: $('b-nurkassen').checked,
     p_allow_opaque: $('b-frei').checked,
     p_require_signed: $('b-signatur').checked,
-    p_welcome_stamp: $('b-willkommen').checked,
     p_counter_enabled: $('b-tresen').checked,
     p_counter_seconds: Number($('b-tresen-sek').value),
     p_detail_days: Number($('b-detail').value),

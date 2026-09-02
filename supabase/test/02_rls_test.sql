@@ -57,10 +57,9 @@ begin
      * Mitgliedschaft: gar nicht mehr aus dem Browser.
      *
      * Hier stand bis zum 02.09.2026, dass ein upsert mit DO NOTHING
-     * durchgehen muss - die App legte die Karte selbst an. Seit
-     * activate_card das uebernimmt (und der Willkommensstempel eine
-     * Entscheidung daran haengt), schreibt der Browser diese Tabelle nicht
-     * mehr, und das Recht dazu ist entzogen.
+     * durchgehen muss - die App legte die Karte selbst an. Seit die Karte
+     * mit dem ersten Stempel entsteht, schreibt der Browser diese Tabelle
+     * nicht mehr, und das Recht dazu ist entzogen.
      *
      * Der Entzug ist Teil des Riegels vom selben Tag: Auf stamps und
      * vouchers standen fremde Policies aus dem Dashboard, die jedem das
@@ -82,16 +81,13 @@ begin
     end;
     call test.check(v_ok, 'Der Browser legt keine Mitgliedschaft mehr selbst an');
 
-    -- Ueber activate_card geht es weiterhin - sonst haette kein Kunde je eine
-    -- Karte. Die Funktion laeuft als definer und bringt das Recht mit.
+    -- Ueber den ersten Stempel entsteht sie - sonst haette kein Kunde je eine
+    -- Karte. issue_stamp_intern laeuft als definer und bringt das Recht mit.
     reset role;
-    call auth.become(v_bob);
-    set local role authenticated;
-    perform public.activate_card(v_tenant);
-    reset role;
+    perform public.issue_stamp_intern(v_bob, v_tenant, 'frei:bob-erster', null, null);
     select count(*) into v_count from public.memberships
      where user_id = v_bob and tenant_id = v_tenant;
-    call test.check(v_count = 1, 'Ueber activate_card entsteht sie');
+    call test.check(v_count = 1, 'Mit dem ersten Stempel entsteht sie');
 
     reset role;
     raise notice '--- RLS-Tests bestanden ---';

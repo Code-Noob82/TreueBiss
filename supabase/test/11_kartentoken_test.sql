@@ -64,7 +64,7 @@ begin
     -- ---------------------------------------------- Der Umzug
     -- Die Mitgliedschaft ohne Rolle anlegen: Seit dem 02.09.2026 darf der
     -- Browser diese Tabelle nicht mehr beschreiben. Im Betrieb entsteht sie
-    -- ueber activate_card, hier reicht der Aufbau ohne Rolle.
+    -- ueber den ersten Stempel, hier reicht der Aufbau ohne Rolle.
     insert into public.memberships (user_id, tenant_id) values (v_neu, v_tenant);
 
     call auth.become(v_neu);

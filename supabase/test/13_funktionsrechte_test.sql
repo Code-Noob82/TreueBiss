@@ -31,7 +31,6 @@ declare
         array['public.issue_stamp(uuid, text, text)',               'n', 'j', 'j'],
         array['public.adopt_card(text)',                            'n', 'j', 'j'],
         array['public.delete_card(text)',                           'n', 'j', 'j'],
-        array['public.activate_card(uuid)',                         'n', 'j', 'j'],
         array['public.staff_pilot_summary()',                       'n', 'j', 'j'],
         array['public.staff_pilot_cohorts()',                       'n', 'j', 'j'],
         array['public.staff_pilot_daily(int)',                      'n', 'j', 'j'],
@@ -40,7 +39,7 @@ declare
         array['public.owner_update_tenant(uuid, text, text, text, text, text,'
               ' text, int, int)',                                   'n', 'j', 'j'],
         array['public.owner_update_proof_rules(uuid, int, int, int, boolean,'
-              ' boolean, boolean, boolean, int, int, int, boolean, int)','n', 'j', 'j'],
+              ' boolean, boolean, boolean, int, int, int, int)','n', 'j', 'j'],
         -- Die Frage "arbeitet der hier?" steht in Policies auf
         -- offer_redemptions, offers und tenant_registers, und die gelten fuer
         -- authenticated. Der Ausdruck einer Policy laeuft mit den Rechten
@@ -68,7 +67,6 @@ declare
         -- der Schluessel erreicht nie einen Browser.
         array['public.counter_token(uuid, int)',                      'n', 'n', 'j'],
         array['public.parse_receipt_qr(text)',                        'n', 'n', 'j'],
-        array['public.karte_anlegen_intern(uuid, uuid)',              'n', 'n', 'j'],
         array['public.issue_stamp_intern(uuid, uuid, text, text, boolean)',
                                                                       'n', 'n', 'j'],
         -- is_demo_of wird nur aus staff_redeem_voucher und
