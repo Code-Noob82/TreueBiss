@@ -90,17 +90,6 @@
   }
 
   /* Zahlen sind Nachschlagewerk, nicht Hauptsache - deshalb nebenan. */
-  .zahlen { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
-  .zahl {
-    border: 1px solid var(--linie-zart); border-radius: var(--s3);
-    padding: var(--s3) var(--s4);
-  }
-  .zahl b {
-    display: block; font-family: var(--display); font-weight: 700;
-    font-size: var(--t-display); font-variant-numeric: tabular-nums;
-    line-height: 1.1;
-  }
-  .zahl span { font-size: var(--t-mikro); color: var(--tinte-leise); }
 </style>
 </head>
 <body>
@@ -159,11 +148,14 @@
     <p class="frist" id="tresen-frist"></p>
   </section>
 
-  <!-- Zahlen -->
-  <section id="zahlen-bereich" class="karte neben verborgen">
-    <p class="marke">Zahlen dieses Betriebs</p>
-    <div class="zahlen" id="zahlen"></div>
-    <div class="reihe" style="margin-top: var(--s5)">
+  <!--
+    Die Zahlen des Betriebs standen hier bis zum 02.09.2026. Sie gehoeren der
+    Betriebsleitung, nicht dem Tresen - eine Verkaufskraft braucht sie nicht,
+    um einzuloesen, und Umsatzzahlen liegen offen, sobald das Geraet
+    unbeaufsichtigt steht.
+  -->
+  <section id="abmelden-bereich" class="karte neben verborgen">
+    <div class="reihe">
       <button id="abmelden" class="still">Abmelden</button>
     </div>
   </section>
@@ -292,7 +284,6 @@ async function einloesen(gutscheinId) {
     .toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   bestaetigen(zeit);
   $('code').value = '';
-  await zahlenLaden();  // Bestaetigung nicht ueberschreiben: der Erfolg zaehlt hier.
 }
 
 /**
@@ -304,36 +295,34 @@ async function einloesen(gutscheinId) {
  *
  * @returns {'ok'|'kein-betrieb'|{fehler: string}}
  */
-async function zahlenLaden() {
-  const { data, error } = await db.rpc('staff_pilot_summary');
+/*
+ * Welcher Betrieb ist das hier?
+ *
+ * Frueher beantwortete das staff_pilot_summary - die Funktion lieferte
+ * Kennzahlen und nebenbei Kennung und Name. Seit die Kasse die Zahlen nicht
+ * mehr sieht, gaebe sie null Zeilen zurueck, und die Kasse haette gar keinen
+ * Betrieb mehr: kein Tresen-Code, kein Name im Kopf. Der Weg fuehrt jetzt
+ * ueber die zwei Tabellen, die das Personal ohnehin lesen darf.
+ *
+ * @returns {'ok'|'kein-betrieb'|{fehler: string}}
+ */
+async function betriebLaden() {
+  const { data: rollen, error } = await db
+    .from('tenant_staff').select('tenant_id').limit(1);
   if (error) {
     if (istNetzfehler(error)) return { fehler: 'Keine Verbindung zum Server.' };
-    if (error.code === '42703' || /column .* does not exist/i.test(error.message ?? '')) {
-      return { fehler: 'Der Datenbank fehlt eine Spalte. Führe '
-                     + '<code>supabase/schema.sql</code> in der aktuellen '
-                     + 'Fassung im SQL-Editor aus.' };
-    }
-    // PostgREST sagt bei jeder unbekannten Funktion "schema cache", auch wenn
-    // es sie gar nicht gibt. Beide Handgriffe nennen, statt zu raten.
-    if (error.code === 'PGRST202' || /schema cache/i.test(error.message ?? '')) {
-      return { fehler: 'Diese Funktion kennt die Schnittstelle nicht. Entweder '
-                     + 'ist <code>supabase/schema.sql</code> nicht in der '
-                     + 'aktuellen Fassung eingespielt — oder PostgREST hat den '
-                     + 'Schema-Cache noch nicht neu geladen; dann hilft '
-                     + '<code>notify pgrst, \'reload schema\';</code>.' };
-    }
-    return { fehler: 'Die Zahlen konnten nicht geladen werden: ' + error.message };
+    return { fehler: 'Der Betrieb liess sich nicht laden: ' + error.message };
   }
-  if (!data?.length) return 'kein-betrieb';
-  const z = data[0];
-  aktiverBetrieb = z.tenant_id;
-  $('betrieb').textContent = z.tenant;
-  $('zahlen').innerHTML = [
-    [z.members, 'Teilnehmer'],
-    [z.stamps_issued, 'Stempel gesamt'],
-    [z.stamps_per_active_day ?? '–', 'Stempel pro Tag'],
-    [z.vouchers_redeemed + ' / ' + z.vouchers_created, 'Gutscheine eingelöst'],
-  ].map(([wert, was]) => `<div class="zahl"><b>${wert}</b><span>${was}</span></div>`).join('');
+  if (!rollen?.length) return 'kein-betrieb';
+
+  const { data: betriebe, error: fehler2 } = await db
+    .from('tenants').select('id, name').eq('id', rollen[0].tenant_id).limit(1);
+  if (fehler2) return { fehler: 'Der Betrieb liess sich nicht laden: ' + fehler2.message };
+  // Zuordnung da, Betrieb nicht lesbar: Die Policy verlangt is_active.
+  if (!betriebe?.length) return 'kein-betrieb';
+
+  aktiverBetrieb = betriebe[0].id;
+  $('betrieb').textContent = betriebe[0].name;
   return 'ok';
 }
 
@@ -468,7 +457,7 @@ async function tresenZeigen(tenantId) {
 function zeigeAngemeldet(ja) {
   $('anmeldung').classList.toggle('verborgen', ja);
   $('kasse').classList.toggle('verborgen', !ja);
-  $('zahlen-bereich').classList.toggle('verborgen', !ja);
+  $('abmelden-bereich').classList.toggle('verborgen', !ja);
   if (!ja) {
     $('wechsel').classList.add('verborgen');
     $('tresen').classList.add('verborgen');
@@ -511,7 +500,7 @@ async function starten() {
   const { data } = await db.auth.getSession();
   if (!data.session) { zeigeAngemeldet(false); return; }
   zeigeAngemeldet(true);
-  const stand = await zahlenLaden();
+  const stand = await betriebLaden();
   if (aktiverBetrieb) await tresenZeigen(aktiverBetrieb);
   await wechselPruefen();
   await scannerVorbereiten();

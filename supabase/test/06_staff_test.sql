@@ -88,6 +88,11 @@ end
 $$;
 
 -- Die Zahlen des eigenen Betriebs - und nur die.
+--
+-- Seit dem 02.09.2026 sieht sie nur die Betriebsleitung. Vorher stand hier
+-- eine Zuordnung ohne Rolle, die damit 'staff' bekam - und der Test bestand,
+-- weil is_staff_of fuer jede Rolle wahr ist. Die Kasse soll die Zahlen des
+-- Betriebs nicht sehen; sie loest ein und zeigt den Tresen-Code.
 do $$
 declare
     v_tenant   uuid := '00000000-0000-4000-8000-000000000001';
@@ -97,13 +102,14 @@ declare
 begin
     insert into auth.users default values returning id into v_personal;
     insert into auth.users default values returning id into v_kunde;
-    insert into public.tenant_staff (user_id, tenant_id) values (v_personal, v_tenant);
+    insert into public.tenant_staff (user_id, tenant_id, role)
+         values (v_personal, v_tenant, 'owner');
 
     call auth.become(v_personal);
     set local role authenticated;
 
     select count(*) into v_n from public.staff_pilot_summary();
-    call test.check(v_n = 1, 'Das Personal sieht genau den eigenen Betrieb');
+    call test.check(v_n = 1, 'Die Betriebsleitung sieht genau den eigenen Betrieb');
 
     select count(*) into v_n from public.staff_pilot_summary() where tenant_id = v_tenant;
     call test.check(v_n = 1, 'Und zwar den richtigen');
