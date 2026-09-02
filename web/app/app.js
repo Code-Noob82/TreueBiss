@@ -1008,10 +1008,23 @@ async function aufstellerLesen() {
      * und ein Abbruch bei jedem falschen Code machte das Scannen im Laden
      * unbrauchbar.
      */
-    melden(/^V0;/.test(wert)
-      ? 'Das ist ein Kassenbon. Den brauchst du erst, wenn du eine Karte hast — '
-        + 'scanne zuerst den Aufsteller am Tresen.'
-      : 'Dieser Code gehört nicht zu TreueBiss.');
+    /*
+     * Die beiden Codes, die im Laden ausserdem herumliegen, beim Namen
+     * nennen. "Gehoert nicht zu TreueBiss" waere bei beiden schlicht falsch -
+     * sie gehoeren dazu, nur an eine andere Stelle.
+     *
+     * Der Tresen-Code ist der wahrscheinlichste Fehlgriff: Er haengt gross
+     * auf einem Bildschirm direkt vor dem Kunden. Er traegt aber keinen
+     * Betrieb, deshalb laesst sich daraus keine Karte anlegen.
+     */
+    melden(
+      /^tresen:/.test(wert)
+        ? 'Das ist der Stempel-Code der Kasse. Er gilt erst, wenn du eine '
+          + 'Karte hast — wähle zuerst deinen Betrieb aus der Liste.'
+      : /^V0;/.test(wert)
+        ? 'Das ist ein Kassenbon. Den brauchst du erst, wenn du eine Karte '
+          + 'hast — wähle zuerst deinen Betrieb aus der Liste.'
+        : 'Dieser Code gehört nicht zu TreueBiss.');
     requestAnimationFrame(suchen);
   };
   requestAnimationFrame(suchen);
