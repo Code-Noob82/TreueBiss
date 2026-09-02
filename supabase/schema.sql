@@ -118,7 +118,18 @@ alter table public.tenants
         check (proof_detail_days between 1 and 365);
 alter table public.tenants
     add column if not exists proof_retention_days int not null default 90
-        check (proof_retention_days between 1 and 3650);
+        check (proof_retention_days between 1 and 3650),
+    /*
+     * Nach wie vielen Tagen eine Karte ohne echten Stempel als verwaist gilt.
+     *
+     * Verwaist heisst: nur der Willkommensstempel, nie ein Beleg oder
+     * Tresen-Code, und seit dieser Frist nichts mehr. So sieht eine Karte
+     * aus, deren Sitzung verloren ging - Browserdaten geloescht, Handy
+     * gewechselt. Niemand kann sie mehr erreichen, sie zaehlt aber weiter als
+     * Teilnehmer. Der Zeitplan raeumt sie weg, wie die Nachweise.
+     */
+    add column if not exists orphan_card_days int not null default 30
+        check (orphan_card_days between 1 and 3650);
 
 do $$
 begin
@@ -1869,6 +1880,57 @@ end;
 $$;
 
 revoke all on function public.cleanup_expired_proofs() from public, anon, authenticated;
+
+/*
+ * Verwaiste Karten wegraeumen.
+ *
+ * Eine Karte, deren Sitzung verloren ging, erreicht niemand mehr - weder der
+ * Kunde noch der Betrieb, der ihn per Konstruktion nicht kennt. Das ist die
+ * Kehrseite der Anonymitaet: Art. 17 laesst sich dort nicht ausueben, wo
+ * niemand mehr den Antrag stellen kann. Also stellt ihn der Zeitplan.
+ *
+ * Verwaist ist nur, wer nie einen echten Stempel hatte. Eine Karte mit auch
+ * nur einem Beleg oder Tresen-Code bleibt, solange die Nachweise reichen -
+ * die koennte jemand noch in der Hand halten. Gutscheine schuetzen ebenfalls.
+ *
+ * Kein Eintrag in card_deletions: Der Zaehler meint Kunden, die ihre Karte
+ * bewusst weggeworfen haben. Das hier ist Hausputz.
+ */
+create or replace function public.cleanup_orphan_cards()
+returns table (karten_entfernt bigint)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_n bigint := 0;
+begin
+    with verwaist as (
+        select m.user_id, m.tenant_id
+          from public.memberships m
+          join public.tenants t on t.id = m.tenant_id
+         where m.joined_at < now() - make_interval(days => t.orphan_card_days)
+           and not exists (select 1 from public.stamp_proofs p
+                            where p.tenant_id = m.tenant_id and p.user_id = m.user_id
+                              and p.source <> 'aktivierung')
+           and not exists (select 1 from public.vouchers v
+                            where v.tenant_id = m.tenant_id and v.user_id = m.user_id)
+    ),
+    s as (delete from public.stamps s using verwaist w
+           where s.tenant_id = w.tenant_id and s.user_id = w.user_id),
+    p as (delete from public.stamp_proofs p using verwaist w
+           where p.tenant_id = w.tenant_id and p.user_id = w.user_id),
+    o as (delete from public.offer_redemptions o using verwaist w
+           where o.tenant_id = w.tenant_id and o.user_id = w.user_id),
+    m as (delete from public.memberships m using verwaist w
+           where m.tenant_id = w.tenant_id and m.user_id = w.user_id returning 1)
+    select count(*) into v_n from m;
+
+    return query select v_n;
+end;
+$$;
+
+revoke all on function public.cleanup_orphan_cards() from public, anon, authenticated;
 do $$
 begin
     if exists (select 1 from pg_roles where rolname = 'service_role') then
@@ -1943,6 +2005,25 @@ begin
         v_name, '20 1 * * *', 'select public.cleanup_expired_proofs();'
     );
     raise notice 'Zeitplan gesetzt: % taeglich 01:20 GMT', v_name;
+end
+$$;
+
+-- Derselbe Zeitplan fuer die verwaisten Karten, zwanzig Minuten spaeter -
+-- nach dem Loeschen der Nachweise, damit eine Karte, deren letzter Beleg
+-- gerade abgelaufen ist, in derselben Nacht mitgeht.
+do $$
+declare v_name constant text := 'treuebiss-verwaiste-karten';
+begin
+    if not exists (select 1 from pg_namespace where nspname = 'cron') then
+        raise notice 'pg_cron fehlt - Zeitplan % nicht gesetzt', v_name;
+        return;
+    end if;
+    if exists (select 1 from cron.job where jobname = v_name) then
+        execute format('select cron.unschedule(%L)', v_name);
+    end if;
+    execute format('select cron.schedule(%L, %L, %L)',
+                   v_name, '40 1 * * *', 'select public.cleanup_orphan_cards();');
+    raise notice 'Zeitplan gesetzt: % taeglich 01:40 GMT', v_name;
 end
 $$;
 
@@ -2469,6 +2550,7 @@ drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boo
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int);
 drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int);
+drop function if exists public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean);
 
 create or replace function public.owner_update_proof_rules(
     p_tenant_id       uuid,
@@ -2486,7 +2568,9 @@ create or replace function public.owner_update_proof_rules(
     p_retention_days  int default 90,
     -- Vorgabe false: Ein bestehender Aufruf ohne diesen Wert schaltet den
     -- Willkommensstempel nicht versehentlich ein.
-    p_welcome_stamp   boolean default false
+    p_welcome_stamp   boolean default false,
+    -- Vorgabe wie in der Tabelle: Ein Aufruf ohne den Wert verstellt nichts.
+    p_orphan_days     int default 30
 )
 returns setof public.tenants
 language plpgsql
@@ -2530,7 +2614,8 @@ begin
            counter_qr_seconds     = p_counter_seconds,
            proof_detail_days      = p_detail_days,
            proof_retention_days   = p_retention_days,
-           welcome_stamp_enabled  = coalesce(p_welcome_stamp, false)
+           welcome_stamp_enabled  = coalesce(p_welcome_stamp, false),
+           orphan_card_days       = coalesce(p_orphan_days, 30)
      where id = p_tenant_id;
 
     -- Beim Einschalten einen Schluessel anlegen, falls noch keiner da ist.
@@ -2560,8 +2645,8 @@ begin
 end;
 $$;
 
-revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean) from public, anon, authenticated;
-grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean) to authenticated;
+revoke all on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean, int) from public, anon, authenticated;
+grant execute on function public.owner_update_proof_rules(uuid, int, int, int, boolean, boolean, boolean, boolean, int, int, int, boolean, int) to authenticated;
 
 -- -------------------------------------------------------- Einloese-Code
 /*

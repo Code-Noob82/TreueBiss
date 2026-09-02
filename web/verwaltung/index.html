@@ -450,8 +450,19 @@
           <label for="b-aufbewahrung">Nachweis ganz löschen nach (Tagen)</label>
           <input id="b-aufbewahrung" type="number" min="1" max="3650" inputmode="numeric">
         </div>
+        <div>
+          <label for="b-verwaist">Karten ohne Einkauf entfernen nach (Tagen)</label>
+          <input id="b-verwaist" type="number" min="1" max="3650" inputmode="numeric">
+        </div>
       </div>
       <p class="warnung verborgen" id="b-frist-warnung"></p>
+      <p class="hinweis">
+        Eine Karte, die nur den Willkommensstempel hat und nie einen Einkauf
+        gesehen hat, ist meist eine verlorene: Browserdaten gelöscht, Handy
+        gewechselt. Sie zählt sonst für immer als Teilnehmer. Der nächtliche
+        Lauf entfernt sie nach dieser Frist. Karten mit auch nur einem echten
+        Stempel oder einem Gutschein bleiben.
+      </p>
 
       <div class="reihe">
         <button id="b-speichern">Regeln speichern</button>
@@ -732,6 +743,7 @@ function formularFuellen() {
   $('b-tresen-sek').value = aktiv.counter_qr_seconds ?? 60;
   $('b-detail').value = aktiv.proof_detail_days ?? 30;
   $('b-aufbewahrung').value = aktiv.proof_retention_days ?? 90;
+  $('b-verwaist').value = aktiv.orphan_card_days ?? 30;
   tresenWarnungPruefen();
   fristWarnungPruefen();
 }
@@ -1159,6 +1171,7 @@ $('b-speichern').onclick = async () => {
     p_counter_seconds: Number($('b-tresen-sek').value),
     p_detail_days: Number($('b-detail').value),
     p_retention_days: Number($('b-aufbewahrung').value),
+    p_orphan_days: Number($('b-verwaist').value),
   });
   beschaeftigt($('b-speichern'), false);
   if (error) { console.error('owner_update_proof_rules', error); melden(fehlertext(error)); return; }
