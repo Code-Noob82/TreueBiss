@@ -2452,20 +2452,33 @@ stable
 security definer
 set search_path = public
 as $$
+    /*
+     * Heute nach Berliner Zeit, nicht nach der Zeitzone der Sitzung.
+     *
+     * Die drei Sichten darunter gruppieren nach Europe/Berlin, die Reihe hier
+     * lief bis zum 03.09.2026 ueber current_date - und das ist in Supabase
+     * UTC. Zwischen 22 und 24 Uhr Berliner Zeit war Berlin schon im naechsten
+     * Tag, die Reihe noch im vorigen: Die Stempel des laufenden Tages fielen
+     * hinten aus der Reihe heraus, und der Betrieb sah abends einen leeren
+     * neuesten Tag. Aufgefallen ist es in der Testsuite, die um 00:01
+     * Berliner Zeit lief.
+     */
+    with heute as (select (now() at time zone 'Europe/Berlin')::date as tag)
     select
         t.id,
         d.tag::date,
         coalesce(s.new_members, 0)::int,
         -- Aelter als die Aufbewahrung: nicht null, sondern unbekannt.
-        case when d.tag::date < (current_date - t.proof_retention_days)
+        case when d.tag::date < (h.tag - t.proof_retention_days)
              then null else coalesce(st.stamps, 0)::int end,
-        case when d.tag::date < (current_date - t.proof_retention_days)
+        case when d.tag::date < (h.tag - t.proof_retention_days)
              then null else coalesce(st.customers, 0)::int end,
         coalesce(r.redemptions, 0)::int
     from public.tenants t
+    cross join heute h
     cross join generate_series(
-        current_date - (greatest(least(coalesce(p_tage, 30), 365), 1) - 1),
-        current_date, interval '1 day') as d(tag)
+        h.tag - (greatest(least(coalesce(p_tage, 30), 365), 1) - 1),
+        h.tag, interval '1 day') as d(tag)
     left join public.pilot_daily_signups s
            on s.tenant_id = t.id and s.day = d.tag::date
     left join public.pilot_daily_stamps st
