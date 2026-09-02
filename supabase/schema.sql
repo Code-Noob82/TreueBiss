@@ -1065,6 +1065,65 @@ alter table public.stamp_proofs
     add column if not exists signature_verified boolean not null default false;
 
 alter table public.stamp_proofs enable row level security;
+
+/*
+ * Fremde Policies wegraeumen - und zwar die, die niemand hier angelegt hat.
+ *
+ * Am 02.09.2026 von aussen nachgewiesen: Jeder anonym Angemeldete konnte sich
+ * Stempel und Gutscheine unmittelbar eintragen, ohne Kaufnachweis und ohne
+ * issue_stamp. Die Ursache waren zwei Policies mit den Namen "Allow individual
+ * insert access" und "Allow individual read access" auf stamps und vouchers -
+ * Vorlagen aus dem Supabase-Dashboard, irgendwann angeklickt und vergessen.
+ *
+ * Die Zeilen darunter loeschen `stamps_insert_own` und Konsorten, also die
+ * Namen, die dieses Schema selbst einmal vergeben hat. Fremde Namen kennt es
+ * nicht - und ein Skript kann nicht wegraeumen, was es nicht kennt.
+ *
+ * Deshalb hier andersherum: Was nicht auf der Liste steht, fliegt. Damit
+ * ueberlebt keine Handanlage aus dem Dashboard das naechste Einspielen.
+ */
+do $$
+declare
+    v_erlaubt text[] := array[
+        'stamps_select_own', 'vouchers_select_own',
+        'memberships_select_own', 'memberships_insert_own', 'memberships_delete_own',
+        'stamp_proofs_select_own',
+        'offer_redemptions_select_own', 'offer_redemptions_staff_read'
+    ];
+    v_p record;
+begin
+    for v_p in
+        select c.relname as tabelle, p.polname as name
+          from pg_policy p
+          join pg_class c on c.oid = p.polrelid
+         where c.relnamespace = 'public'::regnamespace
+           and c.relname in ('stamps', 'vouchers', 'memberships',
+                             'stamp_proofs', 'offer_redemptions')
+           and not (p.polname = any (v_erlaubt))
+    loop
+        execute format('drop policy %I on public.%I', v_p.name, v_p.tabelle);
+        raise notice 'Fremde Policy entfernt: %.%', v_p.tabelle, v_p.name;
+    end loop;
+end;
+$$;
+
+/*
+ * Und der zweite Riegel: das Recht selbst.
+ *
+ * Eine Policy allein reicht nicht, das hat dieser Fall gezeigt. Aus dem
+ * Browser wird keine dieser Tabellen je beschrieben - Stempel, Gutscheine,
+ * Nachweise, Einloesungen und Mitgliedschaften entstehen ausschliesslich in
+ * Funktionen, die als definer laufen und das Recht des Eigentuemers
+ * mitbringen. Ohne insert, update und delete ist eine fremde Policy wirkungslos.
+ *
+ * service_role bleibt unberuehrt: Die Edge Functions schreiben damit.
+ */
+revoke insert, update, delete on public.stamps            from anon, authenticated;
+revoke insert, update, delete on public.vouchers          from anon, authenticated;
+revoke insert, update, delete on public.stamp_proofs      from anon, authenticated;
+revoke insert, update, delete on public.offer_redemptions from anon, authenticated;
+revoke insert, update, delete on public.memberships       from anon, authenticated;
+
 -- Nur lesen; geschrieben wird ausschliesslich in issue_stamp().
 drop policy if exists stamp_proofs_select_own on public.stamp_proofs;
 create policy stamp_proofs_select_own on public.stamp_proofs
