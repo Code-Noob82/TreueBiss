@@ -1270,6 +1270,59 @@ revoke all on function public.parse_receipt_qr(text) from public, anon, authenti
  *
  * Wirft bei bereits verwendetem Nachweis (unique_violation, SQLSTATE 23505).
  */
+/*
+ * Karte anlegen, ohne auth.uid() zu fragen.
+ *
+ * Denselben Kern brauchen zwei Aufrufer: activate_card (Nutzer aus der
+ * Sitzung) und issue_stamp_intern (Nutzer als Parameter, weil der Aufruf auch
+ * aus der Edge Function kommt). Zweimal geschrieben wuerden die beiden
+ * auseinanderlaufen, und der Willkommensstempel ist genau die Sorte Regel, bei
+ * der das teuer wird.
+ *
+ * Gibt zurueck, ob ein Willkommensstempel gefallen ist.
+ */
+create or replace function public.karte_anlegen_intern(p_user uuid, p_tenant uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+    v_an  boolean;
+    v_neu boolean := false;
+begin
+    select t.welcome_stamp_enabled into v_an
+      from public.tenants t where t.id = p_tenant;
+
+    insert into public.memberships (user_id, tenant_id)
+         values (p_user, p_tenant)
+    on conflict (user_id, tenant_id) do nothing;
+
+    if coalesce(v_an, false) then
+        /*
+         * Der Einfuegeversuch ist die Pruefung. Ein vorheriges `if exists`
+         * waere ein zweiter Weg zur selben Frage - und zwei Wege driften
+         * auseinander, sobald zwei Anfragen gleichzeitig ankommen.
+         */
+        begin
+            insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
+                 values (p_tenant, p_user,
+                         encode(extensions.digest('aktivierung:' || p_user::text,
+                                                  'sha256'), 'hex'),
+                         'aktivierung');
+            insert into public.stamps (id, user_id, tenant_id)
+                 values (gen_random_uuid(), p_user, p_tenant);
+            v_neu := true;
+        exception when unique_violation then
+            v_neu := false;   -- diese Karte hatte ihren Willkommensstempel schon
+        end;
+    end if;
+    return v_neu;
+end;
+$$;
+
+revoke all on function public.karte_anlegen_intern(uuid, uuid) from public, anon, authenticated;
+
 create or replace function public.issue_stamp_intern(
     p_user_id   uuid,
     p_tenant_id uuid,
@@ -1288,6 +1341,7 @@ security definer
 set search_path = public
 as $$
 declare
+    v_willkommen boolean := false;
     v_quelle text;
     v_user      uuid := p_user_id;
     v_stamp_id  uuid := gen_random_uuid();
@@ -1306,12 +1360,16 @@ begin
     end if;
     -- Nicht is_member_of: Die Funktion fragt auth.uid(), und beim Aufruf aus
     -- der Edge Function heraus steht der Nutzer als Parameter da.
-    if not exists (
-        select 1 from public.memberships m
-         where m.user_id = p_user_id and m.tenant_id = p_tenant_id
-    ) then
-        raise exception 'not a member of this tenant' using errcode = '42501';
-    end if;
+    /*
+     * Die Mitgliedschaft wird hier nicht mehr verlangt, sondern angelegt -
+     * weiter unten, nachdem der Betrieb geprueft ist. Bis zum 02.09.2026
+     * entstand die Karte schon beim blossen Oeffnen des Links; damit zaehlte
+     * "Teilnehmer" jeden, der einmal hingeschaut hat, und der
+     * Willkommensstempel fiel fuer jeden Blick.
+     *
+     * Jetzt entsteht sie mit dem ersten Stempel. Wer nur schaut, hinterlaesst
+     * nichts.
+     */
     if p_proof_ref is null or length(trim(p_proof_ref)) = 0 then
         raise exception 'proof reference required' using errcode = '22023';
     end if;
@@ -1320,6 +1378,9 @@ begin
     if not found then
         raise exception 'unknown or inactive tenant' using errcode = '22023';
     end if;
+
+    -- Ab hier steht fest, dass es den Betrieb gibt und er laeuft.
+    v_willkommen := public.karte_anlegen_intern(p_user_id, p_tenant_id);
 
     /*
      * Beleg-QR oder freier Nachweis?
@@ -2608,18 +2669,16 @@ security definer
 set search_path = public, extensions
 as $$
 declare
-    v_user    uuid := auth.uid();
-    v_an      boolean;
-    v_aktiv   boolean;
-    v_neu     boolean := false;
-    v_gesamt  int;
+    v_user   uuid := auth.uid();
+    v_aktiv  boolean;
+    v_neu    boolean;
+    v_gesamt int;
 begin
     if v_user is null then
         raise exception 'not signed in' using errcode = '28000';
     end if;
 
-    select t.welcome_stamp_enabled, t.is_active into v_an, v_aktiv
-      from public.tenants t where t.id = p_tenant_id;
+    select t.is_active into v_aktiv from public.tenants t where t.id = p_tenant_id;
     if v_aktiv is null then
         raise exception 'tenant not found' using errcode = '22023';
     end if;
@@ -2627,39 +2686,7 @@ begin
         raise exception 'tenant is not active' using errcode = '22023';
     end if;
 
-    insert into public.memberships (user_id, tenant_id)
-         values (v_user, p_tenant_id)
-    on conflict (user_id, tenant_id) do nothing;
-
-    if v_an then
-        /*
-         * Der Einfuegeversuch ist die Pruefung. Ein vorheriges `if exists`
-         * waere ein zweiter Weg zur selben Frage - und zwei Wege driften
-         * auseinander, sobald zwei Anfragen gleichzeitig ankommen.
-         */
-        begin
-            insert into public.stamp_proofs (tenant_id, user_id, proof_ref, source)
-                 values (p_tenant_id, v_user,
-                         /*
-                          * Gehasht wie in issue_stamp_intern. Stand hier bis
-                          * zum 02.09.2026 im Klartext - und damit war die
-                          * Einmal-Garantie geloest, sobald das Schema einmal
-                          * eingespielt wurde: Die Migration hashte den
-                          * bestehenden Eintrag, der naechste Aufruf schrieb
-                          * wieder Klartext, und der kollidierte mit nichts
-                          * mehr. Zweiter Willkommensstempel.
-                          */
-                         encode(extensions.digest('aktivierung:' || v_user::text,
-                                                  'sha256'), 'hex'),
-                         'aktivierung');
-            insert into public.stamps (id, user_id, tenant_id)
-                 values (gen_random_uuid(), v_user, p_tenant_id);
-            v_neu := true;
-        exception when unique_violation then
-            -- Diese Karte hatte ihren Willkommensstempel schon.
-            v_neu := false;
-        end;
-    end if;
+    v_neu := public.karte_anlegen_intern(v_user, p_tenant_id);
 
     select count(*)::int into v_gesamt
       from public.stamps s

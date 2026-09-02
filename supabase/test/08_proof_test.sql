@@ -313,17 +313,17 @@ begin
     end;
     call test.check(v_ok, 'Auch ein signierter Beleg darf nicht zu alt sein');
 
-    -- Fremde Mitgliedschaft bleibt fremd, auch mit Service-Rolle.
+    -- Auch der geprüfte Weg legt die Karte an, wenn es noch keine gibt -
+    -- seit dem 02.09.2026 entsteht sie mit dem ersten Stempel, nicht beim
+    -- Öffnen. Der Nutzer ist hier ein Parameter, deshalb geht das nur über
+    -- den Helfer, der keine Sitzung braucht.
     declare v_fremd uuid;
     begin
         insert into auth.users default values returning id into v_fremd;
-        begin
-            perform public.service_issue_stamp(v_fremd, v_t, test.bon(p_tx => '3005'));
-            v_ok := false;
-        exception when insufficient_privilege then
-            v_ok := true;
-        end;
-        call test.check(v_ok, 'Ohne Mitgliedschaft gibt es auch geprüft keinen Stempel');
+        perform public.service_issue_stamp(v_fremd, v_t, test.bon(p_tx => '3005'));
+        select count(*) = 1 into v_ok from public.memberships
+         where user_id = v_fremd and tenant_id = v_t;
+        call test.check(v_ok, 'Auch der geprüfte Weg legt die Karte an');
     end;
 
     raise notice '--- Signaturpflicht bestanden ---';

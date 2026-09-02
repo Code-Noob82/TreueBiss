@@ -25,15 +25,24 @@ begin
     select stamps_per_card into v_per_card from public.tenants where id = v_tenant;
     call test.check(v_per_card = 10, 'Demo-Betrieb hat eine 10er-Karte');
 
-    -- ------------------------------------------- Ohne Mitgliedschaft: Ablehnung
+    /*
+     * Ohne Mitgliedschaft: Der erste Stempel legt die Karte an.
+     *
+     * Bis zum 02.09.2026 stand hier "wird abgelehnt". Damals entstand die
+     * Karte schon beim Oeffnen des Links - und damit zaehlte "Teilnehmer"
+     * jeden, der einmal hingeschaut hat. Jetzt entsteht sie mit dem ersten
+     * Stempel; wer nur schaut, hinterlaesst nichts.
+     */
     call auth.become(v_alice);
-    begin
-        perform * from public.issue_stamp(v_tenant, 'bon-ohne-mitgliedschaft');
-        v_ok := false;
-    exception when others then
-        v_ok := (sqlerrm like '%not a member%');
-    end;
-    call test.check(v_ok, 'Ohne Mitgliedschaft wird die Vergabe abgelehnt');
+    perform * from public.issue_stamp(v_tenant, 'bon-ohne-mitgliedschaft');
+    select count(*) = 1 into v_ok from public.memberships
+     where user_id = v_alice and tenant_id = v_tenant;
+    call test.check(v_ok, 'Der erste Stempel legt die Karte an');
+    -- Wieder aufraeumen, damit der Rest des Tests bei null anfaengt - auch
+    -- die Mitgliedschaft, sonst kollidiert das "Mitglied werden" darunter.
+    delete from public.stamps where user_id = v_alice and tenant_id = v_tenant;
+    delete from public.stamp_proofs where user_id = v_alice and tenant_id = v_tenant;
+    delete from public.memberships where user_id = v_alice and tenant_id = v_tenant;
 
     -- ------------------------------------------------------ Mitglied werden
     insert into public.memberships (user_id, tenant_id) values (v_alice, v_tenant);

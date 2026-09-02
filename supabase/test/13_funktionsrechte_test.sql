@@ -67,6 +67,7 @@ declare
         -- der Schluessel erreicht nie einen Browser.
         array['public.counter_token(uuid, int)',                      'n', 'n', 'j'],
         array['public.parse_receipt_qr(text)',                        'n', 'n', 'j'],
+        array['public.karte_anlegen_intern(uuid, uuid)',              'n', 'n', 'j'],
         array['public.issue_stamp_intern(uuid, uuid, text, text, boolean)',
                                                                       'n', 'n', 'j'],
         -- is_demo_of wird nur aus staff_redeem_voucher und
