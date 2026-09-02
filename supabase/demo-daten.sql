@@ -137,7 +137,11 @@ begin
             insert into public.stamp_proofs
                    (tenant_id, user_id, proof_ref, source, created_at, amount_cents)
                  values (v_tenant, v_user,
-                         'demo-' || i || '-' || j, 'demo',
+                         -- Gehasht wie ueberall sonst; sonst legt jeder
+                         -- Lauf wieder Klartext an, den das Schema beim
+                         -- naechsten Einspielen umschreiben muesste.
+                         encode(extensions.digest('demo-' || i || '-' || j,
+                                                  'sha256'), 'hex'), 'demo',
                          now() - make_interval(days => v_letzter + (j % greatest(v_tage,1)) * 3),
                          250 + ((i * j * 37) % 900));
         end loop;
