@@ -62,10 +62,13 @@ begin
     call test.check(v_zeilen = 1, 'Und einen Gutschein aus der vollen Runde davor');
 
     -- ---------------------------------------------- Der Umzug
-    call auth.become(v_neu);
-    set local role authenticated;
+    -- Die Mitgliedschaft ohne Rolle anlegen: Seit dem 02.09.2026 darf der
+    -- Browser diese Tabelle nicht mehr beschreiben. Im Betrieb entsteht sie
+    -- ueber activate_card, hier reicht der Aufbau ohne Rolle.
     insert into public.memberships (user_id, tenant_id) values (v_neu, v_tenant);
 
+    call auth.become(v_neu);
+    set local role authenticated;
     select tenant_slug into v_slug from public.adopt_card(v_token);
     reset role;
     call test.check(v_slug = 'token-test', 'Der Umzug nennt den Betrieb zurück');
@@ -127,8 +130,9 @@ begin
     call test.check(v_ok, 'Ein erfundener Schlüssel findet keine Karte');
 
     -- Ein Gerät, das hier selbst gesammelt hat, verliert nichts stillschweigend.
-    insert into public.memberships (user_id, tenant_id) values (v_dritt, v_tenant);
+    -- Ohne Rolle anlegen, siehe oben.
     reset role;
+    insert into public.memberships (user_id, tenant_id) values (v_dritt, v_tenant);
     call auth.become(v_dritt);
     perform public.issue_stamp(v_tenant, 'token-dritt-1');
     call auth.become(v_dritt);
@@ -155,6 +159,7 @@ begin
     reset role;
 
     -- ---------------------------------------------- Abgeschalteter Betrieb
+    reset role;
     update public.tenants set is_active = false where id = v_fremd;
     insert into public.memberships (user_id, tenant_id) values (v_neu, v_fremd)
         on conflict do nothing;

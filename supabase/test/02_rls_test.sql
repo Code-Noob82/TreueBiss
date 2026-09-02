@@ -53,11 +53,21 @@ begin
     select count(*) into v_count from public.stamps;
     call test.check(v_count = 0, 'Ein anderer Nutzer sieht Alices Stempel nicht');
 
-    -- ------------------- Mitgliedschaft: nur DO NOTHING, kein DO UPDATE
-    -- Regression aus dem Live-Test: Die App rief upsert() ohne
-    -- ignoreDuplicates auf. PostgREST macht daraus ON CONFLICT DO UPDATE,
-    -- was zusaetzlich eine update-Policy braeuchte. Folge: Der erste
-    -- App-Start klappte, jeder weitere lief in einen RLS-Fehler.
+    /*
+     * Mitgliedschaft: gar nicht mehr aus dem Browser.
+     *
+     * Hier stand bis zum 02.09.2026, dass ein upsert mit DO NOTHING
+     * durchgehen muss - die App legte die Karte selbst an. Seit
+     * activate_card das uebernimmt (und der Willkommensstempel eine
+     * Entscheidung daran haengt), schreibt der Browser diese Tabelle nicht
+     * mehr, und das Recht dazu ist entzogen.
+     *
+     * Der Entzug ist Teil des Riegels vom selben Tag: Auf stamps und
+     * vouchers standen fremde Policies aus dem Dashboard, die jedem das
+     * Eintragen erlaubten. Eine Policy allein reicht nicht - das Recht muss
+     * weg. Fuer memberships gilt dasselbe, obwohl dort keine fremde Policy
+     * lag: Was der Browser nicht braucht, soll er nicht koennen.
+     */
     reset role;
     call auth.become(v_alice);
     set local role authenticated;
@@ -66,24 +76,22 @@ begin
         insert into public.memberships (user_id, tenant_id)
         values (v_alice, v_tenant)
         on conflict (user_id, tenant_id) do nothing;
-        v_ok := true;
+        v_ok := false;
     exception when others then
-        v_ok := false;
-    end;
-    call test.check(v_ok, 'Bestehende Mitgliedschaft: ON CONFLICT DO NOTHING geht durch');
-
-    begin
-        insert into public.memberships (user_id, tenant_id)
-        values (v_alice, v_tenant)
-        on conflict (user_id, tenant_id) do update set joined_at = now();
-        v_ok := false;
-    exception when insufficient_privilege then
         v_ok := true;
     end;
-    call test.check(
-        v_ok,
-        'ON CONFLICT DO UPDATE wird abgelehnt - deshalb braucht der Client ignoreDuplicates'
-    );
+    call test.check(v_ok, 'Der Browser legt keine Mitgliedschaft mehr selbst an');
+
+    -- Ueber activate_card geht es weiterhin - sonst haette kein Kunde je eine
+    -- Karte. Die Funktion laeuft als definer und bringt das Recht mit.
+    reset role;
+    call auth.become(v_bob);
+    set local role authenticated;
+    perform public.activate_card(v_tenant);
+    reset role;
+    select count(*) into v_count from public.memberships
+     where user_id = v_bob and tenant_id = v_tenant;
+    call test.check(v_count = 1, 'Ueber activate_card entsteht sie');
 
     reset role;
     raise notice '--- RLS-Tests bestanden ---';

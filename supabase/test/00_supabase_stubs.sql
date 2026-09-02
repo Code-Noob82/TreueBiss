@@ -67,8 +67,11 @@ grant usage on schema public to anon, authenticated, service_role;
 -- anon und authenticated Tabellenrechte auf public - eingeschraenkt wird
 -- ausschliesslich ueber RLS. Ohne diese Rechte wuerde hier schon die
 -- Berechtigungspruefung greifen und die Policies blieben ungetestet.
+-- service_role muss mit. In einem echten Supabase-Projekt hat es volle
+-- Tabellenrechte; ohne das hier faellt jede Pruefung durch, die belegt, dass
+-- ein Entzug fuer anon und authenticated die Edge Functions nicht mitnimmt.
 alter default privileges in schema public
-    grant select, insert, update, delete on tables to anon, authenticated;
+    grant select, insert, update, delete on tables to anon, authenticated, service_role;
 alter default privileges in schema public
     grant usage, select on sequences to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
