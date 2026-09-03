@@ -6,4 +6,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://byte-und-handwerk.github.io/TreueBiss/sitemap.xml
+Sitemap: https://treuebiss.de/sitemap.xml

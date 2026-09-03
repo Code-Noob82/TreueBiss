@@ -3,89 +3,539 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TreueBiss</title>
+<title>TreueBiss — digitale Stempelkarte fürs Lebensmittelhandwerk</title>
 <meta name="theme-color" content="#4CAF50">
-<link rel="canonical" href="https://byte-und-handwerk.github.io/TreueBiss/">
-<meta name="description" content="Digitale Stempelkarte für das Lebensmittelhandwerk. Kundenkarte, Kasse und Verwaltung.">
+<link rel="canonical" href="https://treuebiss.de/">
+<meta name="description" content="Digitale Stempelkarte für Bäckereien, Metzgereien, Hofläden und Feinkost. Kunden installieren nichts. Stempel vergibt der Server, nie das Gerät des Kunden. Vier Wochen Praxis-Zeitraum, dann die Entscheidung.">
+<meta property="og:title" content="TreueBiss — digitale Stempelkarte fürs Lebensmittelhandwerk">
+<meta property="og:description" content="Die Papierkarte, digital. Ohne App, ohne Kundenkonto. Vier Wochen in einer Verkaufsstelle erproben, dann entscheiden.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://treuebiss.de/">
 <link rel="preload" href="gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="gemeinsam/basis.css">
 <style>
   /*
-    Diese Seite gab es bisher nicht: Pages liefert `web/` aus, und ohne
-    index.html auf oberster Ebene antwortete die Startadresse mit einer
-    GitHub-Fehlerseite. Wer die Adresse ohne Pfad tippt oder weitergibt -
-    und das passiert, sobald sie irgendwo gedruckt steht - landete im Nichts.
+    Die Produktseite von treuebiss.de.
+    ---------------------------------
+    Bis zum 03.09.2026 stand hier eine Verteilerseite mit drei Türen, und die
+    Produktseite lag auf byteundhandwerk.de/treuebiss. Mit der eigenen Domain
+    wechseln die Rollen: Hier steht jetzt das Produkt, byte & Handwerk ist der
+    Anbieter dahinter. Die drei Türen sind in die Fußzeile gewandert - Kunden
+    kommen ohnehin per QR direkt auf /app/?b=..., nicht über diese Seite.
 
-    Keine Weiterleitung auf /app/. Hier kommen zwei verschiedene Leute an:
-    Kunden, die ihre Karte suchen, und Betriebe, die sich die Oberflächen
-    ansehen wollen. Eine Weiterleitung bediente immer nur die eine Hälfte.
-
-    Indexierbar, mit Absicht. Der Einwand liegt nahe - wer die Seite über
-    eine Suche findet, hat keinen Betrieb in der Adresse und sieht keine
-    Stempel. Aber gefunden werden soll sie trotzdem: Ein Kunde, der den
-    Namen im Laden gelesen hat und ihn abends eintippt, landet sonst
-    nirgends. Und der Weg zur eigenen Karte führt ohnehin über den
-    Aufsteller am Tresen, nicht über Google.
+    Kein Analysewerkzeug, keine Einwilligungsabfrage, keine fremde Schrift.
+    Eine Seite, die Datensparsamkeit verkauft, kann schlecht selbst Besucher
+    vermessen - und müsste dann eine Cookiebox zeigen, die genau das Gegenteil
+    behauptet.
   */
+
+  /* ------------------------------------------------------------- Grundriss */
+  body { background: var(--papier); }
+  .breit { max-width: 940px; margin: 0 auto; padding: 0 var(--s5); }
+  section { padding: var(--s7) 0; }
+  .augenbraue {
+    font-size: var(--t-mikro); letter-spacing: .11em; text-transform: uppercase;
+    color: var(--tinte-leise); margin: 0 0 var(--s2);
+  }
+  h2 {
+    font-family: var(--display); font-size: var(--t-display); font-weight: 700;
+    line-height: 1.15; margin: 0 0 var(--s3); max-width: 22ch;
+  }
+  h3 {
+    font-family: var(--display); font-size: var(--t-gross); font-weight: 700;
+    line-height: 1.25; margin: 0 0 var(--s1);
+  }
+  .fuehrung { font-size: var(--t-body); line-height: 1.6; max-width: 62ch; margin: 0 0 var(--s5); }
+  p { line-height: 1.65; }
+
+  /* ------------------------------------------------------------------ Kopf */
   .kopf {
     background: var(--grund); color: var(--grund-text);
-    padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s7);
+    padding: calc(env(safe-area-inset-top) + var(--s6)) 0 var(--s7);
     border-radius: 0 0 var(--s5) var(--s5);
-    text-align: center;
   }
-  .kopf h1 { font-size: var(--t-display); font-weight: 700; margin: 0; line-height: 1.2; }
-  .kopf p {
-    margin: var(--s1) 0 0; font-size: var(--t-mikro); letter-spacing: .11em;
-    text-transform: uppercase; color: var(--grund-leise);
+  .kopf .augenbraue { color: var(--grund-leise); }
+  .kopf h1 {
+    font-family: var(--display); font-size: var(--t-display); font-weight: 700;
+    line-height: 1.12; margin: 0 0 var(--s3); max-width: 20ch;
   }
-  main { max-width: 460px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
-  .tuer { display: block; text-decoration: none; color: inherit; }
-  .tuer b {
-    display: block; font-family: var(--display);
-    font-size: var(--t-gross); font-weight: 700; line-height: 1.2;
-    margin-bottom: var(--s1);
+  .kopf h1 span { color: var(--marke); }
+  .kopf .fuehrung { color: var(--grund-leise); }
+  .knoepfe { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s5); }
+  .knopf {
+    display: inline-block; text-decoration: none; border-radius: var(--s2);
+    padding: var(--s3) var(--s4); font-weight: 600; font-size: var(--t-klein);
   }
-  .tuer span { font-size: var(--t-klein); color: var(--tinte-leise); line-height: 1.5; }
+  .knopf.voll { background: var(--marke); color: var(--marke-text); }
+  .knopf.leer { border: 1px solid var(--grund-leise); color: var(--grund-text); }
+  .versprechen { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s1); }
+  .versprechen li {
+    font-size: var(--t-klein); color: var(--grund-leise); padding-left: 1.4em;
+    position: relative;
+  }
+  .versprechen li::before {
+    content: "—"; position: absolute; left: 0; color: var(--marke);
+  }
+
+  /* ----------------------------------------------------------------- Raster */
+  .raster { display: grid; gap: var(--s3); }
+  @media (min-width: 720px) {
+    .raster.drei { grid-template-columns: repeat(3, 1fr); }
+    .raster.vier { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (min-width: 980px) { .raster.vier { grid-template-columns: repeat(4, 1fr); } }
+  .feld {
+    background: var(--karte); border: 1px solid var(--linie-zart);
+    border-radius: var(--s3); padding: var(--s4); box-shadow: var(--hoehe);
+  }
+  .feld .nr {
+    font-family: var(--display); font-size: var(--t-klein); font-weight: 700;
+    color: var(--marke); display: block; margin-bottom: var(--s1);
+  }
+  .feld p { margin: 0; font-size: var(--t-klein); color: var(--tinte-leise); }
+
+  /* ----------------------------------------------------------------- Zitat */
+  .grundsatz {
+    background: var(--gut); border-radius: var(--s3);
+    padding: var(--s5); margin: var(--s5) 0 0;
+  }
+  .grundsatz blockquote {
+    margin: 0 0 var(--s3); font-family: var(--display); font-weight: 700;
+    font-size: var(--t-gross); line-height: 1.3; color: var(--gut-text);
+  }
+  .grundsatz p { margin: 0 0 var(--s2); font-size: var(--t-klein); }
+  .grundsatz p:last-child { margin-bottom: 0; }
+
+  /* ----------------------------------------------------------------- Preise */
+  .preis { text-align: left; }
+  .preis .stufe {
+    font-size: var(--t-mikro); letter-spacing: .1em; text-transform: uppercase;
+    color: var(--tinte-leise); display: block; margin-bottom: var(--s1);
+  }
+  .preis .zahl {
+    font-family: var(--display); font-size: var(--t-display); font-weight: 700;
+    line-height: 1; margin: 0 0 var(--s2);
+  }
+  .preis .zahl small { font-size: var(--t-klein); font-weight: 400; color: var(--tinte-leise); }
+  .fussnote { font-size: var(--t-mikro); color: var(--tinte-leise); margin: var(--s3) 0 0; }
+
+  /* ------------------------------------------------------------ Prüfliste */
+  .pruefliste { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+  @media (min-width: 720px) { .pruefliste { grid-template-columns: 1fr 1fr; } }
+  .pruefliste li { font-size: var(--t-klein); padding-left: 1.6em; position: relative; }
+  .pruefliste li::before {
+    content: "✓"; position: absolute; left: 0; color: var(--marke); font-weight: 700;
+  }
+
+  /* ---------------------------------------------------------------- Fragen */
+  details {
+    background: var(--karte); border: 1px solid var(--linie-zart);
+    border-radius: var(--s2); margin-bottom: var(--s2);
+  }
+  summary {
+    cursor: pointer; padding: var(--s3) var(--s4); font-weight: 600;
+    font-size: var(--t-klein); list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: " +"; color: var(--marke); font-weight: 700; }
+  details[open] summary::after { content: " –"; }
+  details p { margin: 0; padding: 0 var(--s4) var(--s4); font-size: var(--t-klein); color: var(--tinte-leise); }
+
+  /* ----------------------------------------------------------------- Abschluss */
+  .abschluss {
+    background: var(--grund); color: var(--grund-text);
+    border-radius: var(--s4); padding: var(--s6) var(--s5); margin-bottom: var(--s7);
+  }
+  .abschluss h2 { color: var(--grund-text); }
+  .abschluss .fuehrung { color: var(--grund-leise); }
+
+  /* --------------------------------------------------------------- Fußzeile */
+  .fuss { border-top: 1px solid var(--linie); padding: var(--s6) 0 var(--s7); }
+  .tueren { display: grid; gap: var(--s2); margin-bottom: var(--s5); }
+  @media (min-width: 720px) { .tueren { grid-template-columns: repeat(3, 1fr); } }
+  .tuer {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--karte); border: 1px solid var(--linie-zart);
+    border-radius: var(--s2); padding: var(--s3) var(--s4);
+  }
+  .tuer b { display: block; font-family: var(--display); font-size: var(--t-klein); }
+  .tuer span { font-size: var(--t-mikro); color: var(--tinte-leise); }
   .tuer:hover b { color: var(--marke); }
-  .fuss {
-    max-width: 460px; margin: 0 auto; padding: 0 var(--s5) var(--s7);
-    font-size: var(--t-mikro); line-height: 1.6; color: var(--tinte-leise);
-  }
-  .fuss a { color: var(--tinte-leise); }
+  .rechts { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); margin-bottom: var(--s2); }
+  .rechts a, .fuss-text a { color: var(--tinte-leise); }
+  .fuss-text { font-size: var(--t-mikro); line-height: 1.7; color: var(--tinte-leise); margin: 0; }
 </style>
 </head>
 <body>
 
 <header class="kopf">
-  <h1>TreueBiss</h1>
-  <p>Digitale Stempelkarte</p>
+  <div class="breit">
+    <p class="augenbraue">Digitale Stempelkarte für das Lebensmittelhandwerk</p>
+    <!--
+      Bis zum 03.09.2026 stand hier "Ein Stempel, der einen Kauf voraussetzt."
+      Das stimmt seit dem Tresen-Code nicht mehr: Er belegt Anwesenheit, nicht
+      Kauf, und der Betrieb schaltet ihn bewusst ein. Was weiterhin stimmt und
+      der eigentliche Unterschied ist: Der Kunde kann sich selbst keinen
+      Stempel geben.
+    -->
+    <h1>Ein Stempel, den sich <span>niemand selbst</span> geben kann.</h1>
+    <p class="fuehrung">
+      TreueBiss ersetzt die Papierkarte an der Theke — für Bäckereien,
+      Metzgereien, Hofläden, Feinkost und Marktstände. Ihre Kunden brauchen
+      keine Installation und kein Konto. Vergeben wird jeder Stempel auf dem
+      Server, und nur gegen einen Nachweis, den der Betrieb kontrolliert. Vor
+      einer dauerhaften Nutzung steht ein begrenzter Praxis-Zeitraum in einer
+      Verkaufsstelle, an dessen Ende Zahlen stehen statt eines Gefühls.
+    </p>
+    <div class="knoepfe">
+      <a class="knopf voll" href="#termin">Zwanzig Minuten sprechen</a>
+      <a class="knopf leer" href="#preise">Preise ansehen</a>
+    </div>
+    <ul class="versprechen">
+      <li>Keine App-Installation für Ihre Kunden</li>
+      <li>Keine Namen, keine Adressen, kein Kundenkonto</li>
+      <li>Monatlich kündbar, keine Einrichtungsgebühr</li>
+    </ul>
+  </div>
 </header>
 
-<main>
-  <a class="karte tuer" href="app/">
-    <b>Deine Stempelkarte</b>
-    <span>Für Kundinnen und Kunden. Ohne Installation, ohne Konto — den
-    Zugang gibt es über den QR-Code am Tresen oder den Link des Betriebs.</span>
-  </a>
+<section class="breit">
+  <p class="augenbraue">Vor jeder Lösung</p>
+  <h2>Eine volle Kartenbox ist noch kein Beleg für Kundenbindung.</h2>
+  <p class="fuehrung">
+    Papierkarten funktionieren — bis jemand fragt, was sie gebracht haben.
+    Dann fehlen die Zahlen. Eine digitale Karte liefert sie, verschiebt das
+    Problem aber, wenn der Stempel weiterhin an nichts hängt.
+  </p>
+  <div class="raster drei">
+    <div class="feld">
+      <span class="nr">01</span>
+      <h3>Was die Papierkarte nicht zeigt</h3>
+      <p>Wie viele Karten laufen gerade, wie viele werden je eingelöst und wie
+      oft kommt jemand wegen der Karte ein zweites Mal? Aus dem Karton hinter
+      der Theke lässt sich das nicht ablesen.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">02</span>
+      <h3>Was eine App allein nicht löst</h3>
+      <p>Wird der Stempel per Knopfdruck vergeben, ist er ein Rabatt ohne
+      Gegenleistung. Er lässt sich verschenken, doppelt geben und nach einer
+      Neuinstallation neu einsammeln.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">03</span>
+      <h3>Was die Ketten längst haben</h3>
+      <p>Große Filialisten geben Treueprogramme aufs Handy und sehen jeden
+      Einlösevorgang. Der Einzelbetrieb konkurriert um dieselben Kunden — mit
+      einem Stempelkissen.</p>
+    </div>
+  </div>
+  <div class="grundsatz">
+    <blockquote>„Nicht die App ist die erste Frage. Sondern: Kommt der Kunde
+    deswegen wieder?“</blockquote>
+    <p>TreueBiss unterstellt nicht, dass jeder Betrieb eine digitale Karte
+    braucht. Wer heute wenige Karten ausgibt und kaum Einlösungen sieht, hat
+    kein Werkzeugproblem, sondern ein Angebotsproblem — daran ändert eine App
+    nichts.</p>
+    <p>Das Ergebnis eines Praxis-Zeitraums darf deshalb ausdrücklich lauten:
+    Die Papierkarte reicht, oder die Prämie muss sich ändern, bevor über
+    Technik gesprochen wird.</p>
+  </div>
+</section>
 
-  <a class="karte neben tuer" href="kasse/">
-    <b>Kasse</b>
-    <span>Für das Verkaufsteam: Gutschein einlösen und den Tresen-Code zeigen.</span>
-  </a>
+<section class="breit">
+  <p class="augenbraue">Der Unterschied steckt in einem Schritt</p>
+  <h2>So entsteht ein Stempel.</h2>
+  <p class="fuehrung">
+    Die Karte auf dem Handy des Kunden darf Stempel weder anlegen noch
+    verändern. Sie fragt nur an. Vergeben wird auf dem Server, gegen einen
+    Nachweis, der genau einmal zählt.
+  </p>
+  <div class="raster vier">
+    <div class="feld">
+      <span class="nr">01</span>
+      <h3>Karte öffnen</h3>
+      <p>Der Kunde scannt den Aufsteller an der Theke und hat die Karte im
+      Browser. Kein Store, keine Installation, kein Konto — auf iPhone wie auf
+      Android.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">02</span>
+      <!--
+        Hieß "Kauf nachweisen" und behauptete, beide Wege belegten einen
+        Einkauf. Der Tresen-Code belegt Anwesenheit. Der Unterschied gehört
+        offen benannt, sonst steht er beim ersten Rückfragen im Raum.
+      -->
+      <h3>Nachweis vorlegen</h3>
+      <p>Entweder über den QR-Code auf dem Kassenbon — der belegt einen
+      Einkauf. Oder über einen Tresen-Code, der sich fortlaufend ändert; der
+      belegt, dass jemand im Laden stand. Welcher Weg zählt, entscheidet der
+      Betrieb.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">03</span>
+      <h3>Server prüft und vergibt</h3>
+      <p>Derselbe Bon zählt genau einmal — auch dann, wenn er auf einem zweiten
+      Handy erneut eingereicht wird. Der Stempel entsteht in der Datenbank,
+      nicht auf dem Gerät.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">04</span>
+      <h3>Prämie einlösen</h3>
+      <p>Die volle Karte wird automatisch zum Gutschein. Eingelöst wird er an
+      der Kasse mit einem Code, den nur der Betrieb kennt und jederzeit selbst
+      ändern kann.</p>
+    </div>
+  </div>
+</section>
 
-  <a class="karte neben tuer" href="verwaltung/">
-    <b>Verwaltung</b>
-    <span>Für den Betrieb: Kennzahlen, Kartengröße, Prämie und Angebote.</span>
-  </a>
-</main>
+<section class="breit">
+  <p class="augenbraue">Was der Betrieb selbst einstellt</p>
+  <h2>Die Regeln gehören Ihnen, nicht der Software.</h2>
+  <p class="fuehrung">
+    Kartengröße, Prämie, Gültigkeit, Angebote und der Einlösecode werden in
+    einer eigenen Verwaltungsseite gepflegt — ohne Rückfrage und ohne
+    Wartezeit. Farbe und Name des Betriebs bestimmen, wie die Karte beim
+    Kunden aussieht. Am Ende zählen drei Zahlen:
+  </p>
+  <div class="raster drei">
+    <div class="feld">
+      <span class="nr">01</span>
+      <h3>Ausgabe und Nutzung</h3>
+      <p>Wie viele Karten laufen, wie weit sind sie gefüllt und wie viele
+      erreichen überhaupt die Prämie.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">02</span>
+      <h3>Einlösung</h3>
+      <p>Wie viele Gutscheine tatsächlich an der Kasse eingelöst werden — und
+      wie viele verfallen.</p>
+    </div>
+    <div class="feld">
+      <span class="nr">03</span>
+      <h3>Aufwand an der Theke</h3>
+      <p>Wie viele Sekunden der Vorgang im Verkauf kostet. Was den Ablauf
+      bremst, wird nicht durchgehalten.</p>
+    </div>
+  </div>
+</section>
 
-<p class="fuss">
-  TreueBiss ist ein Angebot von
-  <a href="https://byteundhandwerk.de/treuebiss">byte &amp; Handwerk</a>.
-  Ohne Betrieb in der Adresse zeigt die Kundenkarte keine Stempel — sie
-  gehört immer zu genau einem Laden.
-</p>
+<section class="breit">
+  <p class="augenbraue">Der erste Schritt bei bestätigtem Interesse</p>
+  <h2>Ein begrenzter Praxis-Zeitraum in einer Verkaufsstelle.</h2>
+  <p class="fuehrung">
+    Eingerichtet wird ein Betrieb, nicht ein Vertrag. Am Ende steht eine
+    schriftliche Einordnung, ob sich der Weiterbetrieb rechnet — auf Grundlage
+    der Zahlen aus Ihrem eigenen Laden.
+  </p>
+  <ul class="pruefliste">
+    <li>Betrieb anlegen: Name, Farbe, Kartengröße, Prämie und Einlösecode</li>
+    <li>Vergabeweg klären: QR auf dem Kassenbon oder Aufsteller am Tresen</li>
+    <li>Aufsteller und eine kurze Einweisung für das Verkaufsteam</li>
+    <li>laufender Blick auf ausgegebene Karten, Füllstand und Einlösungen</li>
+    <li>schriftliche Einordnung am Ende: weiterbetreiben, Prämie ändern oder lassen</li>
+    <li>keine Pflicht zur Fortsetzung, keine Kündigung nötig</li>
+  </ul>
+  <p class="fussnote">
+    Der Praxis-Zeitraum selbst kostet nichts. Was der Weiterbetrieb kostet,
+    steht unten offen in der Preistabelle. Die Dauer richtet sich danach, wie
+    schnell genug Karten im Umlauf sind, um etwas ablesen zu können.
+  </p>
+</section>
+
+<section class="breit" id="preise">
+  <p class="augenbraue">Preise</p>
+  <h2>Was es kostet, steht hier.</h2>
+  <p class="fuehrung">
+    Gestaffelt nach Verkaufsstellen, nicht nach Kundenzahl. Wie viele Menschen
+    mitmachen, kostet nichts extra — TreueBiss speichert weder Namen noch
+    Adressen und verschickt weder E-Mails noch Push-Nachrichten. Monatlich
+    kündbar, keine Einrichtungsgebühr.
+  </p>
+  <div class="raster drei">
+    <div class="feld preis">
+      <span class="stufe">Eine Verkaufsstelle</span>
+      <p class="zahl">39 €<small> im Monat</small></p>
+      <p>Für den Einzelstandort. Unbegrenzt viele Karten, unbegrenzt viele
+      Kunden, alle Funktionen ohne Ausnahme.</p>
+    </div>
+    <div class="feld preis">
+      <span class="stufe">Bis 5 Verkaufsstellen</span>
+      <p class="zahl">79 €<small> im Monat</small></p>
+      <p>Der übliche Zuschnitt: Auf einen Bäckereibetrieb kommen im Schnitt
+      rund fünf Verkaufsstellen. Jede mit eigenem Aufsteller, für den Kunden
+      eine gemeinsame Karte.</p>
+    </div>
+    <div class="feld preis">
+      <span class="stufe">Bis 15 Verkaufsstellen</span>
+      <p class="zahl">119 €<small> im Monat</small></p>
+      <p>Für den kleinen Filialisten. Darüber hinaus nach Absprache — ab dieser
+      Größe hängt der Aufwand am Vergabeweg, nicht mehr an der Zahl der
+      Läden.</p>
+    </div>
+  </div>
+  <p class="fussnote">
+    Alle Preise sind Endpreise. Nach § 19 UStG wird keine Umsatzsteuer
+    ausgewiesen. Vor dem ersten bezahlten Monat steht der kostenlose
+    Praxis-Zeitraum in einer Verkaufsstelle.
+  </p>
+</section>
+
+<section class="breit">
+  <p class="augenbraue">Voraussetzungen im Betrieb</p>
+  <h2>Eine Karte trägt nur, wenn sie jemand anbietet.</h2>
+  <p class="fuehrung">
+    Die Technik ist der kleinere Teil. Entscheidend ist, ob im Verkauf jemand
+    die Karte anspricht und die Prämie erkennt, wenn sie vorgezeigt wird.
+    Fehlt das, wird auch die beste Karte nicht benutzt.
+  </p>
+  <ul class="pruefliste">
+    <li>wiederkehrender Kundenstamm am selben Verkaufsort</li>
+    <li>eine Prämie, die den Aufwand für den Kunden wert ist</li>
+    <li>Verkaufsteam, das die Karte aktiv anspricht</li>
+    <li>Kassenbon mit QR-Code — oder Platz für einen Aufsteller am Tresen</li>
+    <li>eine Person, die Prämien an der Kasse abwickelt</li>
+    <li>Bereitschaft, die Regeln nach dem Zeitraum zu ändern</li>
+  </ul>
+</section>
+
+<section class="breit">
+  <p class="augenbraue">Warum byte &amp; Handwerk?</p>
+  <!--
+    Hier stand "Ich habe selbst hinter der Theke gestanden." Dominik hat den
+    Satz am 02.09.2026 als erfunden bezeichnet - er stand nie hinter der
+    Theke. Die gelernte Ausbildung stimmt, die Theke nicht.
+  -->
+  <h2>Ich habe das Handwerk gelernt, bevor ich Software dafür gebaut habe.</h2>
+  <p class="fuehrung">
+    Ich bin Dominik Baki, gelernter Bäcker und App-Entwickler. TreueBiss ist
+    aus dieser Doppelperspektive entstanden: Was an der Kasse drei Sekunden zu
+    lang dauert, wird im Alltag nicht gemacht — ganz gleich, wie gut es
+    gedacht war.
+  </p>
+  <p class="fuehrung">
+    Deshalb steht am Anfang kein Vertrag, sondern ein Zeitraum im echten
+    Betrieb. Er darf ausdrücklich zu dem Ergebnis führen, dass sich der
+    Weiterbetrieb nicht lohnt.
+  </p>
+</section>
+
+<section class="breit">
+  <p class="augenbraue">Kurz und konkret</p>
+  <h2>Häufige Fragen zur digitalen Stempelkarte.</h2>
+
+  <details>
+    <summary>Müssen unsere Kunden etwas installieren?</summary>
+    <p>Nein. Die Karte läuft im Browser und wird über einen QR-Code am Tresen
+    geöffnet. Wer möchte, legt sie zusätzlich als Pass in Apple Wallet oder
+    Google Wallet ab — das ist freiwillig und für die Nutzung nicht nötig.</p>
+  </details>
+
+  <details>
+    <summary>Brauchen wir eine neue Kasse?</summary>
+    <p>Nein. Druckt Ihre Kasse einen QR-Code auf den Bon, wird dieser genutzt.
+    Druckt sie keinen, übernimmt ein Aufsteller am Tresen die Vergabe. In die
+    Kasse selbst wird nicht eingegriffen.</p>
+  </details>
+
+  <details>
+    <summary>Setzt jeder Stempel einen Kauf voraus?</summary>
+    <p>Beim Kassenbon ja. Der Tresen-Code belegt dagegen nur, dass jemand im
+    Laden war — er ist für Betriebe gedacht, deren Kasse keinen QR-Code
+    druckt, und der Betrieb schaltet ihn selbst ein oder aus. In den Zahlen
+    stehen beide Wege getrennt, damit „Stempel pro Tag“ nicht mit etwas
+    steigt, für das niemand etwas gekauft hat.</p>
+  </details>
+
+  <details>
+    <summary>Kann sich jemand mehrere Karten anlegen und doppelt sammeln?</summary>
+    <p>Beim Kassenbon nicht: Ein Bon wird genau einmal gezählt, unabhängig
+    davon, auf welchem Gerät oder in welchem Browser er eingereicht wird. Beim
+    Tresen-Code und bei einlösbaren Angeboten gilt die Begrenzung je Karte.
+    Wer sich eine zweite Karte anlegt, fängt dort bei null an und muss für
+    jeden weiteren Stempel erneut im Laden stehen.</p>
+  </details>
+
+  <details>
+    <summary>Was passiert bei einem neuen Handy?</summary>
+    <p>Die Karte lässt sich mit einem Code aus der alten Karte auf das neue
+    Gerät übertragen. Ohne diesen Code bleibt der Stand auf dem alten Gerät —
+    das ist beabsichtigt, weil sonst jeder fremde Karten übernehmen könnte.</p>
+  </details>
+
+  <details>
+    <summary>Welche Daten werden über unsere Kunden gespeichert?</summary>
+    <p>Kein Name, keine Adresse, keine E-Mail und kein Kundenkonto. Gespeichert
+    werden die Karte selbst und der Nachweis, dass ein Stempel berechtigt war.
+    Bei Nachweisen über den Kassenbon werden Betrag und Kassennummer nach einer
+    eingestellten Frist automatisch geleert und der Nachweis danach
+    gelöscht.</p>
+  </details>
+
+  <details>
+    <summary>Was kostet das?</summary>
+    <p>39 Euro im Monat für eine Verkaufsstelle, 79 Euro bis fünf, 119 Euro bis
+    fünfzehn — unabhängig davon, wie viele Kunden mitmachen. Monatlich kündbar,
+    keine Einrichtungsgebühr. Davor steht ein kostenloser Praxis-Zeitraum in
+    einer Verkaufsstelle. Nach § 19 UStG wird keine Umsatzsteuer
+    ausgewiesen.</p>
+  </details>
+</section>
+
+<section class="breit" id="termin">
+  <div class="abschluss">
+    <p class="augenbraue" style="color: var(--grund-leise)">Erst erproben, dann binden</p>
+    <h2>Lohnt sich eine digitale Karte für Ihren Betrieb?</h2>
+    <p class="fuehrung">
+      In zwanzig Minuten klären wir, wie Ihre Karte heute läuft, was Ihre Kasse
+      liefert und ob ein Praxis-Zeitraum der passende nächste Schritt ist. Das
+      Ergebnis darf auch sein, dass die Papierkarte vorerst reicht.
+    </p>
+    <div class="knoepfe">
+      <a class="knopf voll" href="tel:+4962143755044">0621 437 550 44</a>
+      <a class="knopf leer" href="mailto:dominik.baki@byteundhandwerk.de">Kurz schreiben</a>
+    </div>
+  </div>
+</section>
+
+<footer class="fuss">
+  <div class="breit">
+    <!--
+      Die drei Türen. Bis zum 03.09.2026 waren sie der ganze Inhalt dieser
+      Seite. Sie bleiben erreichbar, stehen aber nicht mehr im Weg: Kunden
+      kommen per QR direkt auf /app/?b=..., das Verkaufsteam kennt seine
+      Adresse, und wer hier landet, sucht das Produkt.
+    -->
+    <div class="tueren">
+      <a class="tuer" href="app/">
+        <b>Deine Stempelkarte</b>
+        <span>Für Kundinnen und Kunden. Zugang über den QR-Code am Tresen.</span>
+      </a>
+      <a class="tuer" href="kasse/">
+        <b>Kasse</b>
+        <span>Fürs Verkaufsteam: Gutschein einlösen, Tresen-Code zeigen.</span>
+      </a>
+      <a class="tuer" href="verwaltung/">
+        <b>Verwaltung</b>
+        <span>Für den Betrieb: Kennzahlen, Kartengröße, Prämie, Angebote.</span>
+      </a>
+    </div>
+
+    <!--
+      Die Rechtsseiten stehen erst in der Fußzeile, wenn Text darin steht. Eine
+      verlinkte Seite mit Platzhalter sieht aus, als wäre die Pflicht erfüllt.
+      Siehe rechtstexte/README.md.
+    -->
+
+    <p class="fuss-text">
+      TreueBiss ist ein Produkt von
+      <a href="https://byteundhandwerk.de">byte &amp; Handwerk</a>,
+      Inhaber Dominik Baki, Alsenweg 64, 68305 Mannheim.
+      Telefon <a href="tel:+4962143755044">0621 437 550 44</a>.
+    </p>
+  </div>
+</footer>
 
 </body>
 </html>

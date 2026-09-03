@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Datenschutz in der App — TreueBiss</title>
+<meta name="theme-color" content="#4CAF50">
+<link rel="canonical" href="https://treuebiss.de/datenschutz-app/">
+<meta name="description" content="Was die Stempelkarte selbst verarbeitet: die Karte und der Nachweis, dass ein Stempel berechtigt war.">
+<meta name="robots" content="index, follow">
+<link rel="preload" href="../gemeinsam/fonts/familjen-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../gemeinsam/fonts/public-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../gemeinsam/basis.css">
+<style>
+  /*
+    Rechtsseite. Keine Einwilligungsabfrage, kein Analysewerkzeug - auf
+    treuebiss.de laeuft nichts davon, und eine Rechtsseite waere der letzte
+    Ort, an dem damit angefangen wird.
+
+    Der Textblock kommt von der IT-Recht Kanzlei. Ihr Skript ersetzt den
+    leeren div durch den hinterlegten Text; die Adresse ist je Rechtstext eine
+    andere und steht im Mandantenportal.
+  */
+  .kopf {
+    background: var(--grund); color: var(--grund-text);
+    padding: calc(env(safe-area-inset-top) + var(--s5)) var(--s5) var(--s6);
+    border-radius: 0 0 var(--s5) var(--s5);
+  }
+  .kopf a {
+    color: var(--grund-leise); text-decoration: none;
+    font-size: var(--t-mikro); letter-spacing: .11em; text-transform: uppercase;
+  }
+  .kopf h1 {
+    font-size: var(--t-gross); font-weight: 700; margin: var(--s2) 0 0;
+    line-height: 1.2;
+  }
+  main { max-width: 760px; margin: calc(var(--s6) * -1) auto 0; padding: 0 var(--s5) var(--s7); }
+  .itrk-legaltext { font-size: var(--t-klein); line-height: 1.65; }
+  .itrk-legaltext h1, .itrk-legaltext h2, .itrk-legaltext h3 {
+    font-family: var(--display); line-height: 1.25; margin: var(--s5) 0 var(--s2);
+  }
+  .itrk-legaltext h1 { font-size: var(--t-gross); }
+  .itrk-legaltext h2 { font-size: var(--t-body); }
+  .itrk-legaltext h3 { font-size: var(--t-klein); }
+  .itrk-legaltext p, .itrk-legaltext li { margin: 0 0 var(--s2); }
+  .itrk-legaltext a { color: var(--marke); overflow-wrap: anywhere; }
+  .fuss {
+    max-width: 760px; margin: 0 auto; padding: 0 var(--s5) var(--s7);
+    font-size: var(--t-mikro); line-height: 1.7; color: var(--tinte-leise);
+  }
+  .fuss a { color: var(--tinte-leise); }
+  .fuss nav { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s3); margin-bottom: var(--s2); }
+</style>
+</head>
+<body>
+
+<header class="kopf">
+  <a href="/">TreueBiss</a>
+  <h1>Datenschutz in der App</h1>
+</header>
+
+<main>
+
+  <!--
+    PLATZHALTER - vor dem Livegang loeschen.
+
+    Eine erreichbare Rechtsseite ohne Text ist schlechter als gar keine: Sie
+    sieht aus, als waere die Pflicht erfuellt. Solange dieser Block steht,
+    gehoert die Seite nicht in die Fusszeile und nicht in config.js.
+  -->
+  <div class="karte">
+    <b>Dieser Text ist noch nicht hinterlegt.</b>
+    <p class="leer-text">Er wird über die IT-Recht Kanzlei erstellt und
+    erscheint hier, sobald die Adresse aus dem Mandantenportal eingesetzt
+    ist.</p>
+  </div>
+
+  <!--
+    Der Textblock der IT-Recht Kanzlei.
+
+    data-itrk-legaltext-url ist je Rechtstext eine andere Adresse. Wird die der
+    Website-Datenschutzerklaerung wiederverwendet, steht hier der falsche Text,
+    und zwar unauffaellig.
+  -->
+  <div class="itrk-legaltext" data-itrk-legaltext-url=""></div>
+  <script src="https://www.it-recht-kanzlei.de/js/itrk-legaltext.js"></script>
+
+</main>
+
+<p class="fuss">
+  <nav>
+    <a href="/impressum/">Impressum</a>
+    <a href="/datenschutz/">Datenschutz</a>
+    <a href="/datenschutz-app/">Datenschutz in der App</a>
+    <a href="/agb/">AGB</a>
+  </nav>
+  TreueBiss ist ein Produkt von byte &amp; Handwerk, Inhaber Dominik Baki.
+</p>
+
+</body>
+</html>

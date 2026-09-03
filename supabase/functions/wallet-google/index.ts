@@ -15,7 +15,7 @@
  *   supabase secrets set GOOGLE_WALLET_ISSUER_ID=...
  *   supabase secrets set GOOGLE_WALLET_SA_EMAIL=...
  *   supabase secrets set GOOGLE_WALLET_SA_KEY="-----BEGIN PRIVATE KEY-----..."
- *   supabase secrets set APP_BASIS_URL=https://byte-und-handwerk.github.io/TreueBiss/app/
+ *   supabase secrets set APP_BASIS_URL=https://treuebiss.de/app/
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
