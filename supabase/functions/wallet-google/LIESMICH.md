@@ -63,7 +63,7 @@ Aus der JSON-Datei werden zwei Werte gebraucht: `client_email` und
 supabase secrets set GOOGLE_WALLET_ISSUER_ID=3388000000012345678
 supabase secrets set GOOGLE_WALLET_SA_EMAIL=dienst@projekt.iam.gserviceaccount.com
 supabase secrets set GOOGLE_WALLET_SA_KEY="$(python3 -c "import json,sys; print(json.load(open('schluessel.json'))['private_key'])")"
-supabase secrets set APP_BASIS_URL=https://byte-und-handwerk.github.io/TreueBiss/app/
+supabase secrets set APP_BASIS_URL=https://treuebiss.de/app/
 ```
 
 Der Schlüssel steht in der JSON-Datei mit `\n` als **zwei Zeichen**. Das
